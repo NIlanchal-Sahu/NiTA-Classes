@@ -1,10 +1,9 @@
 import { WHATSAPP_NUMBER } from '../config'
-const PHONE_DISPLAY = '+91 98765 43210'
+const PHONE_DISPLAY = '+91 9986437890'
 const EMAIL = 'contact@nitaclasses.com'
 const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}`
 
-// Replace with your actual location embed URL from Google Maps
-const MAP_EMBED_URL = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3502.268829665!2d77.209!3d28.6139!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjjCsDM2JzUwLjAiTiA3N8KwMTInMzIuNCJF!5e0!3m2!1sen!2sin!4v1234567890'
+const MAP_EMBED_URL = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d915.1425088800215!2d84.59704753701129!3d19.20250970258267!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a3d3fb5981a5b6f%3A0xe896c2770f11714b!2sNBCE%20Chikiti%20%2B%20NITA%20-%20AI%20Tuition!5e0!3m2!1sen!2sin!4v1773998935518!5m2!1sen!2sin'
 
 export default function Contact() {
   return (
@@ -16,7 +15,7 @@ export default function Contact() {
         <div className="space-y-6">
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Phone</h3>
-            <a href={`tel:${WHATSAPP_NUMBER}`} className="mt-1 block text-lg font-medium text-primary-600 hover:underline">
+            <a href="tel:+919986437890" className="mt-1 block text-lg font-medium text-primary-600 hover:underline">
               {PHONE_DISPLAY}
             </a>
           </div>
@@ -54,7 +53,7 @@ export default function Contact() {
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
-          <p className="mt-2 text-sm text-gray-500">Update the map embed URL in Contact.jsx with your actual address.</p>
+          <p className="mt-2 text-sm text-gray-500">NBCE Chikiti + NITA - AI Tuition</p>
         </div>
       </div>
     </div>

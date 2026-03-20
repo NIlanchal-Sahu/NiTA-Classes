@@ -1,15 +1,62 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { WHATSAPP_NUMBER, LOGO_SRC, PROGRAM_START_DATE, WHATSAPP_CTA } from '../config'
+import {
+  WHATSAPP_NUMBER,
+  LOGO_SRC,
+  PROGRAM_START_DATE,
+  WHATSAPP_CTA,
+} from '../config'
 
 const showcase = [
-  { id: 'dca', title: 'DCA: Computer + MS Office + AI Basics', img: '/qr-dummy.png', to: '/courses#dca' },
-  { id: 'cca', title: 'CCA: Advanced Course + Govt Certification', img: '/qr-dummy.png', to: '/courses#cca' },
-  { id: 'spoken', title: 'Spoken English Mastery: Speaking & Confidence', img: '/qr-dummy.png', to: '/courses#spoken-english-mastery' },
-  { id: 'ai', title: 'AI Associate: Python + ML + Data Science', img: '/qr-dummy.png', to: '/courses#ai-associate' },
-  { id: 'video', title: 'AI Video Creation: Prompts + UGC + Masterclass', img: '/qr-dummy.png', to: '/courses#ai-video-creation' },
-  { id: 'vvip', title: 'VVIP Offer: Unlimited classes for ₹699 / month', img: '/qr-dummy.png', to: '/student/pay' },
+  {
+    id: 'dca',
+    title: 'DCA: Computer + MS Office + AI Basics',
+    to: '/courses#dca',
+    icon: '💻',
+    visual: 'Computer Fundamentals',
+    bgClass: 'from-blue-100 via-indigo-100 to-sky-100',
+  },
+  {
+    id: 'cca',
+    title: 'CCA: Advanced Course + Govt Certification',
+    to: '/courses#cca',
+    icon: '🧠',
+    visual: 'Advanced Computer Skills',
+    bgClass: 'from-violet-100 via-fuchsia-100 to-indigo-100',
+  },
+  {
+    id: 'spoken',
+    title: 'Spoken English Mastery: Speaking & Confidence',
+    to: '/courses#spoken-english-mastery',
+    icon: '🎤',
+    visual: 'Communication Practice',
+    bgClass: 'from-emerald-100 via-teal-100 to-cyan-100',
+  },
+  {
+    id: 'ai',
+    title: 'AI Associate: Python + AI Development',
+    to: '/courses#ai-associate',
+    icon: '🤖',
+    visual: 'Python + AI/ML Projects',
+    bgClass: 'from-orange-100 via-amber-100 to-yellow-100',
+  },
+  {
+    id: 'video',
+    title: 'AI Video Creation: Prompts + UGC + Masterclass',
+    to: '/courses#ai-video-creation',
+    icon: '🎬',
+    visual: 'Prompt to Video Workflow',
+    bgClass: 'from-pink-100 via-rose-100 to-purple-100',
+  },
+  {
+    id: 'vvip',
+    title: 'VVIP Offer: Unlimited classes for ₹699 / month',
+    to: '/student/pay',
+    icon: '👑',
+    visual: 'Unlimited Learning Access',
+    bgClass: 'from-yellow-100 via-amber-100 to-orange-100',
+  },
 ]
 
 const testimonials = [
@@ -33,15 +80,30 @@ const testimonials = [
     name: 'AI Associate Student',
     text: 'Python + machine learning topics were taught clearly. The course structure and practice made it easy to understand.',
   },
+  {
+    id: 't5',
+    name: 'AI Video Creation Student',
+    text: 'I learned prompt writing, product ads, and UGC video creation with step-by-step practical sessions.',
+  },
+  {
+    id: 't6',
+    name: 'OAV ICT Student',
+    text: 'OAV ICT classes improved my computer confidence and helped me perform better in school IT practicals.',
+  },
+  {
+    id: 't7',
+    name: '+2 IT Student',
+    text: 'The +2 IT support sessions made difficult chapters easy and helped me prepare with confidence for exams.',
+  },
 ]
 
 const features = [
   { id: 'f1', title: '₹10 Per Class Model', desc: 'Affordable learning with transparent per-class fees.' },
-  { id: 'f2', title: 'Enrollment Fees by Course', desc: 'DCA ₹499, CCA ₹999, Spoken English ₹499, AI Associate ₹1499, AI Video ₹499.' },
+  { id: 'f2', title: 'No Skill Limit', desc: 'Basic to Advanced Computer Skill, Spoken English, AI Video Cration, AI Development with Python.' },
   { id: 'f3', title: 'Urgent Certification', desc: 'DCA/CCA in 45 days, Spoken English in 30 days, AI Associate in 100 days, AI Video in 15 days.' },
-  { id: 'f4', title: 'Govt Certification Support', desc: 'NSDC/NIELIT supported courses with verification on DigiLocker (where applicable).' },
+  { id: 'f4', title: 'Govt Certification', desc: 'NSDC/NIELIT supported courses with verification on DigiLocker App.' },
   { id: 'f5', title: 'VVIP Unlimited Plan', desc: '₹699 for one month unlimited classes (no ₹10 fee during validity).' },
-  { id: 'f6', title: 'WhatsApp Support', desc: 'Batch updates, reminders, and support on WhatsApp.' },
+  { id: 'f6', title: 'WhatsApp & Web APP', desc: 'Batch updates, reminders, and Notes on WhatsApp.' },
 ]
 
 const ROTATING_SKILLS = [
@@ -58,6 +120,11 @@ export default function Home() {
   const [skillIndex, setSkillIndex] = useState(0)
   const [typedSkill, setTypedSkill] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [testimonialIndex, setTestimonialIndex] = useState(0)
+  const [typedWordCount, setTypedWordCount] = useState(0)
+  const [testiFade, setTestiFade] = useState(false)
+  const [ctaVisible, setCtaVisible] = useState(false)
+  const ctaSectionRef = useRef(null)
 
   useEffect(() => {
     const current = ROTATING_SKILLS[skillIndex]
@@ -85,6 +152,42 @@ export default function Home() {
     return () => clearTimeout(timer)
   }, [typedSkill, deleting, skillIndex])
 
+  const activeTestimonial = testimonials[testimonialIndex]
+  const words = activeTestimonial.text.split(' ')
+  const typedComment = words.slice(0, typedWordCount).join(' ')
+
+  useEffect(() => {
+    if (typedWordCount < words.length) {
+      const timer = setTimeout(() => setTypedWordCount((n) => n + 1), 120)
+      return () => clearTimeout(timer)
+    }
+    const hold = setTimeout(() => setTestiFade(true), 1800)
+    return () => clearTimeout(hold)
+  }, [typedWordCount, words.length, testimonialIndex])
+
+  useEffect(() => {
+    if (!testiFade) return
+    const timer = setTimeout(() => {
+      setTestimonialIndex((i) => (i + 1) % testimonials.length)
+      setTypedWordCount(0)
+      setTestiFade(false)
+    }, 420)
+    return () => clearTimeout(timer)
+  }, [testiFade])
+
+  useEffect(() => {
+    const node = ctaSectionRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setCtaVisible(true)
+      },
+      { threshold: 0.2 },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <>
       {/* Hero */}
@@ -93,14 +196,14 @@ export default function Home() {
 
         <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/90">
-            <span>ONLY 47 SEATS LEFT</span>
+            <span>Addimission Open - 07:00 AM - 08:00 PM</span>
           </div>
 
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
             <div>
               <div className="flex items-center gap-3">
                 <img src={LOGO_SRC} alt="NITA Classes logo" className="h-10 w-auto" />
-                <p className="text-sm text-primary-100/80 sm:text-base">Program starts: {PROGRAM_START_DATE}</p>
+                <p className="text-sm text-primary-100/80 sm:text-base">Classes are running from : {PROGRAM_START_DATE}</p>
               </div>
               <h1 className="mt-4 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-6xl">
                 <span className="block">Build Skills</span>
@@ -111,7 +214,7 @@ export default function Home() {
                 <span className="mt-1 block">That Get You Hired</span>
               </h1>
               <p className="mt-4 text-lg font-semibold text-primary-100 sm:text-xl">
-                at just ₹10 per class
+                Just at Rupees ₹10 per class
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -131,14 +234,18 @@ export default function Home() {
 
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { label: '7 Days', value: '7' },
-                  { label: 'No Experience', value: '0' },
-                  { label: 'LIVE Support', value: '1' },
-                  { label: 'From', value: '₹10' },
+                  { title: 'DCA', subtitle: 'Basic Computer + AI' },
+                  { title: 'CCA', subtitle: 'Advanced Computer Course + AI' },
+                  { title: 'AI / ML', subtitle: 'AI development with Python' },
+                  { title: 'AI Video Creation', subtitle: 'Write Prompt Get Video in minutes' },
+                  { title: 'DEO', subtitle: 'Data Entry Operator - 30 Days' },
+                  { title: 'Spoken English', subtitle: 'Speak with Confidence' },
+                  { title: 'OAV - IT', subtitle: 'OAV & Govt. School IT Classes' },
+                  { title: '+2 IT', subtitle: '+2 Arts & Science IT Class' },
                 ].map((x) => (
-                  <div key={x.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-xl font-bold text-white">{x.value}</div>
-                    <div className="mt-1 text-xs text-white/70">{x.label}</div>
+                  <div key={x.title} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-sm font-bold leading-tight text-white sm:text-base">{x.title}</div>
+                    <div className="mt-1 text-xs text-white/70">{x.subtitle}</div>
                   </div>
                 ))}
               </div>
@@ -195,6 +302,40 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Trust & Recognition */}
+      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1.2fr,1fr] lg:items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Certification by NSDC and Skill India </h2>
+              <p className="mt-2 text-gray-700">
+                Selected Courses at NITA Classes are aligned with <span className="font-semibold">NSQF Level 4</span> and
+                follow an industry-ready structure. For applicable courses, certification is recognized under
+                <span className="font-semibold"> NSDC </span> and <span className="font-semibold"> Skill India </span> under the
+                <span className="font-semibold"> Ministry of Skill Development and Entrepreneurship</span>.
+              </p>
+              <p className="mt-3 text-sm text-gray-600">
+              NSDC and Skill India Certifications are digitally verified and accessible via Goverment's DigiLocker App, making it secure, authentic, and widely accepted.
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                Note: If you want to know the provided Certificate are <span className="font-semibold">Government</span> or <span className="font-semibold">Private</span>, Must verify their certificate on <span className="font-semibold">DigiLocker</span> app.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4 rounded-xl border border-white/70 bg-white p-4">
+              <div className="flex items-center justify-center rounded-lg border border-gray-100 bg-white p-3">
+                <img src="/skill-india-logo.png" alt="Skill India recognized pathway" className="h-20 w-auto object-contain sm:h-24" />
+              </div>
+              <div className="flex items-center justify-center rounded-lg border border-gray-100 bg-white p-3">
+                <img src="/nsdc-logo.png" alt="NSDC aligned certification support" className="h-20 w-auto object-contain sm:h-24" />
+              </div>
+              <div className="col-span-2 rounded-lg bg-emerald-100 px-3 py-2 text-center text-xs font-semibold text-emerald-900">
+                Selected Courses are NSQF Level 4 aligned and can be verified on DigiLocker App.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Video Showcase (portfolio-style) */}
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -210,9 +351,11 @@ export default function Home() {
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {showcase.map((v) => (
             <Link key={v.id} to={v.to} className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="relative aspect-video bg-gray-100">
-                <img src={v.img} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+              <div className={`relative flex aspect-video items-center justify-center bg-gradient-to-br ${v.bgClass}`}>
+                <div className="text-center">
+                  <div className="text-5xl transition duration-300 group-hover:-translate-y-1 group-hover:scale-110">{v.icon}</div>
+                  <div className="mt-2 text-sm font-semibold text-gray-700">{v.visual}</div>
+                </div>
               </div>
               <div className="p-4">
                 <div className="font-semibold text-gray-900">{v.title}</div>
@@ -230,8 +373,8 @@ export default function Home() {
             {[
               { k: '₹10', t: 'Per class fee' },
               { k: '5', t: 'Comprehensive courses' },
-              { k: '45 Days', t: 'Urgent certification (DCA/CCA)' },
-              { k: '₹699', t: 'VVIP unlimited (1 month)' },
+              { k: '45 Days', t: 'Urgent certification (DCA/CCA/AI Associate)' },
+              { k: '₹699', t: 'VVIP Unlimited Classes (1 month)' },
             ].map((x) => (
               <div key={x.t} className="rounded-2xl border border-primary-100 bg-white p-6">
                 <div className="text-3xl font-extrabold text-primary-700">{x.k}</div>
@@ -256,31 +399,48 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div
+          ref={ctaSectionRef}
+          className={`mt-12 grid gap-6 lg:grid-cols-2 lg:items-start transition-all duration-700 ${
+            ctaVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+          }`}
+        >
           <div>
             <h3 className="text-xl font-bold text-gray-900">What Program Graduates Are Saying</h3>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {testimonials.slice(0, 4).map((t) => (
-                <blockquote key={t.id} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <p className="text-sm text-gray-700">“{t.text}”</p>
-                  <footer className="mt-4 text-sm font-semibold text-gray-900">{t.name}</footer>
-                </blockquote>
+            <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md">
+              <p className={`min-h-[88px] text-sm text-gray-700 transition-opacity duration-300 ${testiFade ? 'opacity-20' : 'opacity-100'}`}>
+                “{typedComment}
+                <span className="animate-pulse">|</span>”
+              </p>
+              <footer
+                className={`mt-4 text-sm font-semibold text-gray-900 transition-all duration-500 ${
+                  testiFade ? 'translate-y-2 opacity-40' : 'translate-y-0 opacity-100'
+                }`}
+              >
+                {activeTestimonial.name}
+              </footer>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {['DCA', 'CCA', 'Spoken English', 'AI Video Creation', 'OAV ICT', '+2 IT'].map((tag) => (
+                <span key={tag} className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
+                  {tag}
+                </span>
               ))}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-primary-600 to-primary-800 p-6 text-white shadow-sm">
+          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-primary-600 to-primary-800 p-6 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
             <h3 className="text-xl font-bold">Ready to start?</h3>
             <p className="mt-2 text-sm text-white/80">Enroll today and learn with a structured roadmap.</p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link to="/admission" className="btn-touch rounded-xl bg-accent-orange px-5 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition">
+            <div className="mt-5 flex flex-col gap-3">
+              <Link to="/admission" className="btn-touch inline-flex w-full items-center justify-center rounded-xl bg-accent-orange px-5 py-3 text-sm font-semibold text-white hover:bg-orange-600 transition">
                 Enroll Now
               </Link>
               <a
                 href={`https://wa.me/${WHATSAPP_NUMBER}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-touch inline-flex items-center justify-center rounded-xl bg-[#25D366] px-5 py-3 text-sm font-semibold text-white hover:opacity-90 transition"
+                className="btn-touch inline-flex w-full items-center justify-center rounded-xl bg-[#25D366] px-5 py-3 text-sm font-semibold text-white hover:opacity-90 transition"
               >
                 {WHATSAPP_CTA}
               </a>
@@ -317,9 +477,9 @@ export default function Home() {
               </div>
 
               <div className="mt-5 rounded-2xl border border-orange-200 bg-orange-50 p-5">
-                <div className="font-semibold text-orange-900">Affiliate Partner registration fee: ₹99</div>
+                <div className="font-semibold text-orange-900">Affiliate Partner registration fee: ₹0</div>
                 <div className="mt-1 text-sm text-orange-900/90">
-                  Register once to get your personal referral code and start earning.
+                  Join for free to get your personal referral code and start earning.
                 </div>
               </div>
 
@@ -373,6 +533,13 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <Link
+        to="/admission"
+        className="btn-touch fixed bottom-4 left-4 z-50 inline-flex items-center justify-center rounded-full bg-accent-orange px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-orange-600 md:bottom-6 md:left-6"
+      >
+        Enroll Now
+      </Link>
     </>
   )
 }

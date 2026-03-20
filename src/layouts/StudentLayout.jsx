@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { LOGO_SRC } from "../config";
 
 const navItems = [
   { to: "/student", end: true, label: "Dashboard", icon: DashboardIcon },
@@ -207,8 +208,8 @@ export default function StudentLayout() {
       >
         <div className="flex h-14 items-center justify-between border-b border-gray-700 px-4 lg:justify-center">
           <Link to="/student" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-primary-400">NITA</span>
-            <span className="text-xl font-bold text-violet-400">Classes</span>
+            <img src={LOGO_SRC} alt="NITA Academy logo" className="h-9 w-auto" />
+            <span className="text-lg font-bold text-violet-300">Student</span>
           </Link>
           <button
             type="button"

@@ -8,6 +8,7 @@ import Courses from './pages/Courses'
 import Admission from './pages/Admission'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import Referral from './pages/Referral'
 import Login from './pages/Login'
 import AdminPanel from './pages/AdminPanel'
 import DashboardHome from './pages/student/DashboardHome'
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/admission" element={<Admission />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/referral" element={<Referral />} />
           <Route path="/login" element={<Login />} />
         </Route>
         <Route

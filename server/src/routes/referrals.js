@@ -40,7 +40,7 @@ function getStudent(users, id) {
   return users.find((u) => u.id === id && u.role === 'student') || null
 }
 
-// Student: register as affiliate partner (₹99) and choose benefit option:
+// Student: register as affiliate partner (₹0) and choose benefit option:
 // - fixed200: ₹200 per student referred (paid once, after first attendance)
 // - perClass1: ₹1 per class attended by referred student (paid monthly)
 router.post('/register', authRequired, studentOnly, (req, res) => {
@@ -62,7 +62,7 @@ router.post('/register', authRequired, studentOnly, (req, res) => {
     return res.json({ success: true, partner: existing, walletBalance: Number(me.walletBalance) || 0 })
   }
 
-  const fee = 99
+  const fee = 0
   const balance = Number(me.walletBalance) || 0
   if (balance < fee) return res.status(400).json({ error: `Need ₹${fee} in wallet to register as affiliate partner.` })
 

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { LOGO_SRC } from '../config'
 
 const navLinks = [
   { to: '/', label: 'Home' },
   { to: '/courses', label: 'Courses' },
   { to: '/admission', label: 'Admission' },
-  { to: '/#referral', label: 'Referral' },
+  { to: '/referral', label: 'Referral' },
   { to: '/about', label: 'About' },
   { to: '/contact', label: 'Contact' },
 ]
@@ -26,7 +27,8 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <span className="text-xl font-bold text-primary-600">NITA Classes</span>
+          <img src={LOGO_SRC} alt="NITA Academy logo" className="h-10 w-auto sm:h-12" />
+          <span className="hidden text-xl font-bold text-primary-600 sm:inline">NITA Classes</span>
         </Link>
 
         {/* Desktop menu */}

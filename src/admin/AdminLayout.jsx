@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { LOGO_SRC } from '../config'
 
 function BellIcon({ className }) {
   return (
@@ -61,8 +62,8 @@ export default function AdminLayout() {
             className="flex items-center gap-2"
             onClick={() => setOpen(false)}
           >
-            <span className="text-xl font-bold text-primary-400">NITA</span>
-            <span className="text-xl font-bold text-violet-400">{user?.role === 'teacher' ? 'Teacher' : 'Admin'}</span>
+            <img src={LOGO_SRC} alt="NITA Academy logo" className="h-9 w-auto" />
+            <span className="text-lg font-bold text-violet-300">{user?.role === 'teacher' ? 'Teacher' : 'Admin'}</span>
           </Link>
           <button
             type="button"

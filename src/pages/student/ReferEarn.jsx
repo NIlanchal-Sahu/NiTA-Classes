@@ -104,7 +104,7 @@ export default function ReferEarn() {
           <h2 className="text-lg font-bold text-gray-900">How it works</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {[
-              { t: '1) Register as Affiliate Partner', d: 'Pay ₹99 (one-time) from your wallet to get your referral code.' },
+              { t: '1) Register as Affiliate Partner', d: 'Join free and get your referral code instantly.' },
               { t: '2) Share your Referral Code', d: 'Friends enter your code during Admission or Enrollment.' },
               { t: '3) Student attends classes', d: 'Earnings are based on the option you choose.' },
               { t: '4) Payout on next month 1st', d: 'After a calendar month ends, earnings are added to your wallet on the 1st day of next month.' },
@@ -199,7 +199,7 @@ export default function ReferEarn() {
               <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-orange-900">
                 <div className="font-semibold">Register as Affiliate Partner</div>
                 <div className="mt-1 text-sm">
-                  Registration fee is <span className="font-semibold">₹99</span>. You’ll get your referral code immediately.
+                  Registration fee is <span className="font-semibold">₹0</span>. You’ll get your referral code immediately.
                 </div>
               </div>
 
@@ -228,11 +228,11 @@ export default function ReferEarn() {
                   disabled={registering}
                   className="btn-touch w-full rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
                 >
-                  {registering ? 'Registering...' : 'Pay ₹99 and Get Referral Code'}
+                  {registering ? 'Registering...' : 'Join Free and Get Referral Code'}
                 </button>
 
                 <div className="text-xs text-gray-600">
-                  Note: Make sure your wallet has at least ₹99. You can add balance in <Link to="/student/pay" className="font-semibold text-primary-700 hover:underline">Pay for Class</Link>.
+                  No joining fee required. Register and start sharing your code.
                 </div>
               </div>
             </div>

@@ -20,8 +20,9 @@ const COURSE_DETAILS = [
   {
     id: 'cca',
     name: "CCA - Course on Computer Application (Equivalent to PGDCA & 'O' Level)",
+    trustBadge: 'NSQF Level 4 | Skill India + NSDC',
     nsqf: 'NSQF Level - 4',
-    nsdc: 'NSDC Govt. Certification (Certificates available & can be verified on DigiLocker app)',
+    nsdc: 'Recognized under Skill India and NSDC (Ministry of Skill Development and Entrepreneurship). Certificates can be verified on the Government DigiLocker app.',
     courseHour: '600 Hours',
     certificationDuration: '6 Month / 1 Year (as per student preference)',
     enrollmentFees: '999',
@@ -60,9 +61,10 @@ const COURSE_DETAILS = [
   {
     id: 'ai-associate',
     name: 'Artificial Intelligent Associate (AI Development Course with Python)',
+    trustBadge: 'NSQF Level 4 | Skill India + NSDC',
     qpCode: 'QP Code - NIE/SSC/Q1004',
     nsqf: 'NSQF Level - 4',
-    nielit: 'NIELIT / NSDC Govt. Certification (Verify on DigiLocker app)',
+    nielit: 'NIELIT / NSDC recognized certification pathway under the Ministry of Skill Development and Entrepreneurship (verify on Government DigiLocker app)',
     courseHour: '600 Hours',
     certificationDuration: '6 Month / 1 Year (as per student preference)',
     enrollmentFees: '1499',
@@ -106,12 +108,48 @@ export default function Courses() {
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
       <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">Comprehensive Courses</h1>
       <p className="mt-2 text-gray-600">Course duration and certification depend on your preference. *Terms & Conditions Apply.</p>
+      <section className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1.2fr,1fr] lg:items-center">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">Certification by NSDC and Skill India</h2>
+            <p className="mt-2 text-sm text-gray-700 sm:text-base">
+              Selected courses at NITA Classes are aligned with <span className="font-semibold">NSQF Level 4</span> and
+              follow an industry-ready structure. For applicable courses, certification is recognized under
+              <span className="font-semibold"> NSDC</span> and <span className="font-semibold">Skill India</span> under the
+              <span className="font-semibold"> Ministry of Skill Development and Entrepreneurship</span>.
+            </p>
+            <p className="mt-2 text-sm text-gray-600">
+              Certificates earned in eligible programs can be verified on the Government's
+              <span className="font-semibold"> DigiLocker</span> app, making them secure, authentic, and easy to verify.
+            </p>
+            <p className="mt-2 text-sm text-gray-600">
+              Note: To check whether a certificate is Government-recognized, verify it through DigiLocker.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 rounded-xl border border-white/70 bg-white p-4">
+            <div className="flex items-center justify-center rounded-lg border border-gray-100 bg-white p-3">
+              <img src="/skill-india-logo.png" alt="Skill India recognized pathway" className="h-20 w-auto object-contain sm:h-24" />
+            </div>
+            <div className="flex items-center justify-center rounded-lg border border-gray-100 bg-white p-3">
+              <img src="/nsdc-logo.png" alt="NSDC aligned certification support" className="h-20 w-auto object-contain sm:h-24" />
+            </div>
+            <div className="col-span-2 rounded-lg bg-emerald-100 px-3 py-2 text-center text-xs font-semibold text-emerald-900">
+              Selected courses are NSQF Level 4 aligned and can be verified on DigiLocker app.
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="mt-10 space-y-8">
         {COURSE_DETAILS.map((course) => (
           <article key={course.id} id={course.id} className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex-1">
+                {course.trustBadge && (
+                  <div className="mb-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                    {course.trustBadge}
+                  </div>
+                )}
                 <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">{course.name}</h2>
                 <dl className="mt-4 grid gap-2 sm:grid-cols-2">
                   <div>
