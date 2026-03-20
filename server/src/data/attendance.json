@@ -1,0 +1,26 @@
+[
+  {
+    "studentId": "student-1773761641870",
+    "courseId": "ai-video",
+    "date": "2026-03-17",
+    "classesCount": 2
+  },
+  {
+    "studentId": "student-1773761641870",
+    "courseId": "spoken-english",
+    "date": "2026-03-17",
+    "classesCount": 1
+  },
+  {
+    "studentId": "student-1773761641870",
+    "courseId": "office-skills",
+    "date": "2026-03-17",
+    "classesCount": 1
+  },
+  {
+    "studentId": "student-1773761641870",
+    "courseId": "computer-basics",
+    "date": "2026-03-17",
+    "classesCount": 1
+  }
+]

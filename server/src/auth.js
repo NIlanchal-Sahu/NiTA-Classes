@@ -1,0 +1,146 @@
+import jwt from 'jsonwebtoken'
+import bcrypt from 'bcryptjs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { applyReferralCodeToStudent } from './referrals.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const USERS_PATH = join(__dirname, 'data', 'users.json')
+const ENROLLMENTS_PATH = join(__dirname, 'data', 'enrollments.json')
+const SALT_ROUNDS = 10
+
+const JWT_SECRET = process.env.JWT_SECRET || 'nita-dev-secret-change-in-production'
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
+
+// In-memory OTP store: { email: { otp, expiresAt, role } }
+const otpStore = new Map()
+const OTP_TTL_MS = 10 * 60 * 1000 // 10 minutes
+const OTP_LENGTH = 6
+
+function normalizeIdentifier(input) {
+  const raw = String(input || '').trim()
+  const digits = raw.replace(/\D/g, '')
+  // allow mobile login (10 digits) for students
+  if (digits.length === 10) return digits
+  return raw.toLowerCase()
+}
+
+export function getUsers() {
+  if (!existsSync(USERS_PATH)) return []
+  return JSON.parse(readFileSync(USERS_PATH, 'utf8'))
+}
+
+export function saveUsers(users) {
+  writeFileSync(USERS_PATH, JSON.stringify(users, null, 2), 'utf8')
+}
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+export function hashPassword(password) {
+  return bcrypt.hashSync(password, SALT_ROUNDS)
+}
+
+export function verifyPassword(password, hash) {
+  return bcrypt.compareSync(password, hash)
+}
+
+export function signToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN })
+}
+
+export function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET)
+  } catch {
+    return null
+  }
+}
+
+export function findUserByEmail(email) {
+  const normalized = normalizeIdentifier(email)
+  return getUsers().find((u) => u.email.toLowerCase() === normalized) || null
+}
+
+export function loginWithPassword(email, password, role) {
+  const user = findUserByEmail(email)
+  if (!user || user.role !== role) return { ok: false, error: 'Invalid email or role' }
+  if (!user.passwordHash) return { ok: false, error: 'Password login not set. Use OTP or set password.' }
+  if (!verifyPassword(password, user.passwordHash)) return { ok: false, error: 'Invalid password' }
+  const token = signToken({ userId: user.id, email: user.email, role: user.role })
+  return { ok: true, token, user: { id: user.id, email: user.email, role: user.role, name: user.name || user.email.split('@')[0] } }
+}
+
+export function requestOtp(email, role) {
+  const normalized = normalizeIdentifier(email)
+  const users = getUsers()
+  let user = users.find((u) => u.email.toLowerCase() === normalized)
+  if (role === 'admin' || role === 'teacher') {
+    if (!user || user.role !== role) return { ok: false, error: `No ${role} account with this email` }
+  } else {
+    if (!user) {
+      user = { id: `student-${Date.now()}`, email: normalized, role: 'student', name: normalized.split('@')[0] }
+      users.push(user)
+      saveUsers(users)
+    } else if (user.role !== 'student') return { ok: false, error: 'This email is not registered as student' }
+  }
+  const otp = generateOtp()
+  otpStore.set(normalized, { otp, expiresAt: Date.now() + OTP_TTL_MS, role })
+  return { ok: true, otpForDev: process.env.NODE_ENV !== 'production' ? otp : undefined }
+}
+
+export function verifyOtp(email, otp) {
+  const normalized = normalizeIdentifier(email)
+  const stored = otpStore.get(normalized)
+  if (!stored) return { ok: false, error: 'OTP expired or not requested' }
+  if (Date.now() > stored.expiresAt) {
+    otpStore.delete(normalized)
+    return { ok: false, error: 'OTP expired' }
+  }
+  if (stored.otp !== String(otp).trim()) return { ok: false, error: 'Invalid OTP' }
+  otpStore.delete(normalized)
+  const user = findUserByEmail(normalized)
+  const userData = user
+    ? { id: user.id, email: user.email, role: user.role, name: user.name || user.email.split('@')[0] }
+    : { id: `student-${Date.now()}`, email: normalized, role: 'student', name: normalized.split('@')[0] }
+  if (!user) {
+    const users = getUsers()
+    users.push({
+      id: userData.id,
+      email: userData.email,
+      role: userData.role,
+      name: userData.name,
+      walletBalance: 0,
+      totalClassesAttended: 0,
+      vvipValidUntil: null,
+    })
+    saveUsers(users)
+  }
+
+  // Auto-apply referral code if present in latest enrollment (mobile-based) and not already linked.
+  try {
+    if (existsSync(ENROLLMENTS_PATH)) {
+      const list = JSON.parse(readFileSync(ENROLLMENTS_PATH, 'utf8') || '[]')
+      const mobile = String(normalized).replace(/\D/g, '')
+      const match = list
+        .slice()
+        .reverse()
+        .find((e) => String(e.mobile || '').replace(/\D/g, '').slice(-10) === mobile.slice(-10))
+      const code = match?.referralCode
+      if (code) {
+        applyReferralCodeToStudent({ studentId: userData.id, referralCode: code })
+      }
+    }
+  } catch {
+    // ignore referral auto-link errors
+  }
+
+  const token = signToken({ userId: userData.id, email: userData.email, role: userData.role })
+  return { ok: true, token, user: userData }
+}
+
+export function getUserById(userId) {
+  return getUsers().find((u) => u.id === userId) || null
+}

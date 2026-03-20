@@ -1,0 +1,7 @@
+[
+  { "id": "dca", "name": "DCA (Basic Computer Course)" },
+  { "id": "cca", "name": "CCA (Computer Application - PGDCA / O Level)" },
+  { "id": "spoken-english-mastery", "name": "Spoken English Mastery (Advance Level)" },
+  { "id": "ai-associate", "name": "Artificial Intelligent Associate (AI Dev with Python)" },
+  { "id": "ai-video-creation", "name": "AI Video Creation Course" }
+]

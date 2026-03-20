@@ -1,0 +1,38 @@
+[
+  {
+    "id": "admin-1",
+    "email": "admin@nitaclasses.com",
+    "passwordHash": "$2b$10$65rarSUxciXhaDVuWbsjkep.l0yVBbq0Lg0wzm3BirE.Z443SgvOm",
+    "role": "admin",
+    "name": "Admin"
+  },
+  {
+    "id": "teacher-1",
+    "email": "teacher@nitaclasses.com",
+    "passwordHash": "$2b$10$65rarSUxciXhaDVuWbsjkep.l0yVBbq0Lg0wzm3BirE.Z443SgvOm",
+    "role": "teacher",
+    "name": "Teacher"
+  },
+  {
+    "id": "student-1773761641870",
+    "email": "nilanchal@nitaclasses.com",
+    "role": "student",
+    "name": "nilanchal",
+    "walletBalance": 71,
+    "totalClassesAttended": 5,
+    "vvipValidUntil": "2026-04-17"
+  },
+  {
+    "id": "student-1773798510886",
+    "email": "tech.nilanchala25@gmail.com",
+    "role": "student",
+    "name": "tech.nilanchala25",
+    "walletBalance": 100
+  },
+  {
+    "id": "student-1773827789973",
+    "email": "tech.nilanchal@gmail.com",
+    "role": "student",
+    "name": "tech.nilanchal"
+  }
+]
