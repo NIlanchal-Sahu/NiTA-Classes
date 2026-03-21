@@ -54,5 +54,8 @@ export const academyApi = {
   generateCertificate: (body) => request('/certificates/generate', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
 
   getReferralLinks: () => request('/referrals/links', { headers: headers(false) }),
+
+  resetStudentPassword: (body) =>
+    request('/students/reset-password', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
 }
 

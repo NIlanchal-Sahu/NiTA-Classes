@@ -1,6 +1,6 @@
 import { WHATSAPP_NUMBER } from '../config'
 const PHONE_DISPLAY = '+91 9986437890'
-const EMAIL = 'contact@nitaclasses.com'
+const EMAIL = 'contact@nitaclasses.in'
 const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}`
 
 const MAP_EMBED_URL = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d915.1425088800215!2d84.59704753701129!3d19.20250970258267!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a3d3fb5981a5b6f%3A0xe896c2770f11714b!2sNBCE%20Chikiti%20%2B%20NITA%20-%20AI%20Tuition!5e0!3m2!1sen!2sin!4v1773998935518!5m2!1sen!2sin'

@@ -16,6 +16,10 @@ export default function AdminStudents() {
     admissionDate: '',
     enrollmentFeeStatus: 'pending',
   })
+  const [resetId, setResetId] = useState('')
+  const [resetPwd, setResetPwd] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetMsg, setResetMsg] = useState('')
 
   const refresh = async () => {
     setLoading(true)
@@ -65,6 +69,26 @@ export default function AdminStudents() {
     }
   }
 
+  const resetStudentPassword = async (e) => {
+    e.preventDefault()
+    setResetMsg('')
+    setError('')
+    if (!resetId.trim() || !resetPwd.trim()) {
+      setError('Enter Student ID or phone and new password')
+      return
+    }
+    setResetLoading(true)
+    try {
+      await academyApi.resetStudentPassword({ studentIdOrPhone: resetId.trim(), newPassword: resetPwd })
+      setResetMsg('Password reset successfully.')
+      setResetPwd('')
+    } catch (e1) {
+      setError(e1.message || 'Reset failed')
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
   const openProfile = async (id) => {
     setSelectedId(id)
     setProfile(null)
@@ -101,6 +125,37 @@ export default function AdminStudents() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-amber-700/50 bg-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white">Reset student password (LMS)</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Set a new password without the current password. Use Student ID (e.g. NITA20260321) or 10-digit phone.
+        </p>
+        <form onSubmit={resetStudentPassword} className="mt-4 flex flex-wrap items-end gap-3">
+          <input
+            className="min-w-[200px] flex-1 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+            placeholder="Student ID or phone"
+            value={resetId}
+            onChange={(e) => setResetId(e.target.value)}
+          />
+          <input
+            type="text"
+            autoComplete="new-password"
+            className="min-w-[180px] flex-1 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+            placeholder="New password (min 6 chars)"
+            value={resetPwd}
+            onChange={(e) => setResetPwd(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={resetLoading}
+            className="btn-touch rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {resetLoading ? 'Saving…' : 'Reset password'}
+          </button>
+        </form>
+        {resetMsg && <p className="mt-3 text-sm text-green-400">{resetMsg}</p>}
       </div>
 
       {error && <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-200">{error}</div>}

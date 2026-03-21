@@ -45,6 +45,17 @@ export async function verifyOtp(email, otp) {
   return data
 }
 
+export async function changePassword(currentPassword, newPassword) {
+  const res = await fetch(`${API_BASE}/password/change`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to change password')
+  return data
+}
+
 export async function fetchMe() {
   const token = getToken()
   if (!token) return null

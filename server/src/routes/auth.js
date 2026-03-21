@@ -1,5 +1,12 @@
 import { Router } from 'express'
-import { loginWithPassword, requestOtp, verifyOtp, verifyToken, getUserById } from '../auth.js'
+import {
+  loginWithPassword,
+  requestOtp,
+  verifyOtp,
+  verifyToken,
+  getUserById,
+  changePassword,
+} from '../auth.js'
 
 const router = Router()
 
@@ -51,6 +58,16 @@ router.post('/otp/verify', (req, res) => {
   res.json({ token: result.token, user: result.user })
 })
 
+router.post('/password/change', authMiddleware, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {}
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' })
+  }
+  const result = changePassword(req.auth.userId, currentPassword, newPassword)
+  if (!result.ok) return res.status(400).json({ error: result.error })
+  res.json({ success: true })
+})
+
 router.get('/me', authMiddleware, (req, res) => {
   const user = getUserById(req.auth.userId)
   if (!user) return res.status(401).json({ error: 'User not found' })
@@ -58,8 +75,9 @@ router.get('/me', authMiddleware, (req, res) => {
     id: user.id,
     email: user.email,
     role: user.role,
-    name: user.name || user.email.split('@')[0],
+    name: user.name || String(user.email || '').split('@')[0],
   }
+  if (user.studentId) payload.studentId = user.studentId
   if (user.role === 'student') {
     payload.walletBalance = Number(user.walletBalance) ?? 0
     payload.totalClassesAttended = Number(user.totalClassesAttended) ?? 0

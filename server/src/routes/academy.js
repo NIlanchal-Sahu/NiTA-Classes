@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { verifyToken } from '../auth.js'
+import { verifyToken, adminResetStudentPassword } from '../auth.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -158,6 +158,16 @@ router.post('/students/:id/enrollments', auth, allowRoles(['admin', 'teacher']),
   enrollments.push(next)
   saveJson(PATHS.enrollments, enrollments)
   res.json({ success: true, enrollment: next })
+})
+
+router.post('/students/reset-password', auth, allowRoles(['admin']), (req, res) => {
+  const { studentIdOrPhone, newPassword } = req.body || {}
+  if (!String(studentIdOrPhone || '').trim() || !newPassword) {
+    return res.status(400).json({ error: 'studentIdOrPhone and newPassword are required' })
+  }
+  const result = adminResetStudentPassword(String(studentIdOrPhone).trim(), String(newPassword))
+  if (!result.ok) return res.status(400).json({ error: result.error })
+  res.json({ success: true })
 })
 
 // ===== Courses =====

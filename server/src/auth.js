@@ -61,22 +61,84 @@ export function verifyToken(token) {
 
 export function findUserByEmail(email) {
   const normalized = normalizeIdentifier(email)
-  return getUsers().find((u) => u.email.toLowerCase() === normalized) || null
+  return getUsers().find((u) => String(u.email || '').toLowerCase() === normalized) || null
+}
+
+/** Student: login with 10-digit phone, email, or Student ID (NITA…). Admin/Teacher: email only. */
+export function findUserByLogin(identifier) {
+  const raw = String(identifier || '').trim()
+  if (!raw) return null
+  if (/^nita\d+/i.test(raw)) {
+    const sid = raw.toUpperCase()
+    return getUsers().find((u) => u.studentId && String(u.studentId).toUpperCase() === sid) || null
+  }
+  return findUserByEmail(raw)
+}
+
+export function changePassword(userId, currentPassword, newPassword) {
+  if (!newPassword || String(newPassword).length < 6) {
+    return { ok: false, error: 'New password must be at least 6 characters' }
+  }
+  const users = getUsers()
+  const idx = users.findIndex((u) => u.id === userId)
+  if (idx < 0) return { ok: false, error: 'User not found' }
+  const user = users[idx]
+  if (!user.passwordHash) return { ok: false, error: 'Password not set for this account' }
+  if (!verifyPassword(currentPassword, user.passwordHash)) {
+    return { ok: false, error: 'Current password is incorrect' }
+  }
+  users[idx] = { ...user, passwordHash: hashPassword(String(newPassword)) }
+  saveUsers(users)
+  return { ok: true }
+}
+
+/** Admin: reset student password by Student ID or 10-digit phone */
+export function adminResetStudentPassword(studentIdOrPhone, newPassword) {
+  if (!newPassword || String(newPassword).length < 6) {
+    return { ok: false, error: 'New password must be at least 6 characters' }
+  }
+  const raw = String(studentIdOrPhone || '').trim()
+  let user = null
+  if (/^nita\d+/i.test(raw)) {
+    const sid = raw.toUpperCase()
+    user = getUsers().find((u) => u.studentId && String(u.studentId).toUpperCase() === sid)
+  } else {
+    const norm = normalizeIdentifier(raw)
+    user = getUsers().find((u) => u.role === 'student' && String(u.email || '').toLowerCase() === norm)
+  }
+  if (!user) return { ok: false, error: 'Student account not found' }
+  if (user.role !== 'student') return { ok: false, error: 'Not a student account' }
+  const users = getUsers()
+  const idx = users.findIndex((u) => u.id === user.id)
+  users[idx] = { ...users[idx], passwordHash: hashPassword(String(newPassword)) }
+  saveUsers(users)
+  return { ok: true }
+}
+
+function userToPublic(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name || String(user.email || '').split('@')[0],
+    ...(user.studentId ? { studentId: user.studentId } : {}),
+  }
 }
 
 export function loginWithPassword(email, password, role) {
-  const user = findUserByEmail(email)
-  if (!user || user.role !== role) return { ok: false, error: 'Invalid email or role' }
+  const user = role === 'student' ? findUserByLogin(email) : findUserByEmail(email)
+  if (!user || user.role !== role) return { ok: false, error: 'Invalid login or role' }
   if (!user.passwordHash) return { ok: false, error: 'Password login not set. Use OTP or set password.' }
   if (!verifyPassword(password, user.passwordHash)) return { ok: false, error: 'Invalid password' }
   const token = signToken({ userId: user.id, email: user.email, role: user.role })
-  return { ok: true, token, user: { id: user.id, email: user.email, role: user.role, name: user.name || user.email.split('@')[0] } }
+  return { ok: true, token, user: userToPublic(user) }
 }
 
 export function requestOtp(email, role) {
-  const normalized = normalizeIdentifier(email)
+  const rawInput = String(email || '').trim()
+  const normalized = normalizeIdentifier(rawInput)
   const users = getUsers()
-  let user = users.find((u) => u.email.toLowerCase() === normalized)
+  let user = role === 'student' ? findUserByLogin(rawInput) : findUserByEmail(rawInput)
   if (role === 'admin' || role === 'teacher') {
     if (!user || user.role !== role) return { ok: false, error: `No ${role} account with this email` }
   } else {
@@ -86,25 +148,30 @@ export function requestOtp(email, role) {
       saveUsers(users)
     } else if (user.role !== 'student') return { ok: false, error: 'This email is not registered as student' }
   }
+  const otpKey = user && role === 'student' ? normalizeIdentifier(user.email) : normalized
   const otp = generateOtp()
-  otpStore.set(normalized, { otp, expiresAt: Date.now() + OTP_TTL_MS, role })
+  otpStore.set(otpKey, { otp, expiresAt: Date.now() + OTP_TTL_MS, role })
   return { ok: true, otpForDev: process.env.NODE_ENV !== 'production' ? otp : undefined }
 }
 
 export function verifyOtp(email, otp) {
-  const normalized = normalizeIdentifier(email)
-  const stored = otpStore.get(normalized)
+  const rawInput = String(email || '').trim()
+  const normalized = normalizeIdentifier(rawInput)
+  const userForKey = findUserByLogin(rawInput)
+  const otpKey =
+    userForKey && userForKey.role === 'student' ? normalizeIdentifier(userForKey.email) : normalized
+  const stored = otpStore.get(otpKey)
   if (!stored) return { ok: false, error: 'OTP expired or not requested' }
   if (Date.now() > stored.expiresAt) {
-    otpStore.delete(normalized)
+    otpStore.delete(otpKey)
     return { ok: false, error: 'OTP expired' }
   }
   if (stored.otp !== String(otp).trim()) return { ok: false, error: 'Invalid OTP' }
-  otpStore.delete(normalized)
-  const user = findUserByEmail(normalized)
+  otpStore.delete(otpKey)
+  const user = findUserByLogin(rawInput) || findUserByEmail(normalized)
   const userData = user
-    ? { id: user.id, email: user.email, role: user.role, name: user.name || user.email.split('@')[0] }
-    : { id: `student-${Date.now()}`, email: normalized, role: 'student', name: normalized.split('@')[0] }
+    ? userToPublic(user)
+    : { id: `student-${Date.now()}`, email: normalized, role: 'student', name: normalized }
   if (!user) {
     const users = getUsers()
     users.push({

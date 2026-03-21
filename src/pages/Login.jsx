@@ -123,7 +123,9 @@ export default function Login() {
         <form onSubmit={handlePasswordSubmit} className="mt-8 space-y-5">
           <div>
             <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">
-              {role === 'admin' || role === 'teacher' ? `${role[0].toUpperCase()}${role.slice(1)} email` : 'Email / Mobile'}
+              {role === 'admin' || role === 'teacher'
+                ? `${role[0].toUpperCase()}${role.slice(1)} email`
+                : 'Student ID / Mobile / Email'}
             </label>
             <input
               id="login-email"
@@ -132,7 +134,13 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-              placeholder={role === 'admin' ? 'admin@nitaclasses.com' : role === 'teacher' ? 'teacher@nitaclasses.com' : 'email or 10-digit mobile'}
+              placeholder={
+                role === 'admin'
+                  ? 'admin@nitaclasses.com'
+                  : role === 'teacher'
+                    ? 'teacher@nitaclasses.com'
+                    : 'e.g. NITA20260321 or 10-digit mobile'
+              }
               required
             />
           </div>
@@ -163,14 +171,16 @@ export default function Login() {
           {!otpSent ? (
             <form onSubmit={handleRequestOtp}>
               <div>
-            <label htmlFor="otp-email" className="block text-sm font-medium text-gray-700">{role === 'student' ? 'Email / Mobile' : 'Email'}</label>
+            <label htmlFor="otp-email" className="block text-sm font-medium text-gray-700">
+                  {role === 'student' ? 'Student ID / Mobile / Email' : 'Email'}
+                </label>
                 <input
                   id="otp-email"
                   type={role === 'student' ? 'text' : 'email'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                  placeholder={role === 'student' ? 'email or 10-digit mobile' : 'your@email.com'}
+                  placeholder={role === 'student' ? 'NITA… or 10-digit mobile' : 'your@email.com'}
                   required
                 />
               </div>

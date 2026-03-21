@@ -1,10 +1,17 @@
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { studentPortalApi } from '../../api/student'
+import * as authApi from '../../api/auth'
 
 export default function Settings() {
   const { user, logout } = useAuth()
   const [profile, setProfile] = useState(null)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwdMsg, setPwdMsg] = useState('')
+  const [pwdErr, setPwdErr] = useState('')
+  const [pwdLoading, setPwdLoading] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -16,6 +23,32 @@ export default function Settings() {
       }
     })()
   }, [])
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    setPwdErr('')
+    setPwdMsg('')
+    if (newPassword.length < 6) {
+      setPwdErr('New password must be at least 6 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdErr('New passwords do not match')
+      return
+    }
+    setPwdLoading(true)
+    try {
+      await authApi.changePassword(currentPassword, newPassword)
+      setPwdMsg('Password updated successfully.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      setPwdErr(err.message || 'Failed to update password')
+    } finally {
+      setPwdLoading(false)
+    }
+  }
 
   return (
     <>
@@ -41,15 +74,21 @@ export default function Settings() {
           <h3 className="font-semibold text-white">Profile</h3>
           <dl className="mt-3 space-y-2 text-sm">
             <div>
-              <dt className="text-gray-500">Email / Login</dt>
+              <dt className="text-gray-500">Login (mobile / Student ID)</dt>
               <dd className="text-white">{user?.email || '—'}</dd>
             </div>
+            {user?.studentId && (
+              <div>
+                <dt className="text-gray-500">Student ID</dt>
+                <dd className="font-mono text-white">{user.studentId}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-gray-500">Name</dt>
               <dd className="text-white">{user?.name || '—'}</dd>
             </div>
             <div>
-              <dt className="text-gray-500">Student ID</dt>
+              <dt className="text-gray-500">Student ID (academy)</dt>
               <dd className="text-white">{profile?.student?.id || '—'}</dd>
             </div>
             <div>
@@ -70,6 +109,69 @@ export default function Settings() {
             </div>
           </dl>
         </div>
+
+        <div className="rounded-xl border border-gray-700 bg-gray-800 p-6">
+          <h3 className="font-semibold text-white">Change password</h3>
+          <p className="mt-1 text-sm text-gray-400">
+            Enter your current password, then choose a new one. Use this after your first login with the enrollment password.
+          </p>
+          <form onSubmit={handleChangePassword} className="mt-4 space-y-4 max-w-md">
+            <div>
+              <label htmlFor="cur-pwd" className="block text-sm text-gray-400">
+                Current password
+              </label>
+              <input
+                id="cur-pwd"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="new-pwd" className="block text-sm text-gray-400">
+                New password
+              </label>
+              <input
+                id="new-pwd"
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                required
+                minLength={6}
+              />
+            </div>
+            <div>
+              <label htmlFor="conf-pwd" className="block text-sm text-gray-400">
+                Confirm new password
+              </label>
+              <input
+                id="conf-pwd"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                required
+                minLength={6}
+              />
+            </div>
+            {pwdErr && <p className="text-sm text-red-400">{pwdErr}</p>}
+            {pwdMsg && <p className="text-sm text-green-400">{pwdMsg}</p>}
+            <button
+              type="submit"
+              disabled={pwdLoading}
+              className="btn-touch rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+            >
+              {pwdLoading ? 'Updating…' : 'Update password'}
+            </button>
+          </form>
+        </div>
+
         <div className="rounded-xl border border-gray-700 bg-gray-800 p-6">
           <h3 className="font-semibold text-white">Sign out</h3>
           <p className="mt-1 text-sm text-gray-400">Sign out of your account on this device.</p>

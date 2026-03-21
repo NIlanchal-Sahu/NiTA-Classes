@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { FORM_ENDPOINT } from '../config'
 
 const COURSE_OPTIONS = [
@@ -19,6 +20,7 @@ export default function Admission() {
   })
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle') // idle | submitting | success | error
+  const [enrollmentResult, setEnrollmentResult] = useState(null)
 
   const validate = () => {
     const next = {}
@@ -41,18 +43,17 @@ export default function Admission() {
     e.preventDefault()
     if (!validate()) return
     setStatus('submitting')
+    setEnrollmentResult(null)
     try {
-      // 1) Save into local backend JSON (for referral linking + admin management)
-      await fetch('/api/public/enrollments', {
+      const r = await fetch('/api/public/enrollments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
-      }).then(async (r) => {
-        const j = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(j.error || 'Failed to submit enrollment')
       })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'Failed to submit enrollment')
+      setEnrollmentResult(j)
 
-      // 2) Also attempt Google Sheet endpoint (best-effort)
       await fetch(FORM_ENDPOINT, {
         method: 'POST',
         mode: 'no-cors',
@@ -63,8 +64,8 @@ export default function Admission() {
       setStatus('success')
       setForm({ name: '', mobile: '', course: '', school: '', referralCode: '' })
     } catch {
-      // Fallback: show success anyway and suggest email backup
       setStatus('success')
+      setEnrollmentResult(null)
       setForm({ name: '', mobile: '', course: '', school: '', referralCode: '' })
     }
   }
@@ -75,8 +76,53 @@ export default function Admission() {
       <p className="mt-2 text-gray-600">Fill the form below. We'll get in touch soon.</p>
 
       {status === 'success' && (
-        <div className="mt-6 rounded-xl bg-green-50 border border-green-200 p-4 text-green-800">
-          Thank you! Your enrollment request has been submitted. We'll contact you shortly.
+        <div className="mt-6 space-y-4">
+          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-green-800">
+            Thank you! Your enrollment request has been submitted successfully.
+          </div>
+
+          {enrollmentResult?.credentials && (
+            <div className="rounded-xl border-2 border-primary-200 bg-primary-50 p-5 text-gray-900">
+              <h2 className="text-lg font-bold text-primary-900">Your LMS login (save this)</h2>
+              <p className="mt-2 text-sm text-gray-700">
+                Use these to sign in to the student portal. You can log in with <strong>Student ID</strong> or{' '}
+                <strong>mobile number</strong> and the password below.
+              </p>
+              <dl className="mt-4 space-y-2 text-sm">
+                <div>
+                  <dt className="font-medium text-gray-600">Student ID</dt>
+                  <dd className="font-mono text-lg font-bold text-gray-900">{enrollmentResult.credentials.studentId}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-gray-600">Password</dt>
+                  <dd className="font-mono text-lg font-bold text-gray-900">{enrollmentResult.credentials.password}</dd>
+                </div>
+              </dl>
+              <p className="mt-4 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
+                <strong>Important:</strong> Note this down in a safe place. Change your password after first login in{' '}
+                <strong>Student → Settings</strong>.
+              </p>
+              <Link
+                to="/login"
+                className="mt-4 inline-flex btn-touch rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700"
+              >
+                Go to Login
+              </Link>
+            </div>
+          )}
+
+          {enrollmentResult?.existingAccount && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900 text-sm">
+              {enrollmentResult.message ||
+                'You already have an account. Log in with your Student ID or mobile number and your password.'}
+              {enrollmentResult.studentId && (
+                <p className="mt-2 font-mono font-semibold">Student ID: {enrollmentResult.studentId}</p>
+              )}
+              <Link to="/login" className="mt-3 inline-block font-semibold text-primary-700 underline">
+                Go to Login
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
