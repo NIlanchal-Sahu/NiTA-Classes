@@ -41,8 +41,22 @@ function findStudentUserByPhone(phone) {
 }
 
 router.post('/', (req, res) => {
-  const { name, mobile, course, school, referralCode } = req.body || {}
+  const {
+    name,
+    mobile,
+    course,
+    highestQualification,
+    villageCity,
+    gender,
+    fatherName,
+    referralCode,
+  } = req.body || {}
   if (!name || !mobile || !course) return res.status(400).json({ error: 'name, mobile, course are required' })
+  if (!highestQualification || !villageCity || !gender || !fatherName) {
+    return res.status(400).json({
+      error: 'highestQualification, villageCity, gender and fatherName are required',
+    })
+  }
   const phone = normalizeMobile(mobile)
   if (phone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
 
@@ -52,7 +66,10 @@ router.post('/', (req, res) => {
     name: String(name).trim(),
     mobile: phone,
     course: String(course).trim(),
-    school: school ? String(school).trim() : '',
+    highestQualification: String(highestQualification).trim(),
+    villageCity: String(villageCity).trim(),
+    gender: String(gender).trim(),
+    fatherName: String(fatherName).trim(),
     referralCode: referralCode ? String(referralCode).trim().toUpperCase() : '',
     createdAt: new Date().toISOString(),
   }
@@ -107,6 +124,10 @@ router.post('/', (req, res) => {
     name: String(name).trim(),
     phone,
     courseEnrolled: String(course).trim(),
+    highestQualification: String(highestQualification).trim(),
+    villageCity: String(villageCity).trim(),
+    gender: String(gender).trim(),
+    fatherName: String(fatherName).trim(),
     batchId: '',
     admissionDate: new Date().toISOString().slice(0, 10),
     enrollmentFeeStatus: 'pending',

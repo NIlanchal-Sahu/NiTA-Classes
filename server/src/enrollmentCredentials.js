@@ -29,26 +29,23 @@ function loadStudentIds() {
 }
 
 /**
- * NITA + YYYYMMDD (first of day), then NITA + YYYYMMDD + 001, 002, ...
+ * Primary-key style unique ID:
+ * NITA + YYYYMMDD + 6-char entropy (millis+random base36, uppercased).
+ * Example: NITA20260321AB12CD
  */
 export function generateNitaStudentId(existingUserStudentIds = []) {
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const prefix = `NITA${ymd}`
   const fromStudents = loadStudentIds()
   const ids = new Set([...existingUserStudentIds, ...fromStudents].filter(Boolean))
-
-  if (!ids.has(prefix)) return prefix
-
-  let maxSeq = 0
-  for (const id of ids) {
-    if (id === prefix) {
-      maxSeq = Math.max(maxSeq, 0)
-      continue
-    }
-    if (id.startsWith(prefix) && id.length > prefix.length) {
-      const suf = id.slice(prefix.length)
-      if (/^\d{3}$/.test(suf)) maxSeq = Math.max(maxSeq, parseInt(suf, 10))
-    }
-  }
-  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`
+  let candidate = ''
+  let guard = 0
+  do {
+    const entropy = (Date.now().toString(36) + Math.random().toString(36).slice(2))
+      .slice(-6)
+      .toUpperCase()
+    candidate = `${prefix}${entropy}`
+    guard += 1
+  } while (ids.has(candidate) && guard < 10)
+  return candidate
 }

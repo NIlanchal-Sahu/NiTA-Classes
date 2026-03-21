@@ -15,7 +15,10 @@ export default function Admission() {
     name: '',
     mobile: '',
     course: '',
-    school: '',
+    highestQualification: '',
+    villageCity: '',
+    gender: '',
+    fatherName: '',
     referralCode: '',
   })
   const [errors, setErrors] = useState({})
@@ -28,6 +31,10 @@ export default function Admission() {
     if (!form.mobile.trim()) next.mobile = 'Mobile number is required'
     else if (!/^\d{10}$/.test(form.mobile.replace(/\s/g, ''))) next.mobile = 'Enter a valid 10-digit number'
     if (!form.course) next.course = 'Please select a course'
+    if (!form.highestQualification.trim()) next.highestQualification = 'Highest qualification is required'
+    if (!form.villageCity.trim()) next.villageCity = 'Village/City is required'
+    if (!form.gender) next.gender = 'Gender is required'
+    if (!form.fatherName.trim()) next.fatherName = 'Father name is required'
     if (form.referralCode && !/^[a-z0-9-]{4,32}$/i.test(form.referralCode.trim())) next.referralCode = 'Enter a valid referral code'
     setErrors(next)
     return Object.keys(next).length === 0
@@ -62,11 +69,29 @@ export default function Admission() {
       }).catch(() => null)
 
       setStatus('success')
-      setForm({ name: '', mobile: '', course: '', school: '', referralCode: '' })
+      setForm({
+        name: '',
+        mobile: '',
+        course: '',
+        highestQualification: '',
+        villageCity: '',
+        gender: '',
+        fatherName: '',
+        referralCode: '',
+      })
     } catch {
       setStatus('success')
       setEnrollmentResult(null)
-      setForm({ name: '', mobile: '', course: '', school: '', referralCode: '' })
+      setForm({
+        name: '',
+        mobile: '',
+        course: '',
+        highestQualification: '',
+        villageCity: '',
+        gender: '',
+        fatherName: '',
+        referralCode: '',
+      })
     }
   }
 
@@ -179,16 +204,72 @@ export default function Admission() {
         </div>
 
         <div>
-          <label htmlFor="school" className="block text-sm font-medium text-gray-700">School/College Name</label>
-          <input
-            id="school"
-            name="school"
-            type="text"
-            value={form.school}
+          <label htmlFor="highestQualification" className="block text-sm font-medium text-gray-700">Highest Qualification *</label>
+          <select
+            id="highestQualification"
+            name="highestQualification"
+            value={form.highestQualification}
             onChange={handleChange}
             className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            placeholder="Optional"
+            required
+          >
+            <option value="">Select qualification</option>
+            <option value="10th">10th</option>
+            <option value="+2">+2</option>
+            <option value="+3">+3</option>
+            <option value="B.Tech">B.Tech</option>
+            <option value="Diploma">Diploma</option>
+            <option value="Other">Other</option>
+          </select>
+          {errors.highestQualification && <p className="mt-1 text-sm text-red-600">{errors.highestQualification}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="villageCity" className="block text-sm font-medium text-gray-700">Village / City *</label>
+          <input
+            id="villageCity"
+            name="villageCity"
+            type="text"
+            value={form.villageCity}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="Your village or city"
+            required
           />
+          {errors.villageCity && <p className="mt-1 text-sm text-red-600">{errors.villageCity}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="gender" className="block text-sm font-medium text-gray-700">Gender *</label>
+          <select
+            id="gender"
+            name="gender"
+            value={form.gender}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            required
+          >
+            <option value="">Select gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+          {errors.gender && <p className="mt-1 text-sm text-red-600">{errors.gender}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700">Father Name *</label>
+          <input
+            id="fatherName"
+            name="fatherName"
+            type="text"
+            value={form.fatherName}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="Father full name"
+            required
+          />
+          {errors.fatherName && <p className="mt-1 text-sm text-red-600">{errors.fatherName}</p>}
         </div>
 
         <div>
