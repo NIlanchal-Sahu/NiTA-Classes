@@ -1,1 +1,22 @@
-﻿[]
+[
+  {
+    "id": "enr-1774078706690",
+    "studentId": "NITA20260321",
+    "courseId": "ai-video-creation",
+    "batchId": "",
+    "note": "Public admission form",
+    "createdAt": "2026-03-21T07:38:26.690Z"
+  },
+  {
+    "id": "enr-1774146766825-trial",
+    "studentId": "NITA20260322GJUTZH",
+    "courseId": "trial-course",
+    "batchId": "",
+    "note": "1 week trial course",
+    "isTrial": true,
+    "status": "active",
+    "startDate": "2026-03-22",
+    "expiresAt": "2026-03-28",
+    "createdAt": "2026-03-22T02:32:46.825Z"
+  }
+]

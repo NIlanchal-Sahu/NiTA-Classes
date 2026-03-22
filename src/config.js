@@ -19,7 +19,20 @@ export const YOUTUBE_URL = 'https://youtube.com/@nitaclasses'
 export const FORM_ENDPOINT = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'
 
 // Wallet recharge UPI details (update with your real UPI IDs)
-export const WALLET_PAYEE_NAME = 'NITA Classes'
+export const WALLET_PAYEE_NAME = 'NITA Classes(Nilanchal Sahu)'
 export const WALLET_UPI_ID_PHONEPE = '9040358148@ybl'
 export const WALLET_UPI_ID_AMAZONPAY = '9040358148@apl'
-export const WALLET_UPI_ID_PAYTM = 'p040358148@ptyes'
+export const WALLET_UPI_ID_PAYTM = '9040358148@ptyes'
+
+/** Seconds shown on wallet QR step before user confirms payment (informational). */
+export const WALLET_PAYMENT_TIMER_SECONDS = 300
+
+/**
+ * QR images for scan & pay (place files in /public).
+ * e.g. public/wallet-qr-phonepe.png — optional; falls back to UPI text if missing.
+ */
+export const WALLET_QR_IMAGES = {
+  phonepe: '/wallet-qr-phonepe.png',
+  amazonpay: '/wallet-qr-amazonpay.png',
+  paytm: '/wallet-qr-paytm.png',
+}

@@ -16,6 +16,7 @@ import PayForClass from './pages/student/PayForClass'
 import MyCourses from './pages/student/MyCourses'
 import ExploreCourses from './pages/student/ExploreCourses'
 import LearningPaths from './pages/student/LearningPaths'
+import CourseContent from './pages/student/CourseContent'
 import HelpSupport from './pages/student/HelpSupport'
 import Achievements from './pages/student/Achievements'
 import Settings from './pages/student/Settings'
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="my-courses" element={<MyCourses />} />
           <Route path="explore" element={<ExploreCourses />} />
           <Route path="learning-paths" element={<LearningPaths />} />
+          <Route path="course/:courseId" element={<CourseContent />} />
           <Route path="help" element={<HelpSupport />} />
           <Route path="achievements" element={<Achievements />} />
           <Route path="settings" element={<Settings />} />

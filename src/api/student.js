@@ -80,10 +80,19 @@ export const studentPortalApi = {
   getFees: () => portalGet('fees'),
   createPaymentRequest: (body) => portalPost('payment-requests', body),
   getCoursesLearning: () => portalGet('courses'),
+  unlockCourse: (courseId, confirmUnlock = false) =>
+    portalPost('courses/unlock', { courseId, confirmUnlock }),
+  renewCourse: (courseId) => portalPost('courses/renew', { courseId }),
+  getCourseContent: (courseId) => portalGet(`course-content/${encodeURIComponent(courseId)}`),
+  completeChapter: (courseId, chapterId) =>
+    portalPost(`course-content/${encodeURIComponent(courseId)}/chapters/${encodeURIComponent(chapterId)}/complete`, {}),
   getMaterials: (courseId = '', batchId = '') =>
     portalGet(`materials${courseId || batchId ? `?${courseId ? `courseId=${encodeURIComponent(courseId)}` : ''}${courseId && batchId ? '&' : ''}${batchId ? `batchId=${encodeURIComponent(batchId)}` : ''}` : ''}`),
   getReferrals: (month) => portalGet(`referrals?month=${encodeURIComponent(month || '')}`),
   getCertificates: () => portalGet('certificates'),
   requestCertificate: (body) => portalPost('certificates/request', body),
   getMiniDashboard: () => portalGet('dashboard'),
+  notifyPaymentAttempt: (body) => portalPost('payment-attempt', body),
+  getNotifications: () => portalGet('notifications'),
+  markNotificationsRead: (ids) => portalPost('notifications/mark-read', { ids }),
 }

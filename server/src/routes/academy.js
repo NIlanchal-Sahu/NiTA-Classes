@@ -16,10 +16,14 @@ const PATHS = {
   fees: join(__dirname, '..', 'data', 'academy_fees.json'),
   discounts: join(__dirname, '..', 'data', 'academy_discounts.json'),
   notes: join(__dirname, '..', 'data', 'academy_notes.json'),
+  courseContent: join(__dirname, '..', 'data', 'academy_course_content.json'),
   certificates: join(__dirname, '..', 'data', 'academy_certificates.json'),
   referralLinks: join(__dirname, '..', 'data', 'referral_links.json'),
   paymentRequests: join(__dirname, '..', 'data', 'payment_requests.json'),
   users: join(__dirname, '..', 'data', 'users.json'),
+  legacyCourses: join(__dirname, '..', 'data', 'courses.json'),
+  studentNotifications: join(__dirname, '..', 'data', 'student_notifications.json'),
+  adminAlerts: join(__dirname, '..', 'data', 'admin_alerts.json'),
 }
 
 function loadJson(path, fallback = []) {
@@ -74,6 +78,79 @@ function parseDate(value) {
 
 function monthKey(isoDate) {
   return String(isoDate || '').slice(0, 7)
+}
+
+function byOrder(a, b) {
+  return (Number(a.order) || 0) - (Number(b.order) || 0)
+}
+
+function normCourseId(id) {
+  return String(id || '').trim().toLowerCase()
+}
+
+function findTreeCourseIndex(tree, courseId) {
+  const n = normCourseId(courseId)
+  return tree.findIndex((x) => normCourseId(x.courseId) === n)
+}
+
+function getAuthUser(req) {
+  const users = loadJson(PATHS.users, [])
+  return users.find((u) => u.id === req.auth.userId) || null
+}
+
+function getTeacherAssignedCourseIds(req) {
+  const me = getAuthUser(req)
+  if (!me || me.role !== 'teacher') return null
+  const list = Array.isArray(me.assignedCourseIds) ? me.assignedCourseIds : []
+  return list.map((x) => String(x))
+}
+
+function canTeacherAccessCourse(req, courseId) {
+  const assigned = getTeacherAssignedCourseIds(req)
+  if (assigned == null) return true
+  // Empty list = no restriction (otherwise teachers could not manage any course)
+  if (assigned.length === 0) return true
+  const n = normCourseId(courseId)
+  return assigned.some((id) => normCourseId(id) === n)
+}
+
+function requireTeacherCourseAccess(req, res, courseId) {
+  if (!canTeacherAccessCourse(req, courseId)) {
+    res.status(403).json({ error: 'Teacher can manage only assigned courses' })
+    return false
+  }
+  return true
+}
+
+function loadCourseContentTree() {
+  return loadJson(PATHS.courseContent, [])
+}
+
+function saveCourseContentTree(tree) {
+  saveJson(PATHS.courseContent, tree)
+}
+
+function loadCoursesWithLegacyFallback() {
+  const academyCourses = loadJson(PATHS.courses, [])
+  if (academyCourses.length > 0) return academyCourses
+
+  const legacy = loadJson(PATHS.legacyCourses, [])
+  if (!legacy.length) return academyCourses
+
+  const seeded = legacy.map((c, idx) => ({
+    id: String(c.id || `course-${Date.now()}-${idx}`),
+    name: String(c.name || c.title || `Course ${idx + 1}`),
+    description: String(c.description || ''),
+    duration: String(c.duration || ''),
+    status: String(c.status || 'active').toLowerCase() === 'draft' ? 'draft' : 'active',
+    priceType: String(c.priceType || 'perClass10'),
+    price: Number(c.price) || 10,
+    createdAt: c.createdAt || new Date().toISOString(),
+    migratedFromLegacy: true,
+  }))
+
+  saveJson(PATHS.courses, seeded)
+  return seeded
 }
 
 // ===== Students =====
@@ -172,12 +249,12 @@ router.post('/students/reset-password', auth, allowRoles(['admin']), (req, res) 
 
 // ===== Courses =====
 router.get('/courses', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
-  const courses = loadJson(PATHS.courses, [])
+  const courses = loadCoursesWithLegacyFallback()
   res.json({ courses: courses.slice().reverse() })
 })
 
 router.post('/courses', auth, allowRoles(['admin']), (req, res) => {
-  const { name, description = '', duration = '', priceType = 'perClass10', price = 10 } = req.body || {}
+  const { name, description = '', duration = '', status = 'active', priceType = 'perClass10', price = 10 } = req.body || {}
   if (!name) return res.status(400).json({ error: 'name is required' })
   const courses = loadJson(PATHS.courses, [])
   const next = {
@@ -185,6 +262,7 @@ router.post('/courses', auth, allowRoles(['admin']), (req, res) => {
     name: String(name),
     description: String(description),
     duration: String(duration),
+    status: String(status || 'active').toLowerCase() === 'draft' ? 'draft' : 'active',
     priceType: String(priceType), // perClass10 | custom
     price: Number(price) || 10,
     createdAt: new Date().toISOString(),
@@ -209,6 +287,188 @@ router.delete('/courses/:id', auth, allowRoles(['admin']), (req, res) => {
   if (next.length === courses.length) return res.status(404).json({ error: 'Course not found' })
   saveJson(PATHS.courses, next)
   res.json({ success: true })
+})
+
+// ===== Course Content (Course -> Modules -> Chapters) =====
+router.get('/content/courses', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courses = loadJson(PATHS.courses, [])
+  const tree = loadCourseContentTree()
+  const assigned = getTeacherAssignedCourseIds(req)
+  const baseCourses =
+    assigned == null || assigned.length === 0
+      ? courses
+      : courses.filter((c) => assigned.some((id) => normCourseId(id) === normCourseId(c.id)))
+  const out = baseCourses.map((course) => {
+    const node = tree.find((x) => normCourseId(x.courseId) === normCourseId(course.id)) || { modules: [] }
+    const modules = (node.modules || [])
+      .slice()
+      .sort(byOrder)
+      .map((m) => ({
+        ...m,
+        chapters: (m.chapters || []).slice().sort(byOrder),
+      }))
+    return { ...course, modules }
+  })
+  res.json({ courses: out })
+})
+
+router.post('/content/courses/:courseId/modules', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const { title, order } = req.body || {}
+  if (!title) return res.status(400).json({ error: 'title is required' })
+  const tree = loadCourseContentTree()
+  let idx = findTreeCourseIndex(tree, courseId)
+  const node = idx >= 0 ? tree[idx] : { courseId: normCourseId(courseId), modules: [] }
+  const next = {
+    id: `mod-${Date.now()}`,
+    title: String(title),
+    order: Number(order) || node.modules.length + 1,
+    chapters: [],
+    createdAt: new Date().toISOString(),
+  }
+  node.modules.push(next)
+  node.modules.sort(byOrder)
+  if (idx >= 0) tree[idx] = node
+  else tree.push(node)
+  saveCourseContentTree(tree)
+  res.json({ success: true, module: next })
+})
+
+router.put('/content/courses/:courseId/modules/:moduleId', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const moduleId = String(req.params.moduleId)
+  const tree = loadCourseContentTree()
+  const idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  const modules = tree[idx].modules || []
+  const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
+  if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
+  modules[mIdx] = { ...modules[mIdx], ...req.body, updatedAt: new Date().toISOString() }
+  modules.sort(byOrder)
+  tree[idx].modules = modules
+  saveCourseContentTree(tree)
+  res.json({ success: true, module: modules[mIdx] })
+})
+
+router.delete('/content/courses/:courseId/modules/:moduleId', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const moduleId = String(req.params.moduleId)
+  const tree = loadCourseContentTree()
+  const idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  const next = (tree[idx].modules || []).filter((m) => String(m.id) !== moduleId)
+  tree[idx].modules = next
+  saveCourseContentTree(tree)
+  res.json({ success: true })
+})
+
+router.post('/content/courses/:courseId/modules/reorder', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const orders = Array.isArray(req.body?.orders) ? req.body.orders : []
+  const tree = loadCourseContentTree()
+  const idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  const map = new Map(orders.map((o) => [String(o.id), Number(o.order) || 0]))
+  tree[idx].modules = (tree[idx].modules || [])
+    .map((m) => ({ ...m, order: map.has(String(m.id)) ? map.get(String(m.id)) : m.order }))
+    .sort(byOrder)
+  saveCourseContentTree(tree)
+  res.json({ success: true, modules: tree[idx].modules })
+})
+
+router.post('/content/courses/:courseId/modules/:moduleId/chapters', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const moduleId = String(req.params.moduleId)
+  const { title, videoUrl, description = '', heading = '', order, noteText = '', resourceType = 'video' } = req.body || {}
+  if (!title || !videoUrl) return res.status(400).json({ error: 'title and videoUrl are required' })
+  const tree = loadCourseContentTree()
+  const idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  const modules = tree[idx].modules || []
+  const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
+  if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
+  const list = modules[mIdx].chapters || []
+  const next = {
+    id: `ch-${Date.now()}`,
+    title: String(title),
+    heading: String(heading || title),
+    videoUrl: String(videoUrl),
+    description: String(description),
+    resourceType: String(resourceType || 'video'),
+    noteText: String(noteText || ''),
+    order: Number(order) || list.length + 1,
+    createdAt: new Date().toISOString(),
+  }
+  list.push(next)
+  list.sort(byOrder)
+  modules[mIdx].chapters = list
+  tree[idx].modules = modules
+  saveCourseContentTree(tree)
+  res.json({ success: true, chapter: next })
+})
+
+router.put('/content/courses/:courseId/modules/:moduleId/chapters/:chapterId', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const moduleId = String(req.params.moduleId)
+  const chapterId = String(req.params.chapterId)
+  const tree = loadCourseContentTree()
+  const idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  const modules = tree[idx].modules || []
+  const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
+  if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
+  const chapters = modules[mIdx].chapters || []
+  const cIdx = chapters.findIndex((c) => String(c.id) === chapterId)
+  if (cIdx < 0) return res.status(404).json({ error: 'Chapter not found' })
+  chapters[cIdx] = { ...chapters[cIdx], ...req.body, updatedAt: new Date().toISOString() }
+  chapters.sort(byOrder)
+  modules[mIdx].chapters = chapters
+  tree[idx].modules = modules
+  saveCourseContentTree(tree)
+  res.json({ success: true, chapter: chapters[cIdx] })
+})
+
+router.delete('/content/courses/:courseId/modules/:moduleId/chapters/:chapterId', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const moduleId = String(req.params.moduleId)
+  const chapterId = String(req.params.chapterId)
+  const tree = loadCourseContentTree()
+  const idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  const modules = tree[idx].modules || []
+  const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
+  if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
+  modules[mIdx].chapters = (modules[mIdx].chapters || []).filter((c) => String(c.id) !== chapterId)
+  tree[idx].modules = modules
+  saveCourseContentTree(tree)
+  res.json({ success: true })
+})
+
+router.post('/content/courses/:courseId/modules/:moduleId/chapters/reorder', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const courseId = String(req.params.courseId)
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
+  const moduleId = String(req.params.moduleId)
+  const orders = Array.isArray(req.body?.orders) ? req.body.orders : []
+  const tree = loadCourseContentTree()
+  const idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  const modules = tree[idx].modules || []
+  const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
+  if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
+  const map = new Map(orders.map((o) => [String(o.id), Number(o.order) || 0]))
+  modules[mIdx].chapters = (modules[mIdx].chapters || [])
+    .map((c) => ({ ...c, order: map.has(String(c.id)) ? map.get(String(c.id)) : c.order }))
+    .sort(byOrder)
+  tree[idx].modules = modules
+  saveCourseContentTree(tree)
+  res.json({ success: true, chapters: modules[mIdx].chapters })
 })
 
 // ===== Batches =====
@@ -355,6 +615,11 @@ router.get('/fees/payment-requests', auth, allowRoles(['admin', 'teacher']), (_r
   res.json({ requests: requests.slice().reverse() })
 })
 
+router.get('/admin-alerts', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
+  const alerts = loadJson(PATHS.adminAlerts, [])
+  res.json({ alerts: alerts.slice().reverse() })
+})
+
 router.post('/fees/payment-requests/:id/approve', auth, allowRoles(['admin']), (req, res) => {
   const requests = loadJson(PATHS.paymentRequests, [])
   const idx = requests.findIndex((r) => r.id === req.params.id)
@@ -368,10 +633,20 @@ router.post('/fees/payment-requests/:id/approve', auth, allowRoles(['admin']), (
 
   const users = loadJson(PATHS.users, [])
   const u = users.find((x) => x.id === requests[idx].authUserId && x.role === 'student')
+  const credited = Number(requests[idx].amount) || 0
   if (u) {
-    u.walletBalance = (Number(u.walletBalance) || 0) + (Number(requests[idx].amount) || 0)
+    u.walletBalance = (Number(u.walletBalance) || 0) + credited
     saveJson(PATHS.users, users)
   }
+  const notifs = loadJson(PATHS.studentNotifications, [])
+  notifs.push({
+    id: `stu-notif-${Date.now()}`,
+    userId: requests[idx].authUserId,
+    message: `₹${credited} (promotional offer credit) has been added successfully to your wallet.`,
+    read: false,
+    createdAt: new Date().toISOString(),
+  })
+  saveJson(PATHS.studentNotifications, notifs)
   res.json({ success: true, request: requests[idx], walletBalance: Number(u?.walletBalance) || null })
 })
 
@@ -409,8 +684,10 @@ router.get('/notes', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
 })
 
 router.post('/notes', auth, allowRoles(['admin', 'teacher']), (req, res) => {
-  const { title, resourceType, url, courseId = '', batchId = '' } = req.body || {}
-  if (!title || !resourceType || !url) return res.status(400).json({ error: 'title, resourceType, url are required' })
+  const { title, resourceType, url, courseId = '', batchId = '', chapter = 'General', noteText = '' } = req.body || {}
+  if (!title || !resourceType || !url || !courseId) {
+    return res.status(400).json({ error: 'title, resourceType, url, courseId are required' })
+  }
   const notes = loadJson(PATHS.notes, [])
   const next = {
     id: `note-${Date.now()}`,
@@ -419,6 +696,8 @@ router.post('/notes', auth, allowRoles(['admin', 'teacher']), (req, res) => {
     url: String(url),
     courseId: String(courseId),
     batchId: String(batchId),
+    chapter: String(chapter || 'General'),
+    noteText: String(noteText || ''),
     uploadedBy: req.auth.userId,
     createdAt: new Date().toISOString(),
   }

@@ -34,5 +34,27 @@
     "email": "tech.nilanchal@gmail.com",
     "role": "student",
     "name": "tech.nilanchal"
+  },
+  {
+    "id": "auth-1774078706435",
+    "email": "9986437890",
+    "studentId": "NITA20260321",
+    "name": "Nilanchala Sahu",
+    "role": "student",
+    "passwordHash": "$2b$10$n5ZUDjPRZfv5R5uu40lcIuaZ3FOiQnjPd62/AKeybzhde1sqMIklC",
+    "walletBalance": 0,
+    "totalClassesAttended": 0,
+    "vvipValidUntil": null
+  },
+  {
+    "id": "auth-1774146766572",
+    "email": "9178745761",
+    "studentId": "NITA20260322GJUTZH",
+    "name": "Rasmita Sahu",
+    "role": "student",
+    "passwordHash": "$2b$10$cRBSxAF8e7UIFWlwe9shTOtodcbl1RCDMF7JhDKSQNXFk7W7pWUDi",
+    "walletBalance": 0,
+    "totalClassesAttended": 0,
+    "vvipValidUntil": null
   }
 ]

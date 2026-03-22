@@ -1,1 +1,57 @@
-﻿[]
+[
+  {
+    "id": "dca",
+    "name": "DCA (Basic Computer Course)",
+    "description": "",
+    "duration": "",
+    "status": "active",
+    "priceType": "perClass10",
+    "price": 10,
+    "createdAt": "2026-03-17T00:00:00.000Z",
+    "migratedFromLegacy": true
+  },
+  {
+    "id": "cca",
+    "name": "CCA (Computer Application - PGDCA / O Level)",
+    "description": "",
+    "duration": "",
+    "status": "active",
+    "priceType": "perClass10",
+    "price": 10,
+    "createdAt": "2026-03-17T00:00:00.000Z",
+    "migratedFromLegacy": true
+  },
+  {
+    "id": "spoken-english-mastery",
+    "name": "Spoken English Mastery (Advance Level)",
+    "description": "",
+    "duration": "",
+    "status": "active",
+    "priceType": "perClass10",
+    "price": 10,
+    "createdAt": "2026-03-17T00:00:00.000Z",
+    "migratedFromLegacy": true
+  },
+  {
+    "id": "ai-associate",
+    "name": "Artificial Intelligent Associate (AI Dev with Python)",
+    "description": "",
+    "duration": "",
+    "status": "active",
+    "priceType": "perClass10",
+    "price": 10,
+    "createdAt": "2026-03-17T00:00:00.000Z",
+    "migratedFromLegacy": true
+  },
+  {
+    "id": "ai-video-creation",
+    "name": "AI Video Creation Course",
+    "description": "",
+    "duration": "",
+    "status": "active",
+    "priceType": "perClass10",
+    "price": 10,
+    "createdAt": "2026-03-17T00:00:00.000Z",
+    "migratedFromLegacy": true
+  }
+]

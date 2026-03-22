@@ -22,11 +22,29 @@ const ACADEMY_ATTENDANCE_PATH = join(__dirname, "..", "data", "academy_attendanc
 const ACADEMY_FEES_PATH = join(__dirname, "..", "data", "academy_fees.json");
 const ACADEMY_NOTES_PATH = join(__dirname, "..", "data", "academy_notes.json");
 const ACADEMY_CERTIFICATES_PATH = join(__dirname, "..", "data", "academy_certificates.json");
+const ACADEMY_CONTENT_PATH = join(__dirname, "..", "data", "academy_course_content.json");
+const STUDENT_PROGRESS_PATH = join(__dirname, "..", "data", "academy_student_progress.json");
 const PAYMENT_REQUESTS_PATH = join(__dirname, "..", "data", "payment_requests.json");
 const CERTIFICATE_REQUESTS_PATH = join(__dirname, "..", "data", "certificate_requests.json");
 const REFERRAL_LINKS_PATH = join(__dirname, "..", "data", "referral_links.json");
 const REFERRAL_PAYOUTS_PATH = join(__dirname, "..", "data", "referral_payouts.json");
 const ENROLLMENTS_HISTORY_PATH = join(__dirname, "..", "data", "student_enrollments.json");
+const ADMIN_ALERTS_PATH = join(__dirname, "..", "data", "admin_alerts.json");
+const STUDENT_NOTIFICATIONS_PATH = join(__dirname, "..", "data", "student_notifications.json");
+const COURSE_UNLOCK_FEES = {
+  dca: 499,
+  cca: 999,
+  "spoken-english-mastery": 499,
+  "ai-associate": 1499,
+  "ai-video-creation": 499,
+};
+const COURSE_DURATION_DAYS = {
+  dca: 90,
+  cca: 180,
+  "spoken-english-mastery": 90,
+  "ai-associate": 180,
+  "ai-video-creation": 60,
+};
 
 function loadJson(path) {
   if (!existsSync(path)) return [];
@@ -84,6 +102,65 @@ const studentAuth = (req, res, next) => {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeCourseId(input) {
+  return String(input || "").trim().toLowerCase();
+}
+
+function getCourseCatalog() {
+  const academy = loadJson(ACADEMY_COURSES_PATH);
+  const fromAcademy = academy.map((c) => {
+    const id = normalizeCourseId(c.id);
+    return {
+      id,
+      name: c.name || id,
+      description: c.description || "",
+      unlockFee: Number(COURSE_UNLOCK_FEES[id] ?? c.price ?? 499),
+    };
+  });
+  if (fromAcademy.length > 0) return fromAcademy;
+  return [
+    { id: "dca", name: "DCA (Basic Computer Course)", unlockFee: 499 },
+    { id: "cca", name: "CCA (Computer Application)", unlockFee: 999 },
+    { id: "spoken-english-mastery", name: "Spoken English Mastery", unlockFee: 499 },
+    { id: "ai-associate", name: "AI Associate (Python)", unlockFee: 1499 },
+    { id: "ai-video-creation", name: "AI Video Creation Course", unlockFee: 499 },
+  ];
+}
+
+function parseIsoDate(v) {
+  return String(v || "").slice(0, 10);
+}
+
+function addDays(isoDate, days) {
+  const d = new Date(`${parseIsoDate(isoDate)}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + Number(days || 0));
+  return d.toISOString().slice(0, 10);
+}
+
+function daysLeftUntil(isoDate) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const start = new Date(`${todayStr}T00:00:00.000Z`).getTime();
+  const end = new Date(`${parseIsoDate(isoDate)}T00:00:00.000Z`).getTime();
+  return Math.max(0, Math.ceil((end - start) / 86400000));
+}
+
+function isCourseUnlockedForStudent(studentId, courseId) {
+  const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+  return enrollments.some(
+    (e) => e.studentId === studentId && normalizeCourseId(e.courseId) === normalizeCourseId(courseId)
+  );
+}
+
+function getFlatChapterOrder(courseNode) {
+  const modules = (courseNode?.modules || []).slice().sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  const ids = [];
+  for (const m of modules) {
+    const chapters = (m.chapters || []).slice().sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+    for (const c of chapters) ids.push(String(c.id));
+  }
+  return ids;
 }
 
 router.get("/profile", studentAuth, (req, res) => {
@@ -264,18 +341,344 @@ router.post("/portal/payment-requests", studentAuth, (req, res) => {
   res.json({ success: true, request: next });
 });
 
+/** Student started wallet top-up: notify admin (name, contact, amounts). */
+router.post("/portal/payment-attempt", studentAuth, (req, res) => {
+  const authUser = getUserById(req.auth.userId);
+  if (!authUser) return res.status(401).json({ error: "User not found" });
+  const student = resolveStudentRecord(authUser);
+  const { topUpAmount, platform, creditedAmount } = req.body || {};
+  const paid = Number(topUpAmount) || 0;
+  const credit = Number(creditedAmount) || paid;
+  const plat = String(platform || "").trim();
+  if (!paid || !plat) {
+    return res.status(400).json({ error: "topUpAmount and platform are required" });
+  }
+  const name = authUser.name || "Student";
+  const phone = student?.phone || authUser.email || "—";
+
+  const alerts = loadJson(ADMIN_ALERTS_PATH);
+  alerts.push({
+    id: `alert-${Date.now()}`,
+    type: "payment_attempt",
+    studentName: String(name),
+    studentPhone: String(phone),
+    authUserId: req.auth.userId,
+    topUpAmount: paid,
+    creditedAmount: credit,
+    platform: plat,
+    createdAt: new Date().toISOString(),
+  });
+  saveJson(ADMIN_ALERTS_PATH, alerts);
+  res.json({ success: true });
+});
+
+router.get("/portal/notifications", studentAuth, (req, res) => {
+  const list = loadJson(STUDENT_NOTIFICATIONS_PATH).filter((n) => n.userId === req.auth.userId);
+  res.json({ notifications: list.slice().reverse().slice(0, 50) });
+});
+
+router.post("/portal/notifications/mark-read", studentAuth, (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  const list = loadJson(STUDENT_NOTIFICATIONS_PATH);
+  for (const n of list) {
+    if (n.userId === req.auth.userId && ids.includes(n.id)) n.read = true;
+  }
+  saveJson(STUDENT_NOTIFICATIONS_PATH, list);
+  res.json({ success: true });
+});
+
 router.get("/portal/courses", studentAuth, (req, res) => {
   const authUser = getUserById(req.auth.userId);
   const student = resolveStudentRecord(authUser);
-  const courses = loadJson(ACADEMY_COURSES_PATH);
+  const courses = getCourseCatalog();
   const batches = loadJson(ACADEMY_BATCHES_PATH);
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   const enrolledIds = new Set();
-  if (student?.courseEnrolled) enrolledIds.add(student.courseEnrolled);
-  for (const e of enrollments) if (e.studentId === student?.id) enrolledIds.add(e.courseId);
-  const enrolledCourses = courses.filter((c) => enrolledIds.has(c.id));
+  for (const e of enrollments) if (e.studentId === student?.id) enrolledIds.add(normalizeCourseId(e.courseId));
+  const allCourses = courses.map((c) => ({
+    ...c,
+    id: normalizeCourseId(c.id),
+    unlockFee: Number(COURSE_UNLOCK_FEES[normalizeCourseId(c.id)] ?? c.unlockFee ?? 499),
+    unlocked: enrolledIds.has(normalizeCourseId(c.id)),
+  }));
+  const trial = enrollments
+    .filter((e) => e.studentId === student?.id && String(e.courseId) === "trial-course")
+    .slice()
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0] || null;
+
+  const enrollByCourse = {};
+  for (const e of enrollments) {
+    if (e.studentId !== student?.id) continue;
+    const cid = normalizeCourseId(e.courseId);
+    if (!cid || cid === "trial-course") continue;
+    if (!enrollByCourse[cid] || String(e.createdAt || "") > String(enrollByCourse[cid].createdAt || "")) {
+      enrollByCourse[cid] = e;
+    }
+  }
+
+  const enrichedCourses = allCourses.map((c) => {
+    const enr = enrollByCourse[c.id] || null;
+    if (!enr) return { ...c, status: "locked", completed: false, daysLeft: 0 };
+    const startDate = parseIsoDate(enr.startDate || enr.createdAt || today());
+    const endDate = parseIsoDate(enr.expiresAt || addDays(startDate, COURSE_DURATION_DAYS[c.id] || 90));
+    const left = daysLeftUntil(endDate);
+    const completed = left === 0;
+    const renewFee = Math.round((Number(c.unlockFee) || 0) * 0.6);
+    return {
+      ...c,
+      status: completed ? "completed" : "active",
+      completed,
+      startDate,
+      endDate,
+      daysLeft: left,
+      renewFee,
+    };
+  });
+  const enrolledCourses = enrichedCourses.filter((c) => c.unlocked);
   const upcomingBatches = batches.filter((b) => enrolledIds.has(b.courseId)).slice(0, 8);
-  res.json({ student: student || null, enrolledCourses, upcomingBatches });
+  let trialInfo = null;
+  if (trial) {
+    const expiresAt = parseIsoDate(trial.expiresAt || addDays(trial.createdAt || today(), 7));
+    const daysLeft = daysLeftUntil(expiresAt);
+    trialInfo = {
+      id: trial.id,
+      status: daysLeft === 0 ? "completed" : "active",
+      expiresAt,
+      daysLeft,
+      title: "1 Week Trial Course",
+    };
+  }
+  res.json({ student: student || null, enrolledCourses, allCourses: enrichedCourses, upcomingBatches, trialInfo });
+});
+
+router.post("/portal/courses/unlock", studentAuth, (req, res) => {
+  const authUser = getUserById(req.auth.userId);
+  if (!authUser) return res.status(401).json({ error: "User not found" });
+  const student = resolveStudentRecord(authUser);
+  if (!student) return res.status(400).json({ error: "Link your Student ID first to unlock courses." });
+  const courseId = normalizeCourseId(req.body?.courseId);
+  const confirmUnlock = !!req.body?.confirmUnlock;
+  if (!courseId) return res.status(400).json({ error: "courseId is required" });
+
+  const course = getCourseCatalog().find((c) => normalizeCourseId(c.id) === courseId);
+  if (!course) return res.status(404).json({ error: "Course not found" });
+  const unlockFee = Number(COURSE_UNLOCK_FEES[courseId] ?? course.unlockFee ?? 499);
+
+  const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+  const already = enrollments.some(
+    (e) => e.studentId === student.id && normalizeCourseId(e.courseId) === courseId
+  ) || normalizeCourseId(student.courseEnrolled) === courseId;
+  if (already) return res.json({ success: true, alreadyUnlocked: true, message: "Course already unlocked." });
+
+  if (!confirmUnlock) {
+    return res.json({
+      confirmRequired: true,
+      courseId,
+      unlockFee,
+      message: `Unlock fee ₹${unlockFee} will be deducted from wallet.`,
+    });
+  }
+
+  const currentBalance = Number(authUser.walletBalance) || 0;
+  if (currentBalance < unlockFee) {
+    return res.status(400).json({
+      error: `Insufficient wallet balance. Need ₹${unlockFee}, available ₹${currentBalance}. Add balance first.`,
+      requiredAmount: unlockFee,
+      walletBalance: currentBalance,
+    });
+  }
+
+  const users = getUsers();
+  const idx = users.findIndex((u) => u.id === authUser.id);
+  if (idx < 0) return res.status(404).json({ error: "User not found" });
+  users[idx] = { ...users[idx], walletBalance: currentBalance - unlockFee };
+  saveUsers(users);
+
+  const nextEnrollment = {
+    id: `enr-${Date.now()}`,
+    studentId: student.id,
+    courseId,
+    batchId: "",
+    note: `Course unlocked from wallet. Fee deducted ₹${unlockFee}`,
+    status: "active",
+    startDate: today(),
+    expiresAt: addDays(today(), COURSE_DURATION_DAYS[courseId] || 90),
+    createdAt: new Date().toISOString(),
+  };
+  enrollments.push(nextEnrollment);
+  saveJson(ENROLLMENTS_HISTORY_PATH, enrollments);
+
+  res.json({
+    success: true,
+    courseId,
+    unlockFee,
+    walletBalance: Number(users[idx].walletBalance) || 0,
+    message: `Course unlocked successfully. ₹${unlockFee} deducted from wallet.`,
+  });
+});
+
+router.post("/portal/courses/renew", studentAuth, (req, res) => {
+  const authUser = getUserById(req.auth.userId);
+  if (!authUser) return res.status(401).json({ error: "User not found" });
+  const student = resolveStudentRecord(authUser);
+  if (!student) return res.status(400).json({ error: "Link your Student ID first." });
+  const courseId = normalizeCourseId(req.body?.courseId);
+  if (!courseId) return res.status(400).json({ error: "courseId is required" });
+  const course = getCourseCatalog().find((c) => normalizeCourseId(c.id) === courseId);
+  if (!course) return res.status(404).json({ error: "Course not found" });
+  const baseFee = Number(COURSE_UNLOCK_FEES[courseId] ?? course.unlockFee ?? 499);
+  const renewFee = Math.round(baseFee * 0.6);
+  const bal = Number(authUser.walletBalance) || 0;
+  if (bal < renewFee) {
+    return res.status(400).json({
+      error: `Insufficient wallet balance. Need ₹${renewFee}, available ₹${bal}.`,
+      renewFee,
+      walletBalance: bal,
+    });
+  }
+  const users = getUsers();
+  const idx = users.findIndex((u) => u.id === authUser.id);
+  users[idx] = { ...users[idx], walletBalance: bal - renewFee };
+  saveUsers(users);
+  const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+  enrollments.push({
+    id: `enr-${Date.now()}-renew`,
+    studentId: student.id,
+    courseId,
+    batchId: "",
+    note: `Course renewed at 40% discount. Fee deducted ₹${renewFee}`,
+    status: "active",
+    startDate: today(),
+    expiresAt: addDays(today(), COURSE_DURATION_DAYS[courseId] || 90),
+    createdAt: new Date().toISOString(),
+  });
+  saveJson(ENROLLMENTS_HISTORY_PATH, enrollments);
+  return res.json({
+    success: true,
+    courseId,
+    renewFee,
+    walletBalance: Number(users[idx].walletBalance) || 0,
+    message: `Course renewed successfully at 40% discount. ₹${renewFee} deducted.`,
+  });
+});
+
+router.get("/portal/course-content/:courseId", studentAuth, (req, res) => {
+  const authUser = getUserById(req.auth.userId);
+  if (!authUser) return res.status(401).json({ error: "User not found" });
+  const student = resolveStudentRecord(authUser);
+  if (!student) return res.status(400).json({ error: "Link your Student ID first." });
+  const courseId = normalizeCourseId(req.params.courseId);
+  if (!isCourseUnlockedForStudent(student.id, courseId)) {
+    return res.status(403).json({ error: "Course is locked. Unlock it first." });
+  }
+
+  const courses = getCourseCatalog();
+  const course = courses.find((c) => normalizeCourseId(c.id) === courseId);
+  if (!course) return res.status(404).json({ error: "Course not found" });
+
+  const tree = loadJson(ACADEMY_CONTENT_PATH);
+  const courseNode = tree.find((x) => normalizeCourseId(x.courseId) === courseId) || { modules: [] };
+  const progressList = loadJson(STUDENT_PROGRESS_PATH);
+  const progress =
+    progressList.find((p) => p.studentId === student.id && normalizeCourseId(p.courseId) === courseId) ||
+    { studentId: student.id, courseId, completedChapterIds: [] };
+  const completedSet = new Set((progress.completedChapterIds || []).map(String));
+  const flatOrder = getFlatChapterOrder(courseNode);
+  const unlockedSet = new Set();
+  if (flatOrder.length > 0) unlockedSet.add(flatOrder[0]);
+  for (let i = 0; i < flatOrder.length; i += 1) {
+    if (completedSet.has(flatOrder[i]) && flatOrder[i + 1]) unlockedSet.add(flatOrder[i + 1]);
+  }
+  const modules = (courseNode.modules || [])
+    .slice()
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+    .map((m) => ({
+      ...m,
+      chapters: (m.chapters || [])
+        .slice()
+        .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+        .map((c) => ({
+          ...c,
+          unlocked: unlockedSet.has(String(c.id)),
+          completed: completedSet.has(String(c.id)),
+        })),
+    }));
+  const progressPercent = flatOrder.length
+    ? Math.round((completedSet.size / flatOrder.length) * 100)
+    : 0;
+  return res.json({
+    course,
+    modules,
+    progressPercent,
+    completedCount: completedSet.size,
+    totalChapters: flatOrder.length,
+  });
+});
+
+router.post("/portal/course-content/:courseId/chapters/:chapterId/complete", studentAuth, (req, res) => {
+  const authUser = getUserById(req.auth.userId);
+  if (!authUser) return res.status(401).json({ error: "User not found" });
+  const student = resolveStudentRecord(authUser);
+  if (!student) return res.status(400).json({ error: "Link your Student ID first." });
+  const courseId = normalizeCourseId(req.params.courseId);
+  const chapterId = String(req.params.chapterId);
+  if (!isCourseUnlockedForStudent(student.id, courseId)) {
+    return res.status(403).json({ error: "Course is locked. Unlock it first." });
+  }
+  const tree = loadJson(ACADEMY_CONTENT_PATH);
+  const courseNode = tree.find((x) => normalizeCourseId(x.courseId) === courseId);
+  if (!courseNode) return res.status(404).json({ error: "Course content not found" });
+  const flatOrder = getFlatChapterOrder(courseNode);
+  if (!flatOrder.includes(chapterId)) return res.status(404).json({ error: "Chapter not found" });
+
+  const progressList = loadJson(STUDENT_PROGRESS_PATH);
+  let idx = progressList.findIndex(
+    (p) => p.studentId === student.id && normalizeCourseId(p.courseId) === courseId
+  );
+  if (idx < 0) {
+    progressList.push({
+      id: `prog-${Date.now()}`,
+      studentId: student.id,
+      courseId,
+      completedChapterIds: [],
+      createdAt: new Date().toISOString(),
+    });
+    idx = progressList.length - 1;
+  }
+  const completedSet = new Set((progressList[idx].completedChapterIds || []).map(String));
+  const unlockedSet = new Set();
+  if (flatOrder.length > 0) unlockedSet.add(flatOrder[0]);
+  for (let i = 0; i < flatOrder.length; i += 1) {
+    if (completedSet.has(flatOrder[i]) && flatOrder[i + 1]) unlockedSet.add(flatOrder[i + 1]);
+  }
+  if (!unlockedSet.has(chapterId) && !completedSet.has(chapterId)) {
+    return res.status(400).json({ error: "Complete previous chapter first." });
+  }
+  completedSet.add(chapterId);
+  progressList[idx] = {
+    ...progressList[idx],
+    completedChapterIds: Array.from(completedSet),
+    updatedAt: new Date().toISOString(),
+  };
+  saveJson(STUDENT_PROGRESS_PATH, progressList);
+
+  if (completedSet.size >= flatOrder.length && flatOrder.length > 0) {
+    const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+    const eIdx = enrollments
+      .map((e, i) => ({ e, i }))
+      .filter(({ e }) => e.studentId === student.id && normalizeCourseId(e.courseId) === courseId)
+      .sort((a, b) => String(b.e.createdAt || "").localeCompare(String(a.e.createdAt || "")))[0];
+    if (eIdx) {
+      enrollments[eIdx.i] = {
+        ...enrollments[eIdx.i],
+        status: "completed",
+        completedAt: new Date().toISOString(),
+      };
+      saveJson(ENROLLMENTS_HISTORY_PATH, enrollments);
+    }
+  }
+
+  return res.json({ success: true, completedChapterIds: Array.from(completedSet) });
 });
 
 router.get("/portal/materials", studentAuth, (req, res) => {

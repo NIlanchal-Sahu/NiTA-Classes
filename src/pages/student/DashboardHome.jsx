@@ -34,17 +34,26 @@ function BookIcon({ className }) {
 }
 
 export default function DashboardHome() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
+  const walletBalance = Number(user?.walletBalance) || 0
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [mini, setMini] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [coursesData, setCoursesData] = useState(null)
+  const [unlockModal, setUnlockModal] = useState(null)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     ;(async () => {
       try {
-        const [m, p] = await Promise.all([studentPortalApi.getMiniDashboard(), studentPortalApi.getProfile()])
+        const [m, p, c] = await Promise.all([
+          studentPortalApi.getMiniDashboard(),
+          studentPortalApi.getProfile(),
+          studentPortalApi.getCoursesLearning(),
+        ])
         setMini(m)
         setProfile(p)
+        setCoursesData(c)
       } catch {
         // silent fallback for dashboard
       }
@@ -52,6 +61,13 @@ export default function DashboardHome() {
   }, [])
 
   const name = user?.name || user?.email?.split('@')[0] || 'Student'
+
+  const unlockModalFee = unlockModal
+    ? unlockModal.mode === 'renew'
+      ? Number(unlockModal.renewFee) || 0
+      : Number(unlockModal.unlockFee) || 0
+    : 0
+  const unlockModalInsufficient = Boolean(unlockModal && walletBalance < unlockModalFee)
   const stats = [
     {
       label: 'Wallet balance',
@@ -81,14 +97,6 @@ export default function DashboardHome() {
       color: 'text-amber-400',
       bg: 'bg-amber-500/20',
     },
-  ]
-
-  const exploreCourses = [
-    { id: 'dca', title: 'DCA (Basic Computer Course) - Quick & Short Term' },
-    { id: 'cca', title: 'CCA - Computer Application (PGDCA / O Level Equivalent)' },
-    { id: 'spoken-english-mastery', title: 'Spoken English Mastery (Advance Level)' },
-    { id: 'ai-associate', title: 'Artificial Intelligent Associate (AI Dev with Python)' },
-    { id: 'ai-video-creation', title: 'AI Video Creation Course' },
   ]
 
   if (profile && profile.isLinked === false) {
@@ -187,20 +195,134 @@ export default function DashboardHome() {
 
       <div className="mt-10">
         <h3 className="text-lg font-bold text-white">All Courses</h3>
+        {coursesData?.trialInfo && (
+          <div className="mt-3 rounded-xl border border-blue-700 bg-blue-900/20 p-4 text-sm text-blue-100">
+            <div className="font-semibold">{coursesData.trialInfo.title}</div>
+            {coursesData.trialInfo.status === 'active' ? (
+              <div>Expires in {coursesData.trialInfo.daysLeft} day(s) · {coursesData.trialInfo.expiresAt}</div>
+            ) : (
+              <div>Completed on {coursesData.trialInfo.expiresAt}</div>
+            )}
+          </div>
+        )}
+        {actionError && (
+          <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {actionError}
+          </div>
+        )}
         <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {exploreCourses.map((c) => (
+          {(coursesData?.allCourses || []).map((c) => (
             <div key={c.id} className="group overflow-hidden rounded-xl border border-gray-700 bg-gray-800 transition hover:border-gray-600">
               <div className="relative aspect-video bg-gray-700">
                 <img src="/qr-dummy.png" alt="" className="h-full w-full object-cover opacity-70" />
-                <span className="absolute left-2 top-2 rounded bg-red-600/90 px-2 py-1 text-xs font-medium text-white">LOCKED</span>
+                <span className={`absolute left-2 top-2 rounded px-2 py-1 text-xs font-medium text-white ${c.status === 'locked' ? 'bg-red-600/90' : c.status === 'completed' ? 'bg-amber-600/90' : 'bg-emerald-600/90'}`}>
+                  {c.status.toUpperCase()}
+                </span>
               </div>
               <div className="p-4">
-                <p className="font-semibold text-white line-clamp-2">{c.title}</p>
+                <p className="font-semibold text-white line-clamp-2">{c.name || c.title}</p>
+                <p className="mt-1 text-xs text-gray-300">Unlock fee: ₹{c.unlockFee}</p>
+                {c.status === 'active' && <p className="mt-1 text-xs text-emerald-300">Expires in {c.daysLeft} day(s)</p>}
+                {c.status === 'completed' && <p className="mt-1 text-xs text-amber-300">Completed · Renew at 40% discount: ₹{c.renewFee}</p>}
+                <div className="mt-3">
+                  {c.status === 'locked' ? (
+                    <button
+                      type="button"
+                      onClick={() => setUnlockModal({ mode: 'unlock', ...c })}
+                      className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+                    >
+                      Unlock
+                    </button>
+                  ) : c.status === 'completed' ? (
+                    <button
+                      type="button"
+                      onClick={() => setUnlockModal({ mode: 'renew', ...c })}
+                      className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
+                    >
+                      Renew Course
+                    </button>
+                  ) : (
+                    <Link to={`/student/course/${c.id}`} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700">
+                      Open Course
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           ))}
         </div>
       </div>
+      {unlockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-800 p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-white">
+              {unlockModal.mode === 'renew' ? 'Renew course?' : 'Unlock course?'}
+            </h3>
+            <p className="mt-2 text-sm text-gray-300">
+              <span className="font-semibold text-white">{unlockModal.name || unlockModal.title}</span>
+            </p>
+            <p className="mt-2 text-sm text-amber-300">
+              {unlockModal.mode === 'renew'
+                ? `Renew fee ₹${unlockModalFee} (40% discount) will be deducted from wallet.`
+                : `Course unlock fee ₹${unlockModalFee} will be deducted from wallet.`}
+            </p>
+            {unlockModalInsufficient && (
+              <p className="mt-2 text-sm text-red-300">
+                Insufficient wallet balance. Please add balance first.
+              </p>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setUnlockModal(null)
+                  setActionError('')
+                }}
+                className="flex-1 rounded-lg border border-gray-600 py-2.5 font-medium text-gray-300 hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              {unlockModalInsufficient ? (
+                <Link
+                  to="/student/pay"
+                  className="flex-1 rounded-lg bg-blue-600 py-2.5 text-center font-medium text-white hover:bg-blue-700"
+                >
+                  Add Balance
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setActionError('')
+                    try {
+                      if (unlockModal.mode === 'renew') {
+                        await studentPortalApi.renewCourse(unlockModal.id)
+                      } else {
+                        await studentPortalApi.unlockCourse(unlockModal.id, true)
+                      }
+                      setUnlockModal(null)
+                      await refreshUser()
+                      const [m, p, c] = await Promise.all([
+                        studentPortalApi.getMiniDashboard(),
+                        studentPortalApi.getProfile(),
+                        studentPortalApi.getCoursesLearning(),
+                      ])
+                      setMini(m)
+                      setProfile(p)
+                      setCoursesData(c)
+                    } catch (e) {
+                      setActionError(e.message || 'Action failed')
+                    }
+                  }}
+                  className="flex-1 rounded-lg bg-violet-600 py-2.5 font-medium text-white hover:bg-violet-700"
+                >
+                  {unlockModal.mode === 'renew' ? 'Confirm renewal' : 'Confirm unlock'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

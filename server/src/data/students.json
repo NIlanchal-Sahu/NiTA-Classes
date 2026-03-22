@@ -1,1 +1,28 @@
-﻿[]
+[
+  {
+    "id": "NITA20260321",
+    "name": "Nilanchala Sahu",
+    "phone": "9986437890",
+    "courseEnrolled": "ai-video-creation",
+    "batchId": "",
+    "admissionDate": "2026-03-21",
+    "enrollmentFeeStatus": "pending",
+    "accountUserId": "auth-1774078706435",
+    "createdAt": "2026-03-21T07:38:26.689Z"
+  },
+  {
+    "id": "NITA20260322GJUTZH",
+    "name": "Rasmita Sahu",
+    "phone": "9178745761",
+    "courseEnrolled": "cca",
+    "highestQualification": "+3",
+    "villageCity": "Patrapur",
+    "gender": "Female",
+    "fatherName": "Father Name",
+    "batchId": "",
+    "admissionDate": "2026-03-22",
+    "enrollmentFeeStatus": "pending",
+    "accountUserId": "auth-1774146766572",
+    "createdAt": "2026-03-22T02:32:46.824Z"
+  }
+]

@@ -25,7 +25,7 @@ export default function AdminLayout() {
         { to: '/admin/courses', label: 'Courses' },
         { to: '/admin/batches', label: 'Batches' },
         { to: '/admin/attendance', label: 'Attendance' },
-        { to: '/admin/notes', label: 'Notes & Content' },
+        { to: '/admin/notes', label: 'Course Content' },
       ]
     : [
         { to: '/admin', end: true, label: 'Dashboard' },
@@ -36,14 +36,14 @@ export default function AdminLayout() {
         { to: '/admin/fees', label: 'Fees & Payments' },
         { to: '/admin/discounts', label: 'Discounts' },
         { to: '/admin/referrals', label: 'Referrals' },
-        { to: '/admin/notes', label: 'Notes & Content' },
+        { to: '/admin/notes', label: 'Course Content' },
         { to: '/admin/certificates', label: 'Certificates' },
         { to: '/admin/enrollments', label: 'Admissions Queue' },
         { to: '/admin/notifications', label: 'Notifications' },
       ]
 
   return (
-    <div className="flex min-h-screen bg-gray-900">
+    <div className="flex h-screen min-h-0 overflow-hidden bg-gray-900">
       <div
         className="fixed inset-0 z-40 bg-black/50 lg:hidden"
         style={{ display: open ? 'block' : 'none' }}
@@ -52,7 +52,7 @@ export default function AdminLayout() {
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-gray-800 border-r border-gray-700 lg:static lg:translate-x-0 transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-gray-700 bg-gray-800 lg:static lg:translate-x-0 transition-transform duration-200 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -140,7 +140,7 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-8">
           <Outlet />
         </main>
       </div>

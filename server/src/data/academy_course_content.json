@@ -1,0 +1,40 @@
+[
+  {
+    "courseId": "ai-video-creation",
+    "modules": [
+      {
+        "id": "mod-1774119911209",
+        "title": "A",
+        "order": 1,
+        "chapters": [
+          {
+            "id": "ch-1774145274849",
+            "title": "Introduction to AI",
+            "heading": "Welcome",
+            "videoUrl": "https://youtu.be/REk7qgVIo18",
+            "description": "Free Short Video Demo",
+            "resourceType": "video",
+            "noteText": "",
+            "order": 1,
+            "createdAt": "2026-03-22T02:07:54.849Z"
+          }
+        ],
+        "createdAt": "2026-03-21T19:05:11.209Z"
+      },
+      {
+        "id": "mod-1774140598687",
+        "title": "B",
+        "order": 2,
+        "chapters": [],
+        "createdAt": "2026-03-22T00:49:58.687Z"
+      },
+      {
+        "id": "mod-1774142708077",
+        "title": "C",
+        "order": 3,
+        "chapters": [],
+        "createdAt": "2026-03-22T01:25:08.077Z"
+      }
+    ]
+  }
+]

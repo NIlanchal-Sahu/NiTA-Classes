@@ -5,6 +5,7 @@ export default function AdminFees() {
   const [students, setStudents] = useState([])
   const [payments, setPayments] = useState([])
   const [requests, setRequests] = useState([])
+  const [adminAlerts, setAdminAlerts] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -83,6 +84,50 @@ export default function AdminFees() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-900/10 p-6">
+        <h2 className="text-lg font-semibold text-white">Wallet payment attempts (scan &amp; pay)</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Logged when a student opens the QR step (name, contact, amount paid / credit after approval).
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-gray-300">
+              <tr>
+                <th className="px-3 py-3">When</th>
+                <th className="px-3 py-3">Student</th>
+                <th className="px-3 py-3">Contact</th>
+                <th className="px-3 py-3">Pay ₹</th>
+                <th className="px-3 py-3">Credit ₹</th>
+                <th className="px-3 py-3">App</th>
+                <th className="px-3 py-3">Auth ID</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700 text-gray-200">
+              {adminAlerts
+                .filter((x) => x.type === 'payment_attempt')
+                .map((x) => (
+                  <tr key={x.id}>
+                    <td className="px-3 py-3 whitespace-nowrap">{String(x.createdAt || '').slice(0, 19).replace('T', ' ')}</td>
+                    <td className="px-3 py-3">{x.studentName}</td>
+                    <td className="px-3 py-3">{x.studentPhone}</td>
+                    <td className="px-3 py-3">₹{x.topUpAmount}</td>
+                    <td className="px-3 py-3">₹{x.creditedAmount}</td>
+                    <td className="px-3 py-3">{x.platform}</td>
+                    <td className="px-3 py-3 font-mono text-xs">{x.authUserId}</td>
+                  </tr>
+                ))}
+              {adminAlerts.filter((x) => x.type === 'payment_attempt').length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-4 text-gray-500">
+                    No payment attempts logged yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">

@@ -42,6 +42,7 @@ export const academyApi = {
   getFees: (studentId = '') => request(`/fees${studentId ? `?studentId=${encodeURIComponent(studentId)}` : ''}`, { headers: headers(false) }),
   createPayment: (body) => request('/fees/payments', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
   getPaymentRequests: () => request('/fees/payment-requests', { headers: headers(false) }),
+  getAdminAlerts: () => request('/admin-alerts', { headers: headers(false) }),
   approvePaymentRequest: (id) => request(`/fees/payment-requests/${id}/approve`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }),
 
   getDiscounts: () => request('/discounts', { headers: headers(false) }),
@@ -57,5 +58,45 @@ export const academyApi = {
 
   resetStudentPassword: (body) =>
     request('/students/reset-password', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+
+  getContentCourses: () => request('/content/courses', { headers: headers(false) }),
+  createModule: (courseId, body) =>
+    request(`/content/courses/${encodeURIComponent(courseId)}/modules`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+  updateModule: (courseId, moduleId, body) =>
+    request(`/content/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify(body),
+    }),
+  deleteModule: (courseId, moduleId) =>
+    request(`/content/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}`, { method: 'DELETE', headers: headers(false) }),
+  reorderModules: (courseId, orders) =>
+    request(`/content/courses/${encodeURIComponent(courseId)}/modules/reorder`, { method: 'POST', headers: headers(), body: JSON.stringify({ orders }) }),
+  createChapter: (courseId, moduleId, body) =>
+    request(`/content/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/chapters`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(body),
+    }),
+  updateChapter: (courseId, moduleId, chapterId, body) =>
+    request(
+      `/content/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/chapters/${encodeURIComponent(chapterId)}`,
+      {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify(body),
+      }
+    ),
+  deleteChapter: (courseId, moduleId, chapterId) =>
+    request(
+      `/content/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/chapters/${encodeURIComponent(chapterId)}`,
+      { method: 'DELETE', headers: headers(false) }
+    ),
+  reorderChapters: (courseId, moduleId, orders) =>
+    request(`/content/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/chapters/reorder`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ orders }),
+    }),
 }
 

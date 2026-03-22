@@ -49,10 +49,10 @@ export default function MyCourses() {
               </div>
               <p className="mt-1 text-xs text-gray-500">Progress tracking enabled</p>
               <Link
-                to="/student"
+                to={`/student/course/${c.id}`}
                 className="mt-3 inline-block text-sm font-medium text-violet-400 hover:text-violet-300"
               >
-                Continue →
+                Open Course →
               </Link>
             </div>
           </div>

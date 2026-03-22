@@ -40,6 +40,33 @@ function findStudentUserByPhone(phone) {
   )
 }
 
+function getNextSaturdayIso(baseDate = new Date()) {
+  const d = new Date(baseDate)
+  const day = d.getDay() // 0 Sun .. 6 Sat
+  const daysToSaturday = (6 - day + 7) % 7 || 7
+  d.setDate(d.getDate() + daysToSaturday)
+  return d.toISOString().slice(0, 10)
+}
+
+function ensureTrialEnrollment(studentId) {
+  const enr = loadJson(STUDENT_ENROLLMENTS_PATH)
+  const hasTrial = enr.some((e) => e.studentId === studentId && String(e.courseId) === 'trial-course')
+  if (hasTrial) return
+  enr.push({
+    id: `enr-${Date.now()}-trial`,
+    studentId,
+    courseId: 'trial-course',
+    batchId: '',
+    note: '1 week trial course',
+    isTrial: true,
+    status: 'active',
+    startDate: new Date().toISOString().slice(0, 10),
+    expiresAt: getNextSaturdayIso(),
+    createdAt: new Date().toISOString(),
+  })
+  saveJson(STUDENT_ENROLLMENTS_PATH, enr)
+}
+
 router.post('/', (req, res) => {
   const {
     name,
@@ -78,16 +105,7 @@ router.post('/', (req, res) => {
 
   const existingUser = findStudentUserByPhone(phone)
   if (existingUser) {
-    const enr = loadJson(STUDENT_ENROLLMENTS_PATH)
-    enr.push({
-      id: `enr-${Date.now()}`,
-      studentId: existingUser.studentId || existingUser.id,
-      courseId: String(course).trim(),
-      batchId: '',
-      note: 'Public admission form (existing account)',
-      createdAt: new Date().toISOString(),
-    })
-    saveJson(STUDENT_ENROLLMENTS_PATH, enr)
+    ensureTrialEnrollment(existingUser.studentId || existingUser.id)
 
     return res.json({
       success: true,
@@ -137,16 +155,7 @@ router.post('/', (req, res) => {
   students.push(studentRecord)
   saveJson(STUDENTS_PATH, students)
 
-  const enr = loadJson(STUDENT_ENROLLMENTS_PATH)
-  enr.push({
-    id: `enr-${Date.now()}`,
-    studentId,
-    courseId: String(course).trim(),
-    batchId: '',
-    note: 'Public admission form',
-    createdAt: new Date().toISOString(),
-  })
-  saveJson(STUDENT_ENROLLMENTS_PATH, enr)
+  ensureTrialEnrollment(studentId)
 
   return res.json({
     success: true,
