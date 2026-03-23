@@ -10,14 +10,21 @@ import notificationsRoutes from './routes/notifications.js'
 import publicEnrollmentsRoutes from './routes/publicEnrollments.js'
 import referralsRoutes from './routes/referrals.js'
 import academyRoutes from './routes/academy.js'
+import studentProfileRoutes from './routes/studentProfile.js'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 const PORT = process.env.PORT || 3001
 
 app.use(cors({ origin: true, credentials: true }))
-app.use(express.json())
+app.use(express.json({ limit: '2mb' }))
+app.use('/uploads', express.static(join(__dirname, 'uploads')))
 app.use('/api/auth', authRoutes)
 app.use('/api/student', studentRoutes)
+app.use('/api/student', studentProfileRoutes)
 app.use('/api/student/referrals', referralsRoutes)
 app.use('/api/public/enrollments', publicEnrollmentsRoutes)
 app.use('/api/admin', adminRoutes)

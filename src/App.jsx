@@ -20,6 +20,7 @@ import CourseContent from './pages/student/CourseContent'
 import HelpSupport from './pages/student/HelpSupport'
 import Achievements from './pages/student/Achievements'
 import Settings from './pages/student/Settings'
+import StudentProfile from './pages/student/StudentProfile'
 import ReferEarn from './pages/student/ReferEarn'
 import LinkStudent from './pages/student/LinkStudent'
 import AdminLayout from './admin/AdminLayout'
@@ -35,6 +36,7 @@ import AdminFees from './admin/AdminFees'
 import AdminDiscounts from './admin/AdminDiscounts'
 import AdminNotes from './admin/AdminNotes'
 import AdminCertificates from './admin/AdminCertificates'
+import AdminStudentProfiles from './admin/AdminStudentProfiles'
 
 export default function App() {
   return (
@@ -66,6 +68,7 @@ export default function App() {
           <Route path="help" element={<HelpSupport />} />
           <Route path="achievements" element={<Achievements />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="profile" element={<StudentProfile />} />
           <Route path="referrals" element={<ReferEarn />} />
           <Route path="link-student" element={<LinkStudent />} />
         </Route>
@@ -85,6 +88,7 @@ export default function App() {
           <Route path="discounts" element={<AdminDiscounts />} />
           <Route path="notes" element={<AdminNotes />} />
           <Route path="certificates" element={<AdminCertificates />} />
+          <Route path="student-profiles" element={<AdminStudentProfiles />} />
           <Route path="enrollments" element={<AdminEnrollments />} />
           <Route path="batches" element={<AdminBatches />} />
           <Route path="notifications" element={<AdminNotifications />} />

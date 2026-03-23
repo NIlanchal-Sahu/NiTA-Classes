@@ -22,5 +22,11 @@
     "courseId": "computer-basics",
     "date": "2026-03-17",
     "classesCount": 1
+  },
+  {
+    "studentId": "auth-1774146766572",
+    "courseId": "spoken-english-mastery",
+    "date": "2026-03-22",
+    "classesCount": 1
   }
 ]

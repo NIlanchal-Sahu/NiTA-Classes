@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { getStudentAvatarPublicUrl } from './studentProfileUtils.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { applyReferralCodeToStudent } from './referrals.js'
@@ -116,13 +117,18 @@ export function adminResetStudentPassword(studentIdOrPhone, newPassword) {
 }
 
 function userToPublic(user) {
-  return {
+  const base = {
     id: user.id,
     email: user.email,
     role: user.role,
     name: user.name || String(user.email || '').split('@')[0],
     ...(user.studentId ? { studentId: user.studentId } : {}),
   }
+  if (user.role === 'student') {
+    const avatarUrl = getStudentAvatarPublicUrl(user.id)
+    if (avatarUrl) base.avatarUrl = avatarUrl
+  }
+  return base
 }
 
 export function loginWithPassword(email, password, role) {

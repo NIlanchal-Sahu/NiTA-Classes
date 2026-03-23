@@ -19,6 +19,8 @@ const ACADEMY_STUDENTS_PATH = join(__dirname, "..", "data", "students.json");
 const ACADEMY_COURSES_PATH = join(__dirname, "..", "data", "academy_courses.json");
 const ACADEMY_BATCHES_PATH = join(__dirname, "..", "data", "academy_batches.json");
 const ACADEMY_ATTENDANCE_PATH = join(__dirname, "..", "data", "academy_attendance.json");
+/** Wallet / Pay-for-class attendance (auth user id) — same file as `recordClassAndDeduct` in student.js */
+const WALLET_ATTENDANCE_PATH = join(__dirname, "..", "data", "attendance.json");
 const ACADEMY_FEES_PATH = join(__dirname, "..", "data", "academy_fees.json");
 const ACADEMY_NOTES_PATH = join(__dirname, "..", "data", "academy_notes.json");
 const ACADEMY_CERTIFICATES_PATH = join(__dirname, "..", "data", "academy_certificates.json");
@@ -65,6 +67,18 @@ function digits(input) {
 
 function monthKey(dateStr) {
   return String(dateStr || "").slice(0, 7);
+}
+
+function computeBatchLifecycleStatus(batch) {
+  const manual = String(batch?.status || "").toLowerCase();
+  if (manual === "completed" || manual === "cancelled") return manual;
+  const now = today();
+  const start = String(batch?.startDate || "").slice(0, 10);
+  const end = String(batch?.endDate || "").slice(0, 10);
+  if (start && start > now) return "upcoming";
+  if (start && end && now >= start && now <= end) return "active";
+  if (end && now > end) return "completed";
+  return "active";
 }
 
 function resolveStudentRecord(authUser) {
@@ -277,25 +291,92 @@ router.post("/portal/claim", studentAuth, (req, res) => {
   res.json({ success: true, student: students[idx] });
 });
 
+function daysInMonthString(ym) {
+  const [y, m] = String(ym).split("-").map(Number);
+  if (!y || !m) return 30;
+  return new Date(y, m, 0).getDate();
+}
+
+/**
+ * Attendance for calendar:
+ * - Primary: wallet pay-for-class rows in `attendance.json` (studentId = auth user id)
+ * - Optional: academy_attendance.json (studentId = academy student id, manual present/absent)
+ * - No courseId: aggregate all courses — a day is "present" if any class was paid/attended
+ * - With courseId: only that course's sessions count for that day
+ */
 router.get("/portal/attendance", studentAuth, (req, res) => {
   const authUser = getUserById(req.auth.userId);
   const student = resolveStudentRecord(authUser);
-  if (!student) return res.json({ studentId: null, attendance: [], monthlyPercentage: 0 });
   const month = String(req.query.month || monthKey(today()));
-  const courseId = String(req.query.courseId || "");
-  const records = loadJson(ACADEMY_ATTENDANCE_PATH).filter(
-    (r) =>
-      r.studentId === student.id &&
-      monthKey(r.date) === month &&
-      (!courseId || r.courseId === courseId),
+  const courseFilter = String(req.query.courseId || "").trim()
+    ? normalizeCourseId(req.query.courseId)
+    : "";
+
+  const walletRows = loadJson(WALLET_ATTENDANCE_PATH).filter(
+    (r) => r.studentId === req.auth.userId && monthKey(r.date) === month,
   );
-  const present = records.filter((r) => r.status === "present").length;
-  const monthlyPercentage = records.length ? Math.round((present / records.length) * 100) : 0;
+  const filteredWallet = courseFilter
+    ? walletRows.filter((r) => normalizeCourseId(r.courseId) === courseFilter)
+    : walletRows;
+
+  const dayMap = new Map();
+
+  for (const r of filteredWallet) {
+    const d = String(r.date || "").slice(0, 10);
+    if (!d) continue;
+    const cnt = Number(r.classesCount) || 0;
+    if (!dayMap.has(d)) {
+      dayMap.set(d, { classesCount: 0, academyPresent: false, academyAbsent: false });
+    }
+    const e = dayMap.get(d);
+    e.classesCount += cnt;
+  }
+
+  if (student) {
+    const academyRows = loadJson(ACADEMY_ATTENDANCE_PATH).filter(
+      (r) => r.studentId === student.id && monthKey(r.date) === month,
+    );
+    for (const r of academyRows) {
+      if (courseFilter && normalizeCourseId(r.courseId) !== courseFilter) continue;
+      const d = String(r.date || "").slice(0, 10);
+      if (!d) continue;
+      if (!dayMap.has(d)) {
+        dayMap.set(d, { classesCount: 0, academyPresent: false, academyAbsent: false });
+      }
+      const e = dayMap.get(d);
+      const st = String(r.status || "").toLowerCase();
+      if (st === "present") e.academyPresent = true;
+      if (st === "absent") e.academyAbsent = true;
+    }
+  }
+
+  const dim = daysInMonthString(month);
+  let presentDayCount = 0;
+  const attendance = [];
+
+  for (const [date, e] of [...dayMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const paidOrAttended = e.classesCount > 0;
+    const present = paidOrAttended || e.academyPresent;
+    const absent = e.academyAbsent && !present;
+    if (present) presentDayCount += 1;
+    attendance.push({
+      id: `day-${date}-${courseFilter || "all"}`,
+      date,
+      status: present ? "present" : absent ? "absent" : "none",
+      classesCount: e.classesCount,
+    });
+  }
+
+  const monthlyPercentage = dim ? Math.round((presentDayCount / dim) * 100) : 0;
+
   res.json({
-    studentId: student.id,
+    studentId: student?.id || null,
     month,
-    attendance: records,
+    courseId: courseFilter || null,
+    attendance,
     monthlyPercentage,
+    daysInMonth: dim,
+    presentDaysCount: presentDayCount,
   });
 });
 
@@ -395,6 +476,10 @@ router.get("/portal/courses", studentAuth, (req, res) => {
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   const enrolledIds = new Set();
   for (const e of enrollments) if (e.studentId === student?.id) enrolledIds.add(normalizeCourseId(e.courseId));
+  if (student?.batchId) {
+    const assigned = batches.find((b) => b.id === student.batchId);
+    if (assigned?.courseId) enrolledIds.add(normalizeCourseId(assigned.courseId));
+  }
   const allCourses = courses.map((c) => ({
     ...c,
     id: normalizeCourseId(c.id),
@@ -435,7 +520,25 @@ router.get("/portal/courses", studentAuth, (req, res) => {
     };
   });
   const enrolledCourses = enrichedCourses.filter((c) => c.unlocked);
-  const upcomingBatches = batches.filter((b) => enrolledIds.has(b.courseId)).slice(0, 8);
+  const normalizedEnrolled = new Set([...enrolledIds].map((x) => normalizeCourseId(x)));
+  const mappedBatches = batches
+    .filter((b) => normalizedEnrolled.has(normalizeCourseId(b.courseId)))
+    .map((b) => {
+      const teacherIds = Array.isArray(b.teacherIds)
+        ? b.teacherIds.map((x) => String(x))
+        : b.teacherId
+          ? [String(b.teacherId)]
+          : [];
+      return {
+        ...b,
+        mode: String(b.mode || "online"),
+        status: computeBatchLifecycleStatus(b),
+        teacherIds,
+        teacherId: teacherIds[0] || "",
+      };
+    });
+  const assignedBatch = student?.batchId ? mappedBatches.find((b) => b.id === student.batchId) || null : null;
+  const upcomingBatches = mappedBatches.filter((b) => b.status === "upcoming").slice(0, 8);
   let trialInfo = null;
   if (trial) {
     const expiresAt = parseIsoDate(trial.expiresAt || addDays(trial.createdAt || today(), 7));
@@ -448,7 +551,7 @@ router.get("/portal/courses", studentAuth, (req, res) => {
       title: "1 Week Trial Course",
     };
   }
-  res.json({ student: student || null, enrolledCourses, allCourses: enrichedCourses, upcomingBatches, trialInfo });
+  res.json({ student: student || null, assignedBatch, enrolledCourses, allCourses: enrichedCourses, upcomingBatches, trialInfo });
 });
 
 router.post("/portal/courses/unlock", studentAuth, (req, res) => {

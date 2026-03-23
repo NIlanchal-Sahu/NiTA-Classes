@@ -7,6 +7,7 @@ import {
   getUserById,
   changePassword,
 } from '../auth.js'
+import { getStudentAvatarPublicUrl } from '../studentProfileUtils.js'
 
 const router = Router()
 
@@ -82,6 +83,8 @@ router.get('/me', authMiddleware, (req, res) => {
     payload.walletBalance = Number(user.walletBalance) ?? 0
     payload.totalClassesAttended = Number(user.totalClassesAttended) ?? 0
     payload.vvipValidUntil = user.vvipValidUntil || null
+    const avatarUrl = getStudentAvatarPublicUrl(user.id)
+    if (avatarUrl) payload.avatarUrl = avatarUrl
   }
   res.json({ user: payload })
 })

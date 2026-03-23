@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LOGO_SRC } from "../config";
+import { studentPortalApi } from "../api/student";
 
 const navItems = [
   { to: "/student", end: true, label: "Dashboard", icon: DashboardIcon },
@@ -185,10 +186,31 @@ function isVvip(user) {
 
 export default function StudentLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [enrolledCourseCount, setEnrolledCourseCount] = useState(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const initial = (user?.name || user?.email || "S").charAt(0).toUpperCase();
   const vvip = user?.role === "student" && isVvip(user);
+
+  useEffect(() => {
+    if (user?.role !== "student") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const out = await studentPortalApi.getCoursesLearning();
+        const enrolled =
+          out.enrolledCourses || (out.allCourses || []).filter((c) => c.unlocked);
+        const list = enrolled.filter((c) => String(c.id) !== "trial-course");
+        if (!cancelled) setEnrolledCourseCount(list.length);
+      } catch {
+        if (!cancelled) setEnrolledCourseCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role]);
 
   return (
     <div className="flex min-h-screen bg-gray-900">
@@ -301,6 +323,12 @@ export default function StudentLayout() {
                 </span>{" "}
                 classes
               </span>
+              <span className="text-sm text-gray-400">
+                <span className="font-semibold text-white">
+                  {enrolledCourseCount === null ? "—" : enrolledCourseCount}
+                </span>{" "}
+                enrolled
+              </span>
             </div>
           )}
           <div className="flex items-center gap-2 sm:gap-4">
@@ -323,18 +351,65 @@ export default function StudentLayout() {
                 />
               </svg>
             </button>
-            <div className="flex items-center gap-3">
+            <div className="relative flex items-center gap-3">
               {vvip && (
                 <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-semibold text-amber-400 ring-1 ring-amber-500/50">
                   VVIP
                 </span>
               )}
-              <div className="h-9 w-9 rounded-full bg-violet-600 flex items-center justify-center text-sm font-semibold text-white">
-                {initial}
-              </div>
-              <span className="hidden text-sm font-medium text-white sm:block">
-                {user?.name || user?.email || "Student"}
-              </span>
+              <button
+                type="button"
+                className="flex items-center gap-3 rounded-lg py-1 pl-1 pr-2 hover:bg-gray-800"
+                onClick={() => setUserMenuOpen((o) => !o)}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="true"
+              >
+                <div className="h-9 w-9 rounded-full bg-violet-600 flex items-center justify-center text-sm font-semibold text-white overflow-hidden">
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span>{initial}</span>
+                  )}
+                </div>
+                <span className="hidden max-w-[10rem] truncate text-left text-sm font-medium text-white sm:block">
+                  {user?.name || user?.email || "Student"}
+                </span>
+                <svg className="hidden h-4 w-4 text-gray-400 sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {userMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" aria-hidden onClick={() => setUserMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-700 bg-gray-800 py-1 shadow-xl">
+                    <Link
+                      to="/student/profile"
+                      className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      Student profile
+                    </Link>
+                    <Link
+                      to="/student/settings"
+                      className="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      Settings
+                    </Link>
+                    <button
+                      type="button"
+                      className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        logout();
+                        navigate("/login");
+                      }}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>

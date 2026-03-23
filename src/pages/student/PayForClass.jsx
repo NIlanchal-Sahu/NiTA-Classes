@@ -11,25 +11,38 @@ import {
   WALLET_PAYMENT_TIMER_SECONDS,
 } from '../../config'
 
-const COURSE_IDS = [
-  { id: 'dca', name: 'DCA (Basic Computer Course)' },
-  { id: 'cca', name: 'CCA (Computer Application)' },
-  { id: 'spoken-english-mastery', name: 'Spoken English Mastery' },
-  { id: 'ai-associate', name: 'AI Associate (Python)' },
-  { id: 'ai-video-creation', name: 'AI Video Creation Course' },
-]
-
 const VVIP_PRICE = 699
+
+/**
+ * UPI deep links for the selected app (best on mobile with app installed).
+ * Amazon Pay uses standard `upi://` so the system can route to Amazon Pay / any UPI app.
+ */
+function buildUpiAppDeepLink(platform, payeeAddress, payeeName, amount) {
+  const am = Number(amount).toFixed(2)
+  const pn = encodeURIComponent(payeeName)
+  const pa = encodeURIComponent(payeeAddress)
+  const tn = encodeURIComponent('NITA wallet recharge')
+  const q = `pa=${pa}&pn=${pn}&am=${am}&cu=INR&tn=${tn}`
+  switch (platform) {
+    case 'phonepe':
+      return `phonepe://pay?${q}`
+    case 'paytm':
+      return `paytmmp://pay?${q}`
+    case 'amazonpay':
+      return `upi://pay?${q}`
+    default:
+      return `upi://pay?${q}`
+  }
+}
 
 export default function PayForClass() {
   const [searchParams] = useSearchParams()
   const { user, refreshUser } = useAuth()
 
-  const [courseInput, setCourseInput] = useState('')
-  useEffect(() => {
-    const fromQr = searchParams.get('course') || searchParams.get('c')
-    if (fromQr) setCourseInput(fromQr.trim())
-  }, [searchParams])
+  /** Unlocked courses only (from Explore); used for Pay ₹10 dropdown */
+  const [learnCourses, setLearnCourses] = useState([])
+  const [coursesLoading, setCoursesLoading] = useState(true)
+  const [selectedCourseId, setSelectedCourseId] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -54,13 +67,12 @@ export default function PayForClass() {
   const [screenshotDataUrl, setScreenshotDataUrl] = useState('')
   const [screenshotName, setScreenshotName] = useState('')
 
-  /** QR flow: after YES, show upload form */
-  const [showWalletUpload, setShowWalletUpload] = useState(false)
+  /** Wallet modal: 'qr' = scan / pay question; 'upload' = screenshot + submit (same popup) */
+  const [walletModalStep, setWalletModalStep] = useState('qr')
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [qrImgError, setQrImgError] = useState(false)
   const [timerLeft, setTimerLeft] = useState(0)
   const timerRef = useRef(null)
-  const uploadAnchorRef = useRef(null)
 
   const upiId =
     requestPlatform === 'phonepe'
@@ -88,10 +100,36 @@ export default function PayForClass() {
   }, [walletBalance])
 
   useEffect(() => {
+    ;(async () => {
+      setCoursesLoading(true)
+      try {
+        const out = await studentPortalApi.getCoursesLearning()
+        const enrolled =
+          out.enrolledCourses || (out.allCourses || []).filter((c) => c.unlocked)
+        const list = enrolled.filter((c) => String(c.id) !== 'trial-course')
+        setLearnCourses(list)
+      } catch {
+        setLearnCourses([])
+      } finally {
+        setCoursesLoading(false)
+      }
+    })()
+  }, [walletBalance])
+
+  useEffect(() => {
+    const fromQr = searchParams.get('course') || searchParams.get('c')
+    if (!fromQr || !learnCourses.length) return
+    const id = fromQr.trim().toLowerCase()
+    if (learnCourses.some((c) => c.id === id)) setSelectedCourseId(id)
+  }, [searchParams, learnCourses])
+
+  useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [])
+
+  const courseEnrolledCount = learnCourses.length
 
   const QUICK_AMOUNTS = [100, 200, 300, 500, 1000, 1200, 1500, 2000]
   const OFFER_TOPUPS = {
@@ -112,9 +150,9 @@ export default function PayForClass() {
     setError('')
     setSuccess(null)
 
-    const courseId = courseInput.trim().toLowerCase() || null
+    const courseId = selectedCourseId.trim().toLowerCase() || null
     if (!courseId) {
-      setError('Enter the course code from the QR code.')
+      setError('Select the course you are attending.')
       return
     }
 
@@ -126,7 +164,7 @@ export default function PayForClass() {
       } else if (data.success) {
         setSuccess(data)
         await refreshUser()
-        setCourseInput('')
+        setSelectedCourseId('')
       }
     } catch (err) {
       setError(err.message || 'Something went wrong')
@@ -144,7 +182,7 @@ export default function PayForClass() {
       setSuccess(data)
       setConfirmModal(null)
       await refreshUser()
-      setCourseInput('')
+      setSelectedCourseId('')
     } catch (err) {
       setError(err.message || 'Payment failed')
     } finally {
@@ -168,7 +206,7 @@ export default function PayForClass() {
       setError(err.message || 'Could not notify admin. Try again.')
       return
     }
-    setShowWalletUpload(false)
+    setWalletModalStep('qr')
     setQrImgError(false)
     setQrModalOpen(true)
     setTimerLeft(WALLET_PAYMENT_TIMER_SECONDS)
@@ -186,6 +224,7 @@ export default function PayForClass() {
 
   const closeQrModal = () => {
     setQrModalOpen(false)
+    setWalletModalStep('qr')
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -193,9 +232,7 @@ export default function PayForClass() {
   }
 
   const onPaymentSuccessYes = () => {
-    closeQrModal()
-    setShowWalletUpload(true)
-    setTimeout(() => uploadAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+    setWalletModalStep('upload')
   }
 
   const onPaymentSuccessNo = () => {
@@ -212,10 +249,18 @@ export default function PayForClass() {
   const platformLabel =
     requestPlatform === 'phonepe' ? 'PhonePe' : requestPlatform === 'amazonpay' ? 'Amazon Pay' : 'Paytm'
 
+  const openSelectedUpiApp = () => {
+    if (!topUpAmount || topUpAmount < 1) return
+    const url = buildUpiAppDeepLink(requestPlatform, upiId, WALLET_PAYEE_NAME, topUpAmount)
+    window.location.assign(url)
+  }
+
   return (
     <>
       <h1 className="text-2xl font-bold text-white">Pay for Class</h1>
-      <p className="mt-1 text-gray-400">Scan the class QR code, then enter the course code below. ₹10 per class.</p>
+      <p className="mt-1 text-gray-400">
+        Choose a course you have unlocked, then pay ₹10 per class (or use VVIP). Unlock courses from Explore first.
+      </p>
 
       <div className="mt-6 flex flex-wrap gap-4 rounded-xl border border-gray-700 bg-gray-800 p-4">
         <div>
@@ -226,27 +271,49 @@ export default function PayForClass() {
           <p className="text-sm text-gray-400">Classes attended (total)</p>
           <p className="text-xl font-bold text-white">{totalClasses}</p>
         </div>
+        <div>
+          <p className="text-sm text-gray-400">Courses enrolled</p>
+          <p className="text-xl font-bold text-white">{courseEnrolledCount}</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 max-w-md space-y-4">
         <div>
-          <label htmlFor="course-code" className="block text-sm font-medium text-gray-300">
-            Select Class you want to Attend
+          <label htmlFor="course-attend" className="block text-sm font-medium text-gray-300">
+            Select class you want to attend
           </label>
-          <input
-            id="course-code"
-            type="text"
-            value={courseInput}
-            onChange={(e) => setCourseInput(e.target.value)}
-            placeholder="e.g. dca, cca, ai-associate"
-            className="mt-1 block w-full rounded-lg border border-gray-600 bg-gray-800 px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-            list="course-list"
-          />
-          <datalist id="course-list">
-            {COURSE_IDS.map((c) => (
-              <option key={c.id} value={c.id} />
-            ))}
-          </datalist>
+          {coursesLoading ? (
+            <p className="mt-2 text-sm text-gray-500">Loading your courses…</p>
+          ) : learnCourses.length === 0 ? (
+            <div className="mt-3 rounded-xl border border-violet-500/40 bg-gradient-to-br from-violet-950/50 to-gray-900 px-4 py-6 text-center">
+              <p
+                className="bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300 bg-[length:200%_100%] bg-clip-text text-lg font-extrabold tracking-wide text-transparent animate-shimmer"
+              >
+                Unlock a course to attend the classes
+              </p>
+              <p className="mt-2 text-sm text-gray-400">Pay the unlock fee from your wallet on Explore, then return here.</p>
+              <Link
+                to="/student/explore"
+                className="mt-4 inline-flex rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+              >
+                Go to Explore — unlock a course
+              </Link>
+            </div>
+          ) : (
+            <select
+              id="course-attend"
+              value={selectedCourseId}
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+              className="mt-1 block w-full rounded-lg border border-gray-600 bg-gray-800 px-4 py-3 text-white focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            >
+              <option value="">— Choose a course —</option>
+              {learnCourses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name || c.title || c.id}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
@@ -262,7 +329,13 @@ export default function PayForClass() {
 
         <button
           type="submit"
-          disabled={loading || (!isVvip && walletBalance < 10)}
+          disabled={
+            loading ||
+            coursesLoading ||
+            learnCourses.length === 0 ||
+            !selectedCourseId ||
+            (!isVvip && walletBalance < 10)
+          }
           className="btn-touch rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-50 disabled:hover:bg-violet-600"
         >
           {loading ? 'Processing...' : isVvip ? 'Submit (VVIP – no charge)' : 'Submit & Pay ₹10'}
@@ -273,7 +346,7 @@ export default function PayForClass() {
       <div className="mt-6 rounded-xl border border-blue-700/40 bg-blue-900/10 p-5">
         <h3 className="font-medium text-white">Wallet Recharge (UPI — scan QR)</h3>
         <p className="mt-1 text-sm text-gray-300">
-          1) Select amount · 2) Select app · 3) Tap <strong className="text-white">Show QR & pay</strong> — scan and pay within the timer · 4) Admin is notified of your attempt · 5) Answer if payment succeeded · 6) If Yes, upload screenshot and submit request · After approval, offer credit is added to wallet.
+          1) Select amount · 2) Select app · 3) Tap <strong className="text-white">Show QR & pay</strong> — scan or <strong className="text-white">Open … to pay</strong> · 4) If payment succeeded, tap Yes — upload screenshot and submit in the <strong className="text-white">same popup</strong> · After approval, offer credit is added to wallet.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -284,10 +357,7 @@ export default function PayForClass() {
                 <button
                   key={amt}
                   type="button"
-                  onClick={() => {
-                    setRequestAmount(String(amt))
-                    setShowWalletUpload(false)
-                  }}
+                  onClick={() => setRequestAmount(String(amt))}
                   className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
                     Number(requestAmount) === amt
                       ? 'border-blue-400 bg-blue-600 text-white'
@@ -314,10 +384,7 @@ export default function PayForClass() {
             <label className="block text-xs font-semibold text-gray-200">Platform (QR)</label>
             <select
               value={requestPlatform}
-              onChange={(e) => {
-                setRequestPlatform(e.target.value)
-                setShowWalletUpload(false)
-              }}
+              onChange={(e) => setRequestPlatform(e.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2.5 text-white"
             >
               <option value="phonepe">PhonePe</option>
@@ -344,82 +411,6 @@ export default function PayForClass() {
             </div>
           </div>
 
-          {showWalletUpload && (
-            <>
-              <div ref={uploadAnchorRef} className="sm:col-span-2 lg:col-span-4 rounded-lg border border-emerald-500/40 bg-emerald-900/10 p-3 text-sm text-emerald-200">
-                Payment marked successful — upload screenshot and submit for admin approval.
-              </div>
-              <div className="lg:col-span-2">
-                <label className="block text-xs font-semibold text-gray-200">Payment Screenshot *</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    setScreenshotName(file.name)
-                    const reader = new FileReader()
-                    reader.onload = () => {
-                      setScreenshotDataUrl(String(reader.result || ''))
-                    }
-                    reader.readAsDataURL(file)
-                  }}
-                  className="mt-1 w-full text-sm text-gray-200"
-                />
-                {screenshotName ? <div className="mt-1 text-xs text-gray-200">{screenshotName}</div> : null}
-              </div>
-
-              <div className="lg:col-span-2">
-                <label className="block text-xs font-semibold text-gray-200">UPI Txn ID / Note (optional)</label>
-                <input
-                  value={requestNote}
-                  onChange={(e) => setRequestNote(e.target.value)}
-                  placeholder="e.g. 1234567890"
-                  className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2.5 text-white placeholder-gray-500"
-                />
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-4">
-                <button
-                  type="button"
-                  disabled={requestLoading || !screenshotDataUrl || !topUpAmount}
-                  onClick={async () => {
-                    setRequestLoading(true)
-                    setError('')
-                    try {
-                      await studentPortalApi.createPaymentRequest({
-                        amount: creditedAmount,
-                        platform: requestPlatform,
-                        screenshot: screenshotDataUrl,
-                        note: requestNote,
-                        mode: 'upi',
-                      })
-                      setRequestAmount('')
-                      setRequestNote('')
-                      setScreenshotDataUrl('')
-                      setScreenshotName('')
-                      setShowWalletUpload(false)
-                      await refreshUser()
-                      const out = await studentPortalApi.getFees()
-                      setFeesData(out)
-                      setSuccess({
-                        message: 'Payment request submitted. Wallet will update after admin approval.',
-                        walletBalance: user?.walletBalance,
-                        totalClassesAttended: user?.totalClassesAttended,
-                      })
-                    } catch (err) {
-                      setError(err.message || 'Failed to submit request')
-                    } finally {
-                      setRequestLoading(false)
-                    }
-                  }}
-                  className="btn-touch w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {requestLoading ? 'Submitting…' : 'Submit payment request (Admin approval)'}
-                </button>
-              </div>
-            </>
-          )}
         </div>
         <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-900/20 p-3 text-sm text-emerald-200">
           <div className="font-semibold">Recharge offers</div>
@@ -498,70 +489,166 @@ export default function PayForClass() {
         )}
       </div>
 
-      <div className="mt-8 rounded-xl border border-gray-700 bg-gray-800 p-4">
-        <h3 className="font-medium text-white">Valid course codes</h3>
-        <ul className="mt-2 space-y-1 text-sm text-gray-400">
-          {COURSE_IDS.map((c) => (
-            <li key={c.id}>
-              <code className="text-violet-300">{c.id}</code> – {c.name}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* QR + timer + success question */}
+      {/* Wallet: QR + upload in same modal */}
       {qrModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-gray-700 bg-gray-800 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">Scan & pay</h3>
-            <p className="mt-1 text-sm text-gray-300">
-              Pay <span className="font-semibold text-white">₹{topUpAmount}</span> using {platformLabel}. Credit after approval:{' '}
-              <span className="text-emerald-300">₹{creditedAmount}</span>
-            </p>
-            <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-900/20 px-3 py-2 text-center">
-              <p className="text-xs text-amber-200/90">Time remaining</p>
-              <p className="text-2xl font-mono font-bold text-amber-300">{fmtTimer(timerLeft)}</p>
-            </div>
-            <div className="mt-4 flex min-h-[200px] justify-center rounded-lg border border-gray-600 bg-white p-3">
-              {!qrImgError ? (
-                <img
-                  src={qrImageSrc}
-                  alt={`${platformLabel} QR`}
-                  className="max-h-64 w-auto max-w-full object-contain"
-                  onError={() => setQrImgError(true)}
-                />
-              ) : (
-                <div className="max-w-full p-4 text-center text-sm text-gray-700">
-                  <p className="font-semibold">QR image not found</p>
-                  <p className="mt-2">
-                    Add <code className="rounded bg-gray-200 px-1">public{qrImageSrc}</code> or pay using UPI ID:
-                  </p>
-                  <p className="mt-2 font-mono font-bold">{upiId}</p>
+            {walletModalStep === 'qr' ? (
+              <>
+                <h3 className="text-lg font-semibold text-white">Scan & pay</h3>
+                <p className="mt-1 text-sm text-gray-300">
+                  Pay <span className="font-semibold text-white">₹{topUpAmount}</span> using {platformLabel}. Credit after approval:{' '}
+                  <span className="text-emerald-300">₹{creditedAmount}</span>
+                </p>
+                <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-900/20 px-3 py-2 text-center">
+                  <p className="text-xs text-amber-200/90">Time remaining</p>
+                  <p className="text-2xl font-mono font-bold text-amber-300">{fmtTimer(timerLeft)}</p>
                 </div>
-              )}
-            </div>
-            <p className="mt-2 text-center font-mono text-sm text-gray-300">{upiId}</p>
+                <div className="mt-4 flex min-h-[200px] justify-center rounded-lg border border-gray-600 bg-white p-3">
+                  {!qrImgError ? (
+                    <img
+                      src={qrImageSrc}
+                      alt={`${platformLabel} QR`}
+                      className="max-h-64 w-auto max-w-full object-contain"
+                      onError={() => setQrImgError(true)}
+                    />
+                  ) : (
+                    <div className="max-w-full p-4 text-center text-sm text-gray-700">
+                      <p className="font-semibold">QR image not found</p>
+                      <p className="mt-2">
+                        Add <code className="rounded bg-gray-200 px-1">public{qrImageSrc}</code> or pay using UPI ID:
+                      </p>
+                      <p className="mt-2 font-mono font-bold">{upiId}</p>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-2 text-center font-mono text-sm text-gray-300">{upiId}</p>
 
-            <p className="mt-4 text-sm font-medium text-white">Is your payment successful?</p>
-            <div className="mt-3 flex gap-3">
-              <button
-                type="button"
-                onClick={onPaymentSuccessNo}
-                className="flex-1 rounded-lg border border-gray-600 py-2.5 font-medium text-gray-300 hover:bg-gray-700"
-              >
-                No
-              </button>
-              <button
-                type="button"
-                onClick={onPaymentSuccessYes}
-                className="flex-1 rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-700"
-              >
-                Yes
-              </button>
-            </div>
-            <button type="button" onClick={closeQrModal} className="mt-4 w-full text-sm text-gray-400 hover:text-white">
-              Cancel
-            </button>
+                <div className="mt-4 space-y-2">
+                  <button
+                    type="button"
+                    onClick={openSelectedUpiApp}
+                    className="btn-touch w-full rounded-lg border border-cyan-500/50 bg-cyan-700/40 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-700/60"
+                  >
+                    Open {platformLabel} to pay ₹{topUpAmount}
+                  </button>
+                  <p className="text-center text-xs text-gray-500">
+                    Opens the selected UPI app on your phone. On desktop, scan the QR with your phone or copy the UPI ID.
+                  </p>
+                </div>
+
+                <p className="mt-4 text-sm font-medium text-white">Is your payment successful?</p>
+                <div className="mt-3 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onPaymentSuccessNo}
+                    className="flex-1 rounded-lg border border-gray-600 py-2.5 font-medium text-gray-300 hover:bg-gray-700"
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onPaymentSuccessYes}
+                    className="flex-1 rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-700"
+                  >
+                    Yes
+                  </button>
+                </div>
+                <button type="button" onClick={closeQrModal} className="mt-4 w-full text-sm text-gray-400 hover:text-white">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-white">Submit payment request</h3>
+                <p className="mt-1 text-sm text-gray-300">
+                  Upload your payment screenshot and submit. Admin will verify and credit <span className="text-emerald-300">₹{creditedAmount}</span> to your wallet after approval.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-200">Payment screenshot *</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setScreenshotName(file.name)
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                          setScreenshotDataUrl(String(reader.result || ''))
+                        }
+                        reader.readAsDataURL(file)
+                      }}
+                      className="mt-1 w-full text-sm text-gray-200"
+                    />
+                    {screenshotName ? <div className="mt-1 text-xs text-gray-400">{screenshotName}</div> : null}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-200">UPI Txn ID / note (optional)</label>
+                    <input
+                      value={requestNote}
+                      onChange={(e) => setRequestNote(e.target.value)}
+                      placeholder="e.g. transaction reference"
+                      className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2.5 text-white placeholder-gray-500"
+                    />
+                  </div>
+                </div>
+                <div className="mt-6 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    disabled={requestLoading || !screenshotDataUrl || !topUpAmount}
+                    onClick={async () => {
+                      setRequestLoading(true)
+                      setError('')
+                      try {
+                        await studentPortalApi.createPaymentRequest({
+                          amount: creditedAmount,
+                          platform: requestPlatform,
+                          screenshot: screenshotDataUrl,
+                          note: requestNote,
+                          mode: 'upi',
+                        })
+                        setRequestAmount('')
+                        setRequestNote('')
+                        setScreenshotDataUrl('')
+                        setScreenshotName('')
+                        closeQrModal()
+                        await refreshUser()
+                        const out = await studentPortalApi.getFees()
+                        setFeesData(out)
+                        setSuccess({
+                          message: 'Payment request submitted. Wallet will update after admin approval.',
+                          walletBalance: user?.walletBalance,
+                          totalClassesAttended: user?.totalClassesAttended,
+                        })
+                      } catch (err) {
+                        setError(err.message || 'Failed to submit request')
+                      } finally {
+                        setRequestLoading(false)
+                      }
+                    }}
+                    className="btn-touch w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {requestLoading ? 'Submitting…' : 'Submit payment request'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWalletModalStep('qr')}
+                    className="w-full rounded-lg border border-gray-600 py-2.5 text-sm font-medium text-gray-300 hover:bg-gray-700"
+                  >
+                    Back to QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeQrModal}
+                    className="w-full text-sm text-gray-400 hover:text-white"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -603,7 +690,7 @@ export default function PayForClass() {
                     setPromoSuccess(null)
                     setPromoLoading(true)
                     try {
-                      const data = await studentApi.purchaseUnlimitedPromo()
+                      const data = await purchaseUnlimitedPromo()
                       setPromoSuccess(data.message || 'You are now a VVIP Student!')
                       setVvipModalOpen(false)
                       await refreshUser()

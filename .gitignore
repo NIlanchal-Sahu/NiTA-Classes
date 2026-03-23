@@ -9,6 +9,10 @@ dist/
 .env.local
 .env.*.local
 
+# Student profile uploads & Google key (never commit)
+server/uploads/
+server/google-service-account.json
+
 # Editor
 .vscode/
 .idea/

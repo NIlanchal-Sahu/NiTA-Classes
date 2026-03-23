@@ -19,6 +19,7 @@ async function request(path, options = {}) {
 export const academyApi = {
   getDashboard: () => request('/dashboard', { headers: headers(false) }),
   getStudents: () => request('/students', { headers: headers(false) }),
+  getTeachers: () => request('/teachers', { headers: headers(false) }),
   createStudent: (body) => request('/students', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
   updateStudent: (id, body) => request(`/students/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(body) }),
   deleteStudent: (id) => request(`/students/${id}`, { method: 'DELETE', headers: headers(false) }),
@@ -33,16 +34,23 @@ export const academyApi = {
   getBatches: () => request('/batches', { headers: headers(false) }),
   createBatch: (body) => request('/batches', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
   updateBatch: (id, body) => request(`/batches/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(body) }),
+  markBatchCompleted: (id) => request(`/batches/${id}/mark-completed`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }),
 
   getAttendance: (query = '') => request(`/attendance${query ? `?${query}` : ''}`, { headers: headers(false) }),
   markAttendance: (body) => request('/attendance/mark', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
-  getMonthlyAttendanceReport: (month, batchId = '') =>
-    request(`/attendance/report/monthly?month=${encodeURIComponent(month)}${batchId ? `&batchId=${encodeURIComponent(batchId)}` : ''}`, { headers: headers(false) }),
+  getMonthlyAttendanceReport: (monthOrQuery, batchId = '') => {
+    const raw = String(monthOrQuery || '')
+    const qs = raw.includes('=') || raw.includes('&')
+      ? raw
+      : `month=${encodeURIComponent(raw)}${batchId ? `&batchId=${encodeURIComponent(batchId)}` : ''}`
+    return request(`/attendance/report/monthly?${qs}`, { headers: headers(false) })
+  },
 
   getFees: (studentId = '') => request(`/fees${studentId ? `?studentId=${encodeURIComponent(studentId)}` : ''}`, { headers: headers(false) }),
   createPayment: (body) => request('/fees/payments', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
   getPaymentRequests: () => request('/fees/payment-requests', { headers: headers(false) }),
   getAdminAlerts: () => request('/admin-alerts', { headers: headers(false) }),
+  getStudentProfiles: () => request('/student-profiles', { headers: headers(false) }),
   approvePaymentRequest: (id) => request(`/fees/payment-requests/${id}/approve`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }),
 
   getDiscounts: () => request('/discounts', { headers: headers(false) }),

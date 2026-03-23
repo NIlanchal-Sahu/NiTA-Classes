@@ -71,6 +71,29 @@ async function portalPost(path, body) {
   return data
 }
 
+async function portalPut(path, body) {
+  const res = await fetch(`${API_BASE}/portal/${path}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body || {}),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Request failed')
+  return data
+}
+
+export async function postStudentProfileUpload(formData) {
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/portal/student-profile/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Upload failed')
+  return data
+}
+
 export const studentPortalApi = {
   getProfile: () => portalGet('profile'),
   getClaimOptions: () => portalGet('claim-options'),
@@ -95,4 +118,7 @@ export const studentPortalApi = {
   notifyPaymentAttempt: (body) => portalPost('payment-attempt', body),
   getNotifications: () => portalGet('notifications'),
   markNotificationsRead: (ids) => portalPost('notifications/mark-read', { ids }),
+  getStudentProfileDetails: () => portalGet('student-profile'),
+  updateStudentProfileDetails: (body) => portalPut('student-profile', body),
+  uploadStudentProfileFiles: (formData) => postStudentProfileUpload(formData),
 }

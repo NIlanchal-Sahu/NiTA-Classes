@@ -1,1 +1,21 @@
-﻿[]
+[
+  {
+    "id": "batch-1774229789714",
+    "name": "SPENG APR-JUNE",
+    "monthYear": "APRIL 2026",
+    "courseId": "spoken-english-mastery",
+    "timing": "9:00 AM - 10:00 AM",
+    "teacherId": "NILanchal25",
+    "studentIds": [
+      "NITA20260322GJUTZH",
+      "NITA20260321"
+    ],
+    "createdAt": "2026-03-23T01:36:29.715Z",
+    "mode": "on-center",
+    "status": "active",
+    "teacherIds": [
+      "NILanchal25"
+    ],
+    "updatedAt": "2026-03-23T09:12:49.879Z"
+  }
+]

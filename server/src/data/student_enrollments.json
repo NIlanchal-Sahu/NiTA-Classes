@@ -18,5 +18,38 @@
     "startDate": "2026-03-22",
     "expiresAt": "2026-03-28",
     "createdAt": "2026-03-22T02:32:46.825Z"
+  },
+  {
+    "id": "enr-1774196568766",
+    "studentId": "NITA20260322GJUTZH",
+    "courseId": "spoken-english-mastery",
+    "batchId": "",
+    "note": "Course unlocked from wallet. Fee deducted ₹499",
+    "status": "active",
+    "startDate": "2026-03-22",
+    "expiresAt": "2026-06-20",
+    "createdAt": "2026-03-22T16:22:48.767Z"
+  },
+  {
+    "id": "enr-1774257029036-8bc5",
+    "studentId": "NITA20260322GJUTZH",
+    "courseId": "spoken-english-mastery",
+    "batchId": "batch-1774229789714",
+    "status": "active",
+    "startDate": "2026-03-23",
+    "expiresAt": "2026-03-23",
+    "createdAt": "2026-03-23T09:10:29.036Z",
+    "updatedAt": "2026-03-23T09:12:49.884Z"
+  },
+  {
+    "id": "enr-1774257029036-d1b3",
+    "studentId": "NITA20260321",
+    "courseId": "spoken-english-mastery",
+    "batchId": "batch-1774229789714",
+    "status": "active",
+    "startDate": "2026-03-23",
+    "expiresAt": "2026-03-23",
+    "createdAt": "2026-03-23T09:10:29.036Z",
+    "updatedAt": "2026-03-23T09:12:49.884Z"
   }
 ]

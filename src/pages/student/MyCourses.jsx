@@ -6,6 +6,7 @@ export default function MyCourses() {
   const [courses, setCourses] = useState([])
   const [batches, setBatches] = useState([])
   const [student, setStudent] = useState(null)
+  const [assignedBatch, setAssignedBatch] = useState(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export default function MyCourses() {
         setCourses(out.enrolledCourses || [])
         setBatches(out.upcomingBatches || [])
         setStudent(out.student || null)
+        setAssignedBatch(out.assignedBatch || null)
       } catch {
         // silent
       } finally {
@@ -32,6 +34,14 @@ export default function MyCourses() {
       <div className="mt-4 rounded-xl border border-gray-700 bg-gray-800 p-4 text-sm text-gray-300">
         Enrolled Course ID: <span className="text-white">{student?.courseEnrolled || '—'}</span> · Batch:{' '}
         <span className="text-white">{student?.batchId || '—'}</span>
+        {assignedBatch && (
+          <div className="mt-2 text-gray-400">
+            Timing: <span className="text-white">{assignedBatch.timing || '—'}</span> · Teacher:{' '}
+            <span className="text-white">
+              {(assignedBatch.teacherIds || [assignedBatch.teacherId]).filter(Boolean).join(', ') || '—'}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -69,7 +79,8 @@ export default function MyCourses() {
         <div className="mt-3 space-y-2">
           {batches.map((b) => (
             <div key={b.id} className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-300">
-              {b.name} ({b.monthYear}) · {b.timing}
+              {b.name} ({b.monthYear || b.startDate || '—'}) · {b.timing} · Teacher:{' '}
+              {(b.teacherIds || [b.teacherId]).filter(Boolean).join(', ') || '—'}
             </div>
           ))}
           {!loading && batches.length === 0 && <p className="text-sm text-gray-500">No upcoming batches mapped yet.</p>}

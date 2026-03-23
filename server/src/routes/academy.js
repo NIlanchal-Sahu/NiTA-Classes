@@ -24,6 +24,7 @@ const PATHS = {
   legacyCourses: join(__dirname, '..', 'data', 'courses.json'),
   studentNotifications: join(__dirname, '..', 'data', 'student_notifications.json'),
   adminAlerts: join(__dirname, '..', 'data', 'admin_alerts.json'),
+  studentProfiles: join(__dirname, '..', 'data', 'student_profiles.json'),
 }
 
 function loadJson(path, fallback = []) {
@@ -76,6 +77,10 @@ function parseDate(value) {
   return String(value || '').slice(0, 10)
 }
 
+function todayIso() {
+  return parseDate(new Date().toISOString())
+}
+
 function monthKey(isoDate) {
   return String(isoDate || '').slice(0, 7)
 }
@@ -86,6 +91,112 @@ function byOrder(a, b) {
 
 function normCourseId(id) {
   return String(id || '').trim().toLowerCase()
+}
+
+function normMode(mode) {
+  const m = String(mode || '').trim().toLowerCase()
+  if (m === 'on-center' || m === 'offline' || m === 'oncenter') return 'on-center'
+  if (m === 'self-paced' || m === 'selfpaced' || m === 'app') return 'self-paced'
+  return 'online'
+}
+
+function normalizeTeacherIds(input) {
+  const arr = Array.isArray(input) ? input : String(input || '').split(',')
+  const list = arr.map((x) => String(x || '').trim()).filter(Boolean)
+  return [...new Set(list)]
+}
+
+function computeBatchLifecycleStatus(batch, now = todayIso()) {
+  const manual = String(batch?.status || '').toLowerCase()
+  if (manual === 'completed' || manual === 'cancelled') return manual
+  const start = parseDate(batch?.startDate || '')
+  const end = parseDate(batch?.endDate || '')
+  if (start && start > now) return 'upcoming'
+  if (start && end && now >= start && now <= end) return 'active'
+  if (end && now > end) return 'completed'
+  return 'active'
+}
+
+function createTeacherNameMap(users) {
+  const out = {}
+  for (const u of users) {
+    if (u.role !== 'teacher') continue
+    out[String(u.id)] = u.name || u.email || u.id
+  }
+  // Requested default teacher when no assignment exists.
+  out['NILanchal25'] = out['NILanchal25'] || 'NILanchal25'
+  return out
+}
+
+function uniqueStudentIdsByPhone(studentIds, students) {
+  const chosen = []
+  const seenPhone = new Set()
+  const seenStudentId = new Set()
+  for (const sid of Array.isArray(studentIds) ? studentIds : []) {
+    const id = String(sid || '').trim()
+    if (!id || seenStudentId.has(id)) continue
+    const stu = students.find((s) => s.id === id)
+    if (!stu) continue
+    const ph = normalizePhone(stu.phone)
+    if (ph && seenPhone.has(ph)) continue
+    if (ph) seenPhone.add(ph)
+    seenStudentId.add(id)
+    chosen.push(id)
+  }
+  return chosen
+}
+
+function addStudentNotifications(studentRows, studentsById, ids, message) {
+  const now = new Date().toISOString()
+  for (const sid of ids) {
+    const stu = studentsById.get(sid)
+    if (!stu?.accountUserId) continue
+    studentRows.push({
+      id: `stu-notif-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      userId: stu.accountUserId,
+      message: String(message),
+      read: false,
+      createdAt: now,
+    })
+  }
+}
+
+function upsertBatchEnrollments(enrollments, studentIds, courseId, batchId, startDate, endDate) {
+  const now = new Date().toISOString()
+  const course = String(courseId || '')
+  const batch = String(batchId || '')
+  const start = parseDate(startDate || now)
+  const expires = parseDate(endDate || start)
+  for (const sid of studentIds) {
+    const studentId = String(sid || '')
+    if (!studentId) continue
+    const idx = enrollments.findIndex(
+      (e) =>
+        String(e.studentId) === studentId &&
+        normCourseId(e.courseId) === normCourseId(course) &&
+        String(e.batchId || '') === batch
+    )
+    if (idx >= 0) {
+      enrollments[idx] = {
+        ...enrollments[idx],
+        status: 'active',
+        startDate: enrollments[idx].startDate || start,
+        expiresAt: enrollments[idx].expiresAt || expires,
+        updatedAt: now,
+      }
+    } else {
+      enrollments.push({
+        id: `enr-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+        studentId,
+        courseId: course,
+        batchId: batch,
+        status: 'active',
+        startDate: start,
+        expiresAt: expires,
+        createdAt: now,
+      })
+    }
+  }
 }
 
 function findTreeCourseIndex(tree, courseId) {
@@ -245,6 +356,17 @@ router.post('/students/reset-password', auth, allowRoles(['admin']), (req, res) 
   const result = adminResetStudentPassword(String(studentIdOrPhone).trim(), String(newPassword))
   if (!result.ok) return res.status(400).json({ error: result.error })
   res.json({ success: true })
+})
+
+router.get('/teachers', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
+  const users = loadJson(PATHS.users, [])
+  const teachers = users
+    .filter((u) => u.role === 'teacher')
+    .map((u) => ({ id: String(u.id), name: String(u.name || u.email || u.id) }))
+  if (!teachers.some((t) => t.id === 'NILanchal25')) {
+    teachers.unshift({ id: 'NILanchal25', name: 'NILanchal25 (Default)' })
+  }
+  res.json({ teachers })
 })
 
 // ===== Courses =====
@@ -475,64 +597,230 @@ router.post('/content/courses/:courseId/modules/:moduleId/chapters/reorder', aut
 router.get('/batches', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
   const batches = loadJson(PATHS.batches, [])
   const students = loadJson(PATHS.students, [])
+  const users = loadJson(PATHS.users, [])
+  const teacherNameMap = createTeacherNameMap(users)
   const withSize = batches.map((b) => ({
     ...b,
+    mode: b.mode ? normMode(b.mode) : 'online',
+    teacherIds: normalizeTeacherIds(b.teacherIds?.length ? b.teacherIds : b.teacherId || 'NILanchal25'),
+    status: computeBatchLifecycleStatus(b),
+    teacherNames: normalizeTeacherIds(b.teacherIds?.length ? b.teacherIds : b.teacherId || 'NILanchal25').map(
+      (id) => teacherNameMap[id] || id
+    ),
     batchSize: students.filter((s) => s.batchId === b.id).length,
   }))
   res.json({ batches: withSize.slice().reverse() })
 })
 
-router.post('/batches', auth, allowRoles(['admin']), (req, res) => {
-  const { name, monthYear, courseId, timing, teacherId = '', studentIds = [] } = req.body || {}
-  if (!name || !monthYear || !courseId || !timing) {
-    return res.status(400).json({ error: 'name, monthYear, courseId, timing are required' })
+router.post('/batches', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const { name, monthYear, courseId, timing, startDate, endDate, mode = 'online', teacherId, teacherIds, studentIds = [] } =
+    req.body || {}
+  if (!name || !courseId || !timing || !startDate || !endDate) {
+    return res.status(400).json({ error: 'name, courseId, timing, startDate, endDate are required' })
   }
+  if (!requireTeacherCourseAccess(req, res, courseId)) return
   const batches = loadJson(PATHS.batches, [])
   const students = loadJson(PATHS.students, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const notifications = loadJson(PATHS.studentNotifications, [])
+  const selectedStudentIds = uniqueStudentIdsByPhone(studentIds, students)
+  const finalTeacherIds = normalizeTeacherIds(teacherIds?.length ? teacherIds : teacherId || 'NILanchal25')
   const next = {
     id: `batch-${Date.now()}`,
     name: String(name),
-    monthYear: String(monthYear),
+    monthYear: String(monthYear || monthKey(startDate)),
     courseId: String(courseId),
     timing: String(timing),
-    teacherId: String(teacherId || ''),
-    studentIds: Array.isArray(studentIds) ? studentIds.map(String) : [],
+    mode: normMode(mode),
+    startDate: parseDate(startDate),
+    endDate: parseDate(endDate),
+    status: String(req.body?.status || '').toLowerCase() === 'cancelled' ? 'cancelled' : 'active',
+    teacherIds: finalTeacherIds,
+    teacherId: finalTeacherIds[0] || 'NILanchal25',
+    studentIds: selectedStudentIds,
     createdAt: new Date().toISOString(),
   }
   batches.push(next)
   saveJson(PATHS.batches, batches)
-  if (next.studentIds.length) {
+  if (selectedStudentIds.length) {
+    const selected = new Set(selectedStudentIds)
     for (const s of students) {
-      if (next.studentIds.includes(s.id)) s.batchId = next.id
+      if (selected.has(s.id)) {
+        s.batchId = next.id
+        if (!s.courseEnrolled) s.courseEnrolled = String(courseId)
+      }
     }
     saveJson(PATHS.students, students)
+    upsertBatchEnrollments(enrollments, selectedStudentIds, courseId, next.id, next.startDate, next.endDate)
+    saveJson(PATHS.enrollments, enrollments)
+    const map = new Map(students.map((s) => [s.id, s]))
+    addStudentNotifications(
+      notifications,
+      map,
+      selectedStudentIds,
+      `You were added to batch "${next.name}". Timing: ${next.timing}.`
+    )
+    saveJson(PATHS.studentNotifications, notifications)
   }
   res.json({ success: true, batch: next })
 })
 
-router.put('/batches/:id', auth, allowRoles(['admin']), (req, res) => {
+router.put('/batches/:id', auth, allowRoles(['admin', 'teacher']), (req, res) => {
   const batches = loadJson(PATHS.batches, [])
   const idx = batches.findIndex((x) => x.id === req.params.id)
   if (idx < 0) return res.status(404).json({ error: 'Batch not found' })
-  batches[idx] = { ...batches[idx], ...req.body, updatedAt: new Date().toISOString() }
+  const students = loadJson(PATHS.students, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const notifications = loadJson(PATHS.studentNotifications, [])
+  const prev = batches[idx]
+  const nextCourseId = String(req.body?.courseId ?? prev.courseId ?? '')
+  if (!requireTeacherCourseAccess(req, res, nextCourseId)) return
+  const hasStudentIdsUpdate = Array.isArray(req.body?.studentIds)
+  const mergedTeacherIds = normalizeTeacherIds(
+    req.body?.teacherIds?.length ? req.body.teacherIds : req.body?.teacherId ?? prev.teacherIds ?? prev.teacherId ?? 'NILanchal25'
+  )
+  const nextStudentIds = hasStudentIdsUpdate
+    ? uniqueStudentIdsByPhone(req.body.studentIds, students)
+    : Array.isArray(prev.studentIds)
+      ? prev.studentIds
+      : []
+  const nextBatch = {
+    ...prev,
+    ...req.body,
+    mode: req.body?.mode ? normMode(req.body.mode) : normMode(prev.mode || 'online'),
+    startDate: req.body?.startDate ? parseDate(req.body.startDate) : prev.startDate,
+    endDate: req.body?.endDate ? parseDate(req.body.endDate) : prev.endDate,
+    teacherIds: mergedTeacherIds,
+    teacherId: mergedTeacherIds[0] || 'NILanchal25',
+    studentIds: nextStudentIds,
+    updatedAt: new Date().toISOString(),
+  }
+  batches[idx] = nextBatch
   saveJson(PATHS.batches, batches)
 
-  if (Array.isArray(req.body?.studentIds)) {
-    const students = loadJson(PATHS.students, [])
+  const prevSet = new Set(Array.isArray(prev.studentIds) ? prev.studentIds : [])
+  const nextSet = new Set(nextStudentIds)
+  const addedStudentIds = [...nextSet].filter((id) => !prevSet.has(id))
+  const removedStudentIds = [...prevSet].filter((id) => !nextSet.has(id))
+
+  if (hasStudentIdsUpdate) {
     for (const s of students) {
-      if (req.body.studentIds.includes(s.id)) s.batchId = batches[idx].id
+      if (nextSet.has(s.id)) {
+        s.batchId = nextBatch.id
+        if (!s.courseEnrolled) s.courseEnrolled = String(nextBatch.courseId || s.courseEnrolled || '')
+      } else if (s.batchId === nextBatch.id && removedStudentIds.includes(s.id)) {
+        s.batchId = ''
+      }
     }
     saveJson(PATHS.students, students)
   }
+
+  const effectiveStudentIds = hasStudentIdsUpdate
+    ? nextStudentIds
+    : Array.isArray(prev.studentIds)
+      ? prev.studentIds
+      : []
+  if (effectiveStudentIds.length) {
+    upsertBatchEnrollments(
+      enrollments,
+      effectiveStudentIds,
+      nextBatch.courseId,
+      nextBatch.id,
+      nextBatch.startDate || prev.startDate,
+      nextBatch.endDate || prev.endDate
+    )
+    saveJson(PATHS.enrollments, enrollments)
+  }
+
+  const changedTiming = typeof req.body?.timing === 'string' && String(req.body.timing) !== String(prev.timing || '')
+  const changedTeacher =
+    req.body?.teacherId != null ||
+    (Array.isArray(req.body?.teacherIds) &&
+      normalizeTeacherIds(req.body.teacherIds).join(',') !== normalizeTeacherIds(prev.teacherIds || prev.teacherId).join(','))
+
+  const studentsById = new Map(students.map((s) => [s.id, s]))
+  if (addedStudentIds.length) {
+    addStudentNotifications(
+      notifications,
+      studentsById,
+      addedStudentIds,
+      `You were added to batch "${nextBatch.name}". Timing: ${nextBatch.timing}.`
+    )
+  }
+  if (removedStudentIds.length) {
+    addStudentNotifications(notifications, studentsById, removedStudentIds, `You were removed from batch "${nextBatch.name}".`)
+  }
+  if (changedTiming || changedTeacher) {
+    const studentIdsToNotify = hasStudentIdsUpdate ? nextStudentIds : Array.isArray(prev.studentIds) ? prev.studentIds : []
+    const msg = changedTiming && changedTeacher
+      ? `Batch "${nextBatch.name}" timing and teacher have been updated.`
+      : changedTiming
+        ? `Batch "${nextBatch.name}" timing has changed to ${nextBatch.timing}.`
+        : `Batch "${nextBatch.name}" teacher has been changed.`
+    addStudentNotifications(notifications, studentsById, studentIdsToNotify, msg)
+  }
+  saveJson(PATHS.studentNotifications, notifications)
+  res.json({ success: true, batch: nextBatch })
+})
+
+router.post('/batches/:id/mark-completed', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const batches = loadJson(PATHS.batches, [])
+  const idx = batches.findIndex((x) => x.id === req.params.id)
+  if (idx < 0) return res.status(404).json({ error: 'Batch not found' })
+  batches[idx] = {
+    ...batches[idx],
+    status: 'completed',
+    completedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+  saveJson(PATHS.batches, batches)
+
+  const students = loadJson(PATHS.students, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const studentsById = new Map(students.map((s) => [s.id, s]))
+  const notifications = loadJson(PATHS.studentNotifications, [])
+  const ids = Array.isArray(batches[idx].studentIds) ? batches[idx].studentIds : []
+  for (const e of enrollments) {
+    if (String(e.batchId || '') !== String(batches[idx].id)) continue
+    e.status = 'completed'
+    if (!e.expiresAt) e.expiresAt = parseDate(batches[idx].endDate || new Date().toISOString())
+    e.updatedAt = new Date().toISOString()
+  }
+  saveJson(PATHS.enrollments, enrollments)
+  addStudentNotifications(notifications, studentsById, ids, `Batch "${batches[idx].name}" has been marked as completed.`)
+  saveJson(PATHS.studentNotifications, notifications)
   res.json({ success: true, batch: batches[idx] })
 })
 
 // ===== Attendance =====
 router.get('/attendance', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const month = String(req.query.month || '')
+  const courseId = String(req.query.courseId || '')
   const batchId = String(req.query.batchId || '')
   const date = parseDate(req.query.date || '')
+  const mobile = normalizePhone(req.query.mobile || '')
+  const unlockedOnly = String(req.query.unlockedOnly || '').toLowerCase() === 'true'
   const records = loadJson(PATHS.attendance, [])
-  const filtered = records.filter((r) => (!batchId || r.batchId === batchId) && (!date || r.date === date))
+  const students = loadJson(PATHS.students, [])
+  const batches = loadJson(PATHS.batches, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const batchById = new Map(batches.map((b) => [String(b.id), b]))
+  const studentsById = new Map(students.map((s) => [String(s.id), s]))
+  const hasEnrollment = (studentId, cid) =>
+    enrollments.some((e) => String(e.studentId) === String(studentId) && normCourseId(e.courseId) === normCourseId(cid))
+
+  const filtered = records.filter((r) => {
+    const b = batchById.get(String(r.batchId || ''))
+    const recCourse = String(r.courseId || b?.courseId || '')
+    const stu = studentsById.get(String(r.studentId || ''))
+    if (batchId && String(r.batchId) !== batchId) return false
+    if (date && parseDate(r.date) !== date) return false
+    if (month && monthKey(r.date) !== month) return false
+    if (courseId && normCourseId(recCourse) !== normCourseId(courseId)) return false
+    if (mobile && normalizePhone(stu?.phone) !== mobile) return false
+    if (unlockedOnly && !hasEnrollment(r.studentId, recCourse)) return false
+    return true
+  })
   res.json({ attendance: filtered.slice().reverse() })
 })
 
@@ -542,15 +830,33 @@ router.post('/attendance/mark', auth, allowRoles(['admin', 'teacher']), (req, re
     return res.status(400).json({ error: 'date, batchId, studentId, status(present/absent) are required' })
   }
   const records = loadJson(PATHS.attendance, [])
+  const batches = loadJson(PATHS.batches, [])
+  const batch = batches.find((b) => String(b.id) === String(batchId))
+  if (!batch) return res.status(404).json({ error: 'Batch not found' })
+  if (!requireTeacherCourseAccess(req, res, batch.courseId)) return
   const d = parseDate(date)
-  const idx = records.findIndex((r) => r.date === d && r.batchId === String(batchId) && r.studentId === String(studentId))
+  const courseId = String(batch.courseId || '')
+  // Prevent duplicate attendance for the same student+course+date
+  const idx = records.findIndex(
+    (r) =>
+      r.date === d &&
+      String(r.studentId) === String(studentId) &&
+      normCourseId(r.courseId || '') === normCourseId(courseId)
+  )
   if (idx >= 0) {
-    records[idx] = { ...records[idx], status: String(status), updatedAt: new Date().toISOString() }
+    records[idx] = {
+      ...records[idx],
+      batchId: String(batchId),
+      courseId,
+      status: String(status),
+      updatedAt: new Date().toISOString(),
+    }
   } else {
     records.push({
       id: `att-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
       date: d,
       batchId: String(batchId),
+      courseId,
       studentId: String(studentId),
       status: String(status),
       markedBy: req.auth.userId,
@@ -563,19 +869,47 @@ router.post('/attendance/mark', auth, allowRoles(['admin', 'teacher']), (req, re
 
 router.get('/attendance/report/monthly', auth, allowRoles(['admin', 'teacher']), (req, res) => {
   const month = String(req.query.month || monthKey(new Date().toISOString()))
+  const courseId = String(req.query.courseId || '')
   const batchId = String(req.query.batchId || '')
+  const mobile = normalizePhone(req.query.mobile || '')
+  const unlockedOnly = String(req.query.unlockedOnly || '').toLowerCase() === 'true'
   const records = loadJson(PATHS.attendance, [])
-  const filtered = records.filter((r) => monthKey(r.date) === month && (!batchId || r.batchId === batchId))
+  const students = loadJson(PATHS.students, [])
+  const batches = loadJson(PATHS.batches, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const batchById = new Map(batches.map((b) => [String(b.id), b]))
+  const studentsById = new Map(students.map((s) => [String(s.id), s]))
+  const hasEnrollment = (studentId, cid) =>
+    enrollments.some((e) => String(e.studentId) === String(studentId) && normCourseId(e.courseId) === normCourseId(cid))
+
+  const filtered = records.filter((r) => {
+    if (monthKey(r.date) !== month) return false
+    if (batchId && String(r.batchId) !== batchId) return false
+    const b = batchById.get(String(r.batchId || ''))
+    const recCourse = String(r.courseId || b?.courseId || '')
+    if (courseId && normCourseId(recCourse) !== normCourseId(courseId)) return false
+    const stu = studentsById.get(String(r.studentId || ''))
+    if (mobile && normalizePhone(stu?.phone) !== mobile) return false
+    if (unlockedOnly && !hasEnrollment(r.studentId, recCourse)) return false
+    return true
+  })
   const byStudent = {}
   for (const r of filtered) {
-    byStudent[r.studentId] ||= { present: 0, absent: 0, total: 0 }
+    byStudent[r.studentId] ||= { present: 0, absent: 0, total: 0, studentId: r.studentId, name: '', phone: '' }
     byStudent[r.studentId].total += 1
     byStudent[r.studentId][r.status] += 1
   }
-  const rows = Object.keys(byStudent).map((studentId) => {
-    const x = byStudent[studentId]
+  const rows = Object.keys(byStudent).map((sid) => {
+    const x = byStudent[sid]
+    const s = studentsById.get(String(sid))
     const percentage = x.total ? Math.round((x.present / x.total) * 100) : 0
-    return { studentId, ...x, percentage }
+    return {
+      ...x,
+      name: s?.name || sid,
+      phone: s?.phone || '',
+      percentage,
+      below75: percentage < 75,
+    }
   })
   res.json({ month, batchId: batchId || null, report: rows })
 })
@@ -771,18 +1105,48 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
     revenueMap[m] = (revenueMap[m] || 0) + (Number(f.amount) || 0)
   }
 
+  const statusBuckets = { active: 0, upcoming: 0, completed: 0, cancelled: 0 }
+  const batchStudentCount = {}
+  for (const b of batches) {
+    const status = computeBatchLifecycleStatus(b)
+    statusBuckets[status] = (statusBuckets[status] || 0) + 1
+    batchStudentCount[b.id] = students.filter((s) => s.batchId === b.id).length
+  }
+
+  const coursePerformance = {}
+  for (const b of batches) {
+    const cid = String(b.courseId || 'unassigned')
+    coursePerformance[cid] ||= { batches: 0, students: 0, completed: 0 }
+    coursePerformance[cid].batches += 1
+    coursePerformance[cid].students += batchStudentCount[b.id] || 0
+    if (computeBatchLifecycleStatus(b) === 'completed') coursePerformance[cid].completed += 1
+  }
+
   res.json({
     totals: {
       totalStudents: students.length,
-      activeBatches: batches.length,
+      totalBatches: batches.length,
+      activeBatches: statusBuckets.active,
+      completedBatches: statusBuckets.completed,
       revenueDaily,
       revenueMonthly,
       attendanceRate,
+    },
+    batchesAnalytics: {
+      statuses: statusBuckets,
+      studentCountPerBatch: batchStudentCount,
+      coursePerformance,
     },
     courseWiseStudents: courseWise,
     studentGrowth: growthMap,
     revenueTrend: revenueMap,
   })
+})
+
+/** Certification profiles (structured data + file URLs) — admin/teacher read-only */
+router.get('/student-profiles', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
+  const profiles = loadJson(PATHS.studentProfiles, [])
+  res.json({ profiles: profiles.slice().reverse() })
 })
 
 export default router

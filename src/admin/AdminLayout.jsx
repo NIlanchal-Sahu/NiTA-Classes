@@ -26,6 +26,7 @@ export default function AdminLayout() {
         { to: '/admin/batches', label: 'Batches' },
         { to: '/admin/attendance', label: 'Attendance' },
         { to: '/admin/notes', label: 'Course Content' },
+        { to: '/admin/student-profiles', label: 'Student profiles' },
       ]
     : [
         { to: '/admin', end: true, label: 'Dashboard' },
@@ -38,6 +39,7 @@ export default function AdminLayout() {
         { to: '/admin/referrals', label: 'Referrals' },
         { to: '/admin/notes', label: 'Course Content' },
         { to: '/admin/certificates', label: 'Certificates' },
+        { to: '/admin/student-profiles', label: 'Student profiles' },
         { to: '/admin/enrollments', label: 'Admissions Queue' },
         { to: '/admin/notifications', label: 'Notifications' },
       ]

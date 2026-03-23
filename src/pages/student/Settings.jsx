@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { studentPortalApi } from '../../api/student'
@@ -70,11 +71,24 @@ export default function Settings() {
       )}
 
       <div className="mt-8 space-y-6">
+        <div className="rounded-xl border border-violet-500/30 bg-violet-950/20 p-6">
+          <h3 className="font-semibold text-white">Certification profile</h3>
+          <p className="mt-1 text-sm text-gray-400">
+            Full name, Aadhaar, address, qualification, and document uploads for certificates and records.
+          </p>
+          <Link
+            to="/student/profile"
+            className="mt-4 inline-flex rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+          >
+            Edit profile
+          </Link>
+        </div>
+
         <div className="rounded-xl border border-gray-700 bg-gray-800 p-6">
-          <h3 className="font-semibold text-white">Profile</h3>
+          <h3 className="font-semibold text-white">Academy account</h3>
           <dl className="mt-3 space-y-2 text-sm">
             <div>
-              <dt className="text-gray-500">Login (mobile / Student ID)</dt>
+              <dt className="text-gray-500">Login (mobile / email)</dt>
               <dd className="text-white">{user?.email || '—'}</dd>
             </div>
             {user?.studentId && (

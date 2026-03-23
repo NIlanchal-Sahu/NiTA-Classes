@@ -1,1 +1,23 @@
-﻿[]
+[
+  {
+    "id": "att-1774260005444-01633",
+    "date": "2026-03-23",
+    "batchId": "batch-1774229789714",
+    "courseId": "spoken-english-mastery",
+    "studentId": "NITA20260322GJUTZH",
+    "status": "present",
+    "markedBy": "admin-1",
+    "createdAt": "2026-03-23T10:00:05.444Z"
+  },
+  {
+    "id": "att-1774260109207-e6d59",
+    "date": "2026-03-23",
+    "batchId": "batch-1774229789714",
+    "courseId": "spoken-english-mastery",
+    "studentId": "NITA20260321",
+    "status": "present",
+    "markedBy": "admin-1",
+    "createdAt": "2026-03-23T10:01:49.207Z",
+    "updatedAt": "2026-03-23T10:02:00.532Z"
+  }
+]

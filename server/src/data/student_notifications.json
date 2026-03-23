@@ -1,1 +1,44 @@
-[]
+[
+  {
+    "id": "stu-notif-1774187147064",
+    "userId": "auth-1774146766572",
+    "message": "₹2000 (promotional offer credit) has been added successfully to your wallet.",
+    "read": false,
+    "createdAt": "2026-03-22T13:45:47.064Z"
+  },
+  {
+    "id": "stu-notif-1774257029037-2ae6c8",
+    "userId": "auth-1774078706435",
+    "message": "You were added to batch \"SPENG APR-JUNE\". Timing: 9:00 AM - 10:00 AM.",
+    "read": false,
+    "createdAt": "2026-03-23T09:10:29.037Z"
+  },
+  {
+    "id": "stu-notif-1774257082902-a7c3e6",
+    "userId": "auth-1774146766572",
+    "message": "Batch \"SPENG APR-JUNE\" teacher has been changed.",
+    "read": false,
+    "createdAt": "2026-03-23T09:11:22.902Z"
+  },
+  {
+    "id": "stu-notif-1774257082902-672000",
+    "userId": "auth-1774078706435",
+    "message": "Batch \"SPENG APR-JUNE\" teacher has been changed.",
+    "read": false,
+    "createdAt": "2026-03-23T09:11:22.902Z"
+  },
+  {
+    "id": "stu-notif-1774257156807-600cad",
+    "userId": "auth-1774146766572",
+    "message": "Batch \"SPENG APR-JUNE\" teacher has been changed.",
+    "read": false,
+    "createdAt": "2026-03-23T09:12:36.807Z"
+  },
+  {
+    "id": "stu-notif-1774257156807-4adc61",
+    "userId": "auth-1774078706435",
+    "message": "Batch \"SPENG APR-JUNE\" teacher has been changed.",
+    "read": false,
+    "createdAt": "2026-03-23T09:12:36.807Z"
+  }
+]
