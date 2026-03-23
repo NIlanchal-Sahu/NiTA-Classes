@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ENROLLMENTS_PATH = join(__dirname, '..', 'data', 'enrollments.json')
+const STUDENTS_PATH = join(__dirname, '..', 'data', 'students.json')
 
 function studentAdminAuth(req, res, next) {
   const auth = req.headers.authorization
@@ -33,27 +34,127 @@ function saveJson(path, data) {
   writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
 }
 
+function digits(input) {
+  return String(input || '').replace(/\D/g, '')
+}
+
+function normalizePhone(input) {
+  return digits(input).slice(-10)
+}
+
+function normalizeCourseIds(rawCourses, rawCourse) {
+  const base = Array.isArray(rawCourses) ? rawCourses : rawCourse ? [rawCourse] : []
+  return [...new Set(base.map((x) => String(x || '').trim()).filter(Boolean))]
+}
+
+function monthNameUpper(dateObj) {
+  return dateObj.toLocaleString('en-US', { month: 'long' }).toUpperCase()
+}
+
+function makeAdmissionId(phone, existing, now = new Date()) {
+  const last4 = String(phone || '').slice(-4) || '0000'
+  const prefix = `${monthNameUpper(now)}${now.getFullYear()}${last4}`
+  let out = prefix
+  let i = 1
+  const used = new Set(existing.map((e) => String(e.admissionId || '')))
+  while (used.has(out)) {
+    i += 1
+    out = `${prefix}-${i}`
+  }
+  return out
+}
+
 router.get('/', studentAdminAuth, (req, res) => {
   const list = loadJson(ENROLLMENTS_PATH)
   res.json({ enrollments: list.slice().reverse() })
 })
 
 router.post('/', studentAdminAuth, (req, res) => {
-  const { name, mobile, course, school, referralCode } = req.body || {}
-  if (!name || !mobile || !course) return res.status(400).json({ error: 'name, mobile, course are required' })
+  const {
+    name,
+    mobile,
+    course,
+    courses,
+    school = '',
+    highestQualification = '',
+    villageCity = '',
+    gender = '',
+    fatherName = '',
+    referralCode,
+  } = req.body || {}
+  const phone = normalizePhone(mobile)
+  const courseIds = normalizeCourseIds(courses, course)
+  if (!name || !phone || courseIds.length === 0) {
+    return res.status(400).json({ error: 'name, mobile and at least one course are required' })
+  }
+  if (phone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
   const list = loadJson(ENROLLMENTS_PATH)
+  if (list.some((x) => normalizePhone(x.mobile) === phone)) {
+    return res.status(409).json({ error: 'Mobile number already exists in admission queue. Contact WhatsApp support.' })
+  }
+  const students = loadJson(STUDENTS_PATH)
+  if (students.some((s) => normalizePhone(s.phone) === phone)) {
+    return res.status(409).json({ error: 'Mobile number already exists as active student. Contact WhatsApp support.' })
+  }
+  const users = getUsers()
+  if (users.some((u) => u.role === 'student' && normalizePhone(u.email) === phone)) {
+    return res.status(409).json({ error: 'Mobile number already has LMS account. Contact WhatsApp support.' })
+  }
+  const now = new Date()
   const next = {
     id: `enroll-${Date.now()}`,
-    name: String(name),
-    mobile: String(mobile),
-    course: String(course),
-    school: school ? String(school) : '',
+    admissionId: makeAdmissionId(phone, list, now),
+    name: String(name).trim(),
+    mobile: phone,
+    courseIds,
+    course: courseIds[0],
+    school: String(school || '').trim(),
+    highestQualification: String(highestQualification || '').trim(),
+    villageCity: String(villageCity || '').trim(),
+    gender: String(gender || '').trim(),
+    fatherName: String(fatherName || '').trim(),
     referralCode: referralCode ? String(referralCode).trim().toUpperCase() : '',
-    createdAt: new Date().toISOString(),
+    status: 'queued',
+    createdAt: now.toISOString(),
   }
   list.push(next)
   saveJson(ENROLLMENTS_PATH, list)
   res.json({ success: true, enrollment: next })
+})
+
+router.put('/:id', studentAdminAuth, (req, res) => {
+  const list = loadJson(ENROLLMENTS_PATH)
+  const idx = list.findIndex((x) => x.id === req.params.id)
+  if (idx < 0) return res.status(404).json({ error: 'Enrollment not found' })
+  const old = list[idx]
+  const nextMobile = req.body?.mobile ? normalizePhone(req.body.mobile) : normalizePhone(old.mobile)
+  if (nextMobile.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
+  if (list.some((x) => x.id !== old.id && normalizePhone(x.mobile) === nextMobile)) {
+    return res.status(409).json({ error: 'Mobile number already exists in admission queue. Contact WhatsApp support.' })
+  }
+  const nextCourses = req.body?.courses || req.body?.course
+    ? normalizeCourseIds(req.body?.courses, req.body?.course)
+    : normalizeCourseIds(old.courseIds, old.course)
+  if (nextCourses.length === 0) return res.status(400).json({ error: 'At least one course is required' })
+  list[idx] = {
+    ...old,
+    ...req.body,
+    mobile: nextMobile,
+    courseIds: nextCourses,
+    course: nextCourses[0],
+    referralCode: req.body?.referralCode ? String(req.body.referralCode).trim().toUpperCase() : old.referralCode || '',
+    updatedAt: new Date().toISOString(),
+  }
+  saveJson(ENROLLMENTS_PATH, list)
+  res.json({ success: true, enrollment: list[idx] })
+})
+
+router.delete('/:id', studentAdminAuth, (req, res) => {
+  const list = loadJson(ENROLLMENTS_PATH)
+  const next = list.filter((x) => x.id !== req.params.id)
+  if (next.length === list.length) return res.status(404).json({ error: 'Enrollment not found' })
+  saveJson(ENROLLMENTS_PATH, next)
+  res.json({ success: true })
 })
 
 export default router

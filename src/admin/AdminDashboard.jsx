@@ -32,6 +32,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState('')
 
   const courseRows = useMemo(() => Object.entries(data?.courseWiseStudents || {}).sort((a, b) => b[1] - a[1]), [data])
+  const referralRows = useMemo(() => data?.admissionsAnalytics?.referralPerformance || [], [data])
 
   useEffect(() => {
     ;(async () => {
@@ -89,6 +90,40 @@ export default function AdminDashboard() {
         <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6">
           <h2 className="text-lg font-semibold text-white">Revenue Trend 💰</h2>
           <TinyBars data={data?.revenueTrend || {}} color="bg-emerald-500" />
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white">Admissions Funnel & Conversion</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+            <div className="text-sm text-gray-400">Admissions Queue</div>
+            <div className="mt-1 text-2xl font-bold text-white">{data?.admissionsAnalytics?.queueCount ?? 0}</div>
+          </div>
+          <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+            <div className="text-sm text-gray-400">Active Students</div>
+            <div className="mt-1 text-2xl font-bold text-white">{data?.admissionsAnalytics?.activeStudents ?? 0}</div>
+          </div>
+          <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+            <div className="text-sm text-gray-400">Conversion Rate</div>
+            <div className="mt-1 text-2xl font-bold text-emerald-300">{data?.admissionsAnalytics?.conversionRate ?? 0}%</div>
+          </div>
+          <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+            <div className="text-sm text-gray-400">Top Referral Code</div>
+            <div className="mt-1 text-lg font-bold text-white">{referralRows[0]?.code || '—'}</div>
+          </div>
+        </div>
+        <div className="mt-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
+          <h3 className="text-sm font-semibold text-white">Referral Performance</h3>
+          <div className="mt-2 space-y-2">
+            {referralRows.map((r) => (
+              <div key={r.code} className="flex items-center justify-between text-sm text-gray-300">
+                <span>{r.code}</span>
+                <span className="font-semibold text-white">{r.count}</span>
+              </div>
+            ))}
+            {referralRows.length === 0 && <p className="text-sm text-gray-500">No referral activity yet.</p>}
+          </div>
         </div>
       </div>
 

@@ -31,6 +31,7 @@ const CERTIFICATE_REQUESTS_PATH = join(__dirname, "..", "data", "certificate_req
 const REFERRAL_LINKS_PATH = join(__dirname, "..", "data", "referral_links.json");
 const REFERRAL_PAYOUTS_PATH = join(__dirname, "..", "data", "referral_payouts.json");
 const ENROLLMENTS_HISTORY_PATH = join(__dirname, "..", "data", "student_enrollments.json");
+const ADMISSIONS_QUEUE_PATH = join(__dirname, "..", "data", "enrollments.json");
 const ADMIN_ALERTS_PATH = join(__dirname, "..", "data", "admin_alerts.json");
 const STUDENT_NOTIFICATIONS_PATH = join(__dirname, "..", "data", "student_notifications.json");
 const COURSE_UNLOCK_FEES = {
@@ -120,6 +121,18 @@ function today() {
 
 function normalizeCourseId(input) {
   return String(input || "").trim().toLowerCase();
+}
+
+function normalizePhone(input) {
+  return String(input || "").replace(/\D/g, "").slice(-10);
+}
+
+function removeAdmissionQueueByPhone(phone) {
+  const p = normalizePhone(phone);
+  if (!p) return;
+  const rows = loadJson(ADMISSIONS_QUEUE_PATH);
+  const next = rows.filter((r) => normalizePhone(r.mobile) !== p);
+  if (next.length !== rows.length) saveJson(ADMISSIONS_QUEUE_PATH, next);
 }
 
 function getCourseCatalog() {
@@ -610,6 +623,7 @@ router.post("/portal/courses/unlock", studentAuth, (req, res) => {
   };
   enrollments.push(nextEnrollment);
   saveJson(ENROLLMENTS_HISTORY_PATH, enrollments);
+  removeAdmissionQueueByPhone(student.phone || authUser.email || "");
 
   res.json({
     success: true,

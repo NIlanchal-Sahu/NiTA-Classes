@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { FORM_ENDPOINT } from '../config'
 
@@ -14,27 +14,39 @@ export default function Admission() {
   const [form, setForm] = useState({
     name: '',
     mobile: '',
-    course: '',
+    courses: [],
     highestQualification: '',
     villageCity: '',
     gender: '',
     fatherName: '',
+    school: '',
     referralCode: '',
   })
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle') // idle | submitting | success | error
   const [enrollmentResult, setEnrollmentResult] = useState(null)
+  const [courseOpen, setCourseOpen] = useState(false)
+  const [courseSearch, setCourseSearch] = useState('')
+  const courseBoxRef = useRef(null)
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (!courseBoxRef.current) return
+      if (!courseBoxRef.current.contains(e.target)) setCourseOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
 
   const validate = () => {
     const next = {}
     if (!form.name.trim()) next.name = 'Name is required'
     if (!form.mobile.trim()) next.mobile = 'Mobile number is required'
     else if (!/^\d{10}$/.test(form.mobile.replace(/\s/g, ''))) next.mobile = 'Enter a valid 10-digit number'
-    if (!form.course) next.course = 'Please select a course'
+    if (!Array.isArray(form.courses) || form.courses.length === 0) next.courses = 'Please select at least one course'
     if (!form.highestQualification.trim()) next.highestQualification = 'Highest qualification is required'
     if (!form.villageCity.trim()) next.villageCity = 'Village/City is required'
     if (!form.gender) next.gender = 'Gender is required'
-    if (!form.fatherName.trim()) next.fatherName = 'Father name is required'
     if (form.referralCode && !/^[a-z0-9-]{4,32}$/i.test(form.referralCode.trim())) next.referralCode = 'Enter a valid referral code'
     setErrors(next)
     return Object.keys(next).length === 0
@@ -44,6 +56,24 @@ export default function Admission() {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }))
+  }
+
+  const handleCoursesChange = (e) => {
+    const selected = Array.from(e.target.selectedOptions || []).map((opt) => opt.value)
+    setForm((prev) => ({ ...prev, courses: selected }))
+    if (errors.courses) setErrors((prev) => ({ ...prev, courses: '' }))
+  }
+
+  const filteredCourseOptions = useMemo(() => {
+    const q = courseSearch.trim().toLowerCase()
+    if (!q) return COURSE_OPTIONS
+    return COURSE_OPTIONS.filter(
+      (c) => c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q),
+    )
+  }, [courseSearch])
+
+  const removeCourse = (id) => {
+    setForm((prev) => ({ ...prev, courses: prev.courses.filter((x) => x !== id) }))
   }
 
   const handleSubmit = async (e) => {
@@ -72,26 +102,17 @@ export default function Admission() {
       setForm({
         name: '',
         mobile: '',
-        course: '',
+        courses: [],
         highestQualification: '',
         villageCity: '',
         gender: '',
         fatherName: '',
+        school: '',
         referralCode: '',
       })
-    } catch {
-      setStatus('success')
-      setEnrollmentResult(null)
-      setForm({
-        name: '',
-        mobile: '',
-        course: '',
-        highestQualification: '',
-        villageCity: '',
-        gender: '',
-        fatherName: '',
-        referralCode: '',
-      })
+    } catch (err) {
+      setStatus('error')
+      setErrors((prev) => ({ ...prev, submit: err?.message || 'Failed to submit admission form.' }))
     }
   }
 
@@ -123,6 +144,9 @@ export default function Admission() {
                   <dd className="font-mono text-lg font-bold text-gray-900">{enrollmentResult.credentials.password}</dd>
                 </div>
               </dl>
+              <p className="mt-2 text-sm text-gray-700">
+                Admission ID: <span className="font-semibold">{enrollmentResult?.enrollment?.admissionId || '—'}</span>
+              </p>
               <p className="mt-4 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
                 <strong>Important:</strong> Note this down in a safe place. Change your password after first login in{' '}
                 <strong>Student → Settings</strong>.
@@ -184,23 +208,91 @@ export default function Admission() {
         </div>
 
         <div>
-          <label htmlFor="course" className="block text-sm font-medium text-gray-700">Class / Course *</label>
-          <select
-            id="course"
-            name="course"
-            required
-            value={form.course}
+          <label className="block text-sm font-medium text-gray-700">Class / Course * (Multi-select)</label>
+          <div ref={courseBoxRef} className="relative mt-1">
+            <button
+              type="button"
+              onClick={() => setCourseOpen((v) => !v)}
+              className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            >
+              <span className="text-sm text-gray-700">
+                {form.courses.length > 0 ? `${form.courses.length} course(s) selected` : 'Select one or more courses'}
+              </span>
+              <span className="text-gray-500">{courseOpen ? '▲' : '▼'}</span>
+            </button>
+
+            {courseOpen && (
+              <div className="absolute z-20 mt-2 w-full rounded-lg border border-gray-300 bg-white shadow-lg">
+                <div className="border-b border-gray-200 p-2">
+                  <input
+                    type="text"
+                    value={courseSearch}
+                    onChange={(e) => setCourseSearch(e.target.value)}
+                    placeholder="Search course..."
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="max-h-64 overflow-auto p-2">
+                  {filteredCourseOptions.map((opt) => (
+                    <label key={opt.id} className="flex cursor-pointer items-start gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={form.courses.includes(opt.id)}
+                        onChange={(e) => {
+                          const selected = e.target.checked
+                            ? [...form.courses, opt.id]
+                            : form.courses.filter((x) => x !== opt.id)
+                          handleCoursesChange({ target: { selectedOptions: selected.map((v) => ({ value: v })) } })
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                  {filteredCourseOptions.length === 0 && (
+                    <p className="px-2 py-2 text-sm text-gray-500">No matching courses.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          {form.courses.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {form.courses.map((cid) => {
+                const found = COURSE_OPTIONS.find((c) => c.id === cid)
+                return (
+                  <span
+                    key={cid}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary-100 px-3 py-1 text-xs text-primary-800"
+                  >
+                    {found?.label || cid}
+                    <button
+                      type="button"
+                      onClick={() => removeCourse(cid)}
+                      className="font-semibold hover:text-primary-900"
+                      aria-label={`Remove ${cid}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+          {errors.courses && <p className="mt-1 text-sm text-red-600">{errors.courses}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="school" className="block text-sm font-medium text-gray-700">School / College</label>
+          <input
+            id="school"
+            name="school"
+            type="text"
+            value={form.school}
             onChange={handleChange}
             className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-          >
-            <option value="">Select course</option>
-            {COURSE_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {errors.course && <p className="mt-1 text-sm text-red-600">{errors.course}</p>}
+            placeholder="School or college name"
+          />
         </div>
 
         <div>
@@ -258,7 +350,7 @@ export default function Admission() {
         </div>
 
         <div>
-          <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700">Father Name *</label>
+          <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700">Father Name (optional)</label>
           <input
             id="fatherName"
             name="fatherName"
@@ -267,7 +359,6 @@ export default function Admission() {
             onChange={handleChange}
             className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="Father full name"
-            required
           />
           {errors.fatherName && <p className="mt-1 text-sm text-red-600">{errors.fatherName}</p>}
         </div>
@@ -296,6 +387,16 @@ export default function Admission() {
         >
           {status === 'submitting' ? 'Submitting...' : 'Submit'}
         </button>
+        {errors.submit && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {errors.submit}
+          </div>
+        )}
+        {status === 'error' && (
+          <p className="text-sm text-gray-600">
+            If this mobile number was already used, please contact WhatsApp support.
+          </p>
+        )}
       </form>
 
       <p className="mt-4 text-center text-sm text-gray-500">*Terms & Conditions Apply</p>

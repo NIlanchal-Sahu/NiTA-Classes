@@ -25,6 +25,7 @@ const PATHS = {
   studentNotifications: join(__dirname, '..', 'data', 'student_notifications.json'),
   adminAlerts: join(__dirname, '..', 'data', 'admin_alerts.json'),
   studentProfiles: join(__dirname, '..', 'data', 'student_profiles.json'),
+  admissionsQueue: join(__dirname, '..', 'data', 'enrollments.json'),
 }
 
 function loadJson(path, fallback = []) {
@@ -61,6 +62,14 @@ function allowRoles(roles) {
 
 function normalizePhone(input) {
   return String(input || '').replace(/\D/g, '').slice(-10)
+}
+
+function removeAdmissionsByPhones(phones = []) {
+  const targets = new Set((phones || []).map((p) => normalizePhone(p)).filter(Boolean))
+  if (targets.size === 0) return
+  const rows = loadJson(PATHS.admissionsQueue, [])
+  const next = rows.filter((r) => !targets.has(normalizePhone(r.mobile)))
+  if (next.length !== rows.length) saveJson(PATHS.admissionsQueue, next)
 }
 
 function makeStudentId(name, phone) {
@@ -331,7 +340,8 @@ router.delete('/students/:id', auth, allowRoles(['admin']), (req, res) => {
 
 router.post('/students/:id/enrollments', auth, allowRoles(['admin', 'teacher']), (req, res) => {
   const students = loadJson(PATHS.students, [])
-  if (!students.some((s) => s.id === req.params.id)) return res.status(404).json({ error: 'Student not found' })
+  const student = students.find((s) => s.id === req.params.id)
+  if (!student) return res.status(404).json({ error: 'Student not found' })
   const { courseId, batchId, note = '' } = req.body || {}
   if (!courseId) return res.status(400).json({ error: 'courseId is required' })
   const enrollments = loadJson(PATHS.enrollments, [])
@@ -345,6 +355,7 @@ router.post('/students/:id/enrollments', auth, allowRoles(['admin', 'teacher']),
   }
   enrollments.push(next)
   saveJson(PATHS.enrollments, enrollments)
+  removeAdmissionsByPhones([student.phone])
   res.json({ success: true, enrollment: next })
 })
 
@@ -1079,6 +1090,7 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
   const batches = loadJson(PATHS.batches, [])
   const fees = loadJson(PATHS.fees, [])
   const attendance = loadJson(PATHS.attendance, [])
+  const admissions = loadJson(PATHS.admissionsQueue, [])
 
   const today = parseDate(new Date().toISOString())
   const currentMonth = monthKey(today)
@@ -1122,6 +1134,21 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
     if (computeBatchLifecycleStatus(b) === 'completed') coursePerformance[cid].completed += 1
   }
 
+  const admissionCount = admissions.length
+  const activeStudentCount = students.length
+  const funnelTotal = admissionCount + activeStudentCount
+  const conversionRate = funnelTotal ? Math.round((activeStudentCount / funnelTotal) * 100) : 0
+  const referralMap = {}
+  for (const a of admissions) {
+    const code = String(a.referralCode || '').trim().toUpperCase()
+    if (!code) continue
+    referralMap[code] = (referralMap[code] || 0) + 1
+  }
+  const referralPerformance = Object.entries(referralMap)
+    .map(([code, count]) => ({ code, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
   res.json({
     totals: {
       totalStudents: students.length,
@@ -1136,6 +1163,12 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
       statuses: statusBuckets,
       studentCountPerBatch: batchStudentCount,
       coursePerformance,
+    },
+    admissionsAnalytics: {
+      queueCount: admissionCount,
+      activeStudents: activeStudentCount,
+      conversionRate,
+      referralPerformance,
     },
     courseWiseStudents: courseWise,
     studentGrowth: growthMap,

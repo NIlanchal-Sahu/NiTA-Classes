@@ -33,6 +33,28 @@ function normalizeMobile(input) {
   return normalizePhoneDigits(input)
 }
 
+function normalizeCourseIds(rawCourses, rawCourse) {
+  const base = Array.isArray(rawCourses) ? rawCourses : rawCourse ? [rawCourse] : []
+  return [...new Set(base.map((x) => String(x || '').trim()).filter(Boolean))]
+}
+
+function monthNameUpper(dateObj) {
+  return dateObj.toLocaleString('en-US', { month: 'long' }).toUpperCase()
+}
+
+function makeAdmissionId(phone, existing, now = new Date()) {
+  const last4 = String(phone || '').slice(-4) || '0000'
+  const prefix = `${monthNameUpper(now)}${now.getFullYear()}${last4}`
+  let out = prefix
+  let i = 1
+  const used = new Set(existing.map((e) => String(e.admissionId || '')))
+  while (used.has(out)) {
+    i += 1
+    out = `${prefix}-${i}`
+  }
+  return out
+}
+
 function findStudentUserByPhone(phone) {
   const p = normalizeMobile(phone)
   return getUsers().find(
@@ -72,50 +94,60 @@ router.post('/', (req, res) => {
     name,
     mobile,
     course,
+    courses,
     highestQualification,
     villageCity,
     gender,
     fatherName,
+    school,
     referralCode,
   } = req.body || {}
-  if (!name || !mobile || !course) return res.status(400).json({ error: 'name, mobile, course are required' })
-  if (!highestQualification || !villageCity || !gender || !fatherName) {
+  const courseIds = normalizeCourseIds(courses, course)
+  if (!name || !mobile || courseIds.length === 0) {
+    return res.status(400).json({ error: 'name, mobile, and at least one course are required' })
+  }
+  if (!highestQualification || !villageCity || !gender) {
     return res.status(400).json({
-      error: 'highestQualification, villageCity, gender and fatherName are required',
+      error: 'highestQualification, villageCity and gender are required',
     })
   }
   const phone = normalizeMobile(mobile)
   if (phone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
 
   const list = loadJson(ENROLLMENTS_PATH)
+  const duplicateInQueue = list.some((x) => normalizeMobile(x.mobile) === phone)
+  if (duplicateInQueue) {
+    return res.status(409).json({
+      error: 'Mobile number already exists in admission queue. Please contact WhatsApp support.',
+    })
+  }
+  const duplicateInStudent = loadJson(STUDENTS_PATH).some((s) => normalizeMobile(s.phone) === phone)
+  const duplicateInUser = getUsers().some((u) => u.role === 'student' && normalizeMobile(u.email) === phone)
+  if (duplicateInStudent || duplicateInUser) {
+    return res.status(409).json({
+      error: 'Mobile number already registered. Please contact WhatsApp support.',
+    })
+  }
+  const now = new Date()
+  const admissionId = makeAdmissionId(phone, list, now)
   const next = {
     id: `enroll-${Date.now()}`,
+    admissionId,
     name: String(name).trim(),
     mobile: phone,
-    course: String(course).trim(),
+    courseIds,
+    course: courseIds[0],
+    school: school ? String(school).trim() : '',
     highestQualification: String(highestQualification).trim(),
     villageCity: String(villageCity).trim(),
     gender: String(gender).trim(),
-    fatherName: String(fatherName).trim(),
+    fatherName: fatherName ? String(fatherName).trim() : '',
     referralCode: referralCode ? String(referralCode).trim().toUpperCase() : '',
-    createdAt: new Date().toISOString(),
+    status: 'queued',
+    createdAt: now.toISOString(),
   }
   list.push(next)
   saveJson(ENROLLMENTS_PATH, list)
-
-  const existingUser = findStudentUserByPhone(phone)
-  if (existingUser) {
-    ensureTrialEnrollment(existingUser.studentId || existingUser.id)
-
-    return res.json({
-      success: true,
-      enrollment: next,
-      existingAccount: true,
-      studentId: existingUser.studentId || null,
-      message:
-        'You already have an LMS account. Log in with your Student ID or mobile number and your password. If you forgot your password, contact admin.',
-    })
-  }
 
   const users = getUsers()
   const studentIds = users.map((u) => u.studentId).filter(Boolean)
@@ -141,11 +173,11 @@ router.post('/', (req, res) => {
     id: studentId,
     name: String(name).trim(),
     phone,
-    courseEnrolled: String(course).trim(),
+    courseEnrolled: String(courseIds[0] || '').trim(),
     highestQualification: String(highestQualification).trim(),
     villageCity: String(villageCity).trim(),
     gender: String(gender).trim(),
-    fatherName: String(fatherName).trim(),
+    fatherName: fatherName ? String(fatherName).trim() : '',
     batchId: '',
     admissionDate: new Date().toISOString().slice(0, 10),
     enrollmentFeeStatus: 'pending',
