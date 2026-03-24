@@ -8,6 +8,7 @@ const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ENROLLMENTS_PATH = join(__dirname, '..', 'data', 'enrollments.json')
 const STUDENTS_PATH = join(__dirname, '..', 'data', 'students.json')
+const STUDENT_ENROLLMENTS_PATH = join(__dirname, '..', 'data', 'student_enrollments.json')
 
 function studentAdminAuth(req, res, next) {
   const auth = req.headers.authorization
@@ -64,8 +65,43 @@ function makeAdmissionId(phone, existing, now = new Date()) {
   return out
 }
 
-router.get('/', studentAdminAuth, (req, res) => {
+function isConvertedAdmissionRow(row, students, users, studentEnrollments) {
+  const phone = normalizePhone(row?.mobile)
+  if (!phone) return false
+  const student = students.find((s) => normalizePhone(s.phone) === phone)
+  const user = users.find((u) => u.role === 'student' && normalizePhone(u.email) === phone)
+  if (!student || !user) return false
+  return studentEnrollments.some(
+    (e) =>
+      String(e.studentId || '') === String(student.id || '') &&
+      String(e.courseId || '').trim().toLowerCase() !== 'trial-course'
+  )
+}
+
+function reconcileAdmissionsQueue() {
   const list = loadJson(ENROLLMENTS_PATH)
+  if (!list.length) return list
+  const students = loadJson(STUDENTS_PATH)
+  const users = getUsers()
+  const studentEnrollments = loadJson(STUDENT_ENROLLMENTS_PATH)
+  const next = list
+    .map((r) => {
+      const courseIds = normalizeCourseIds(r.courseIds, r.course)
+      return {
+        ...r,
+        mobile: normalizePhone(r.mobile),
+        courseIds,
+        course: courseIds[0] || '',
+        status: r.status || 'queued',
+      }
+    })
+    .filter((r) => !isConvertedAdmissionRow(r, students, users, studentEnrollments))
+  if (next.length !== list.length) saveJson(ENROLLMENTS_PATH, next)
+  return next
+}
+
+router.get('/', studentAdminAuth, (req, res) => {
+  const list = reconcileAdmissionsQueue()
   res.json({ enrollments: list.slice().reverse() })
 })
 
@@ -88,7 +124,7 @@ router.post('/', studentAdminAuth, (req, res) => {
     return res.status(400).json({ error: 'name, mobile and at least one course are required' })
   }
   if (phone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
-  const list = loadJson(ENROLLMENTS_PATH)
+  const list = reconcileAdmissionsQueue()
   if (list.some((x) => normalizePhone(x.mobile) === phone)) {
     return res.status(409).json({ error: 'Mobile number already exists in admission queue. Contact WhatsApp support.' })
   }
@@ -123,7 +159,7 @@ router.post('/', studentAdminAuth, (req, res) => {
 })
 
 router.put('/:id', studentAdminAuth, (req, res) => {
-  const list = loadJson(ENROLLMENTS_PATH)
+  const list = reconcileAdmissionsQueue()
   const idx = list.findIndex((x) => x.id === req.params.id)
   if (idx < 0) return res.status(404).json({ error: 'Enrollment not found' })
   const old = list[idx]

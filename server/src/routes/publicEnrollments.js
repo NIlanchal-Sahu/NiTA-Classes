@@ -62,6 +62,41 @@ function findStudentUserByPhone(phone) {
   )
 }
 
+function isConvertedAdmissionRow(row, students, users, studentEnrollments) {
+  const phone = normalizeMobile(row?.mobile)
+  if (!phone) return false
+  const student = students.find((s) => normalizeMobile(s.phone) === phone)
+  const user = users.find((u) => u.role === 'student' && normalizeMobile(u.email) === phone)
+  if (!student || !user) return false
+  return studentEnrollments.some(
+    (e) =>
+      String(e.studentId || '') === String(student.id || '') &&
+      String(e.courseId || '').trim().toLowerCase() !== 'trial-course',
+  )
+}
+
+function reconcileAdmissionsQueue() {
+  const rows = loadJson(ENROLLMENTS_PATH)
+  if (!rows.length) return rows
+  const students = loadJson(STUDENTS_PATH)
+  const users = getUsers()
+  const studentEnrollments = loadJson(STUDENT_ENROLLMENTS_PATH)
+  const next = rows
+    .map((r) => {
+      const courseIds = normalizeCourseIds(r.courseIds, r.course)
+      return {
+        ...r,
+        mobile: normalizeMobile(r.mobile),
+        courseIds,
+        course: courseIds[0] || '',
+        status: r.status || 'queued',
+      }
+    })
+    .filter((r) => !isConvertedAdmissionRow(r, students, users, studentEnrollments))
+  if (next.length !== rows.length) saveJson(ENROLLMENTS_PATH, next)
+  return next
+}
+
 function getNextSaturdayIso(baseDate = new Date()) {
   const d = new Date(baseDate)
   const day = d.getDay() // 0 Sun .. 6 Sat
@@ -114,7 +149,7 @@ router.post('/', (req, res) => {
   const phone = normalizeMobile(mobile)
   if (phone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
 
-  const list = loadJson(ENROLLMENTS_PATH)
+  const list = reconcileAdmissionsQueue()
   const duplicateInQueue = list.some((x) => normalizeMobile(x.mobile) === phone)
   if (duplicateInQueue) {
     return res.status(409).json({

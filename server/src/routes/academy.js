@@ -1517,10 +1517,28 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
   const present = attendance.filter((x) => x.status === 'present').length
   const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : 0
 
+  // Course-wise student metrics must come from actual unlock/completion history.
+  const studentEnrollments = loadJson(PATHS.enrollments, [])
+  const courseWiseLifecycle = {}
+  for (const e of studentEnrollments) {
+    const courseId = normCourseId(e.courseId)
+    if (!courseId || courseId === 'trial-course') continue
+    courseWiseLifecycle[courseId] ||= { unlockedStudents: new Set(), completedStudents: new Set() }
+    courseWiseLifecycle[courseId].unlockedStudents.add(String(e.studentId || ''))
+    if (String(e.status || '').toLowerCase() === 'completed') {
+      courseWiseLifecycle[courseId].completedStudents.add(String(e.studentId || ''))
+    }
+  }
   const courseWise = {}
-  for (const s of students) {
-    const key = s.courseEnrolled || 'unassigned'
-    courseWise[key] = (courseWise[key] || 0) + 1
+  const courseWiseLifecycleOut = {}
+  for (const [courseId, bucket] of Object.entries(courseWiseLifecycle)) {
+    const unlockedCount = bucket.unlockedStudents.size
+    const completedCount = bucket.completedStudents.size
+    courseWise[courseId] = unlockedCount
+    courseWiseLifecycleOut[courseId] = {
+      unlocked: unlockedCount,
+      completed: completedCount,
+    }
   }
 
   const growthMap = {}
@@ -1624,6 +1642,7 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
       teacherEarningsTrend,
     },
     courseWiseStudents: courseWise,
+    courseWiseLifecycle: courseWiseLifecycleOut,
     studentGrowth: growthMap,
     revenueTrend: revenueMap,
   })

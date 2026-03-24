@@ -37,7 +37,10 @@ export default function AdminDashboard() {
   const [adminResetSaving, setAdminResetSaving] = useState(false)
   const [adminResetMsg, setAdminResetMsg] = useState('')
 
-  const courseRows = useMemo(() => Object.entries(data?.courseWiseStudents || {}).sort((a, b) => b[1] - a[1]), [data])
+  const courseRows = useMemo(
+    () => Object.entries(data?.courseWiseLifecycle || {}).sort((a, b) => (b?.[1]?.unlocked || 0) - (a?.[1]?.unlocked || 0)),
+    [data]
+  )
   const referralRows = useMemo(() => data?.admissionsAnalytics?.referralPerformance || [], [data])
 
   useEffect(() => {
@@ -210,12 +213,15 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
-        <h2 className="text-lg font-semibold text-white">Course-wise Students</h2>
+        <h2 className="text-lg font-semibold text-white">Course-wise Students (Unlocked / Completed)</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {courseRows.map(([course, count]) => (
+          {courseRows.map(([course, stats]) => (
             <div key={course} className="rounded-xl border border-gray-700 bg-gray-900 p-4">
               <div className="text-sm text-gray-400">{course}</div>
-              <div className="mt-1 text-2xl font-bold text-white">{count}</div>
+              <div className="mt-1 text-2xl font-bold text-white">{stats?.unlocked ?? 0}</div>
+              <div className="text-xs text-gray-400">Unlocked Students</div>
+              <div className="mt-2 text-lg font-semibold text-emerald-300">{stats?.completed ?? 0}</div>
+              <div className="text-xs text-gray-400">Completed Students</div>
             </div>
           ))}
           {courseRows.length === 0 && <div className="text-sm text-gray-500">No course-wise data yet.</div>}
