@@ -27,6 +27,7 @@ import AdminLayout from './admin/AdminLayout'
 import AdminDashboard from './admin/AdminDashboard'
 import AdminStudents from './admin/AdminStudents'
 import AdminAttendance from './admin/AdminAttendance'
+import AdminTeachers from './admin/AdminTeachers'
 import AdminEnrollments from './admin/AdminEnrollments'
 import AdminBatches from './admin/AdminBatches'
 import AdminNotifications from './admin/AdminNotifications'
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="students" element={<AdminStudents />} />
           <Route path="courses" element={<AdminCourses />} />
           <Route path="attendance" element={<AdminAttendance />} />
+          <Route path="teachers" element={<AdminTeachers />} />
           <Route path="fees" element={<AdminFees />} />
           <Route path="discounts" element={<AdminDiscounts />} />
           <Route path="notes" element={<AdminNotes />} />

@@ -20,6 +20,27 @@ export const academyApi = {
   getDashboard: () => request('/dashboard', { headers: headers(false) }),
   getStudents: () => request('/students', { headers: headers(false) }),
   getTeachers: () => request('/teachers', { headers: headers(false) }),
+  createTeacher: (body) => request('/teachers', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+  updateTeacher: (id, body) => request(`/teachers/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(body) }),
+  updateTeacherStatus: (id, status) =>
+    request(`/teachers/${id}/status`, { method: 'PATCH', headers: headers(), body: JSON.stringify({ status }) }),
+  deleteTeacher: (id) => request(`/teachers/${id}`, { method: 'DELETE', headers: headers(false) }),
+  getTeacherAttendance: (query = '') =>
+    request(`/teachers/attendance${query ? `?${query}` : ''}`, { headers: headers(false) }),
+  markTeacherAttendance: (body) =>
+    request('/teachers/attendance', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+  getTeacherAttendanceRequests: (query = '') =>
+    request(`/teachers/attendance-requests${query ? `?${query}` : ''}`, { headers: headers(false) }),
+  createTeacherAttendanceRequest: (body) =>
+    request('/teachers/attendance-requests', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+  approveTeacherAttendanceRequest: (id) =>
+    request(`/teachers/attendance-requests/${id}/approve`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }),
+  rejectTeacherAttendanceRequest: (id, note = '') =>
+    request(`/teachers/attendance-requests/${id}/reject`, { method: 'POST', headers: headers(), body: JSON.stringify({ note }) }),
+  getTeacherPayments: (query = '') =>
+    request(`/teachers/payments${query ? `?${query}` : ''}`, { headers: headers(false) }),
+  addTeacherPayment: (body) =>
+    request('/teachers/payments', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
   createStudent: (body) => request('/students', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
   updateStudent: (id, body) => request(`/students/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(body) }),
   deleteStudent: (id) => request(`/students/${id}`, { method: 'DELETE', headers: headers(false) }),
@@ -66,6 +87,8 @@ export const academyApi = {
 
   resetStudentPassword: (body) =>
     request('/students/reset-password', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+  resetAdminPassword: (body) =>
+    request('/admins/reset-password', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
 
   getContentCourses: () => request('/content/courses', { headers: headers(false) }),
   createModule: (courseId, body) =>

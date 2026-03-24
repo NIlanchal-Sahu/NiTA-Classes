@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { verifyToken, adminResetStudentPassword } from '../auth.js'
+import { verifyToken, adminResetStudentPassword, adminResetAdminPassword, hashPassword } from '../auth.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -26,6 +26,9 @@ const PATHS = {
   adminAlerts: join(__dirname, '..', 'data', 'admin_alerts.json'),
   studentProfiles: join(__dirname, '..', 'data', 'student_profiles.json'),
   admissionsQueue: join(__dirname, '..', 'data', 'enrollments.json'),
+  teacherAttendance: join(__dirname, '..', 'data', 'teacher_attendance.json'),
+  teacherAttendanceRequests: join(__dirname, '..', 'data', 'teacher_attendance_requests.json'),
+  teacherPayments: join(__dirname, '..', 'data', 'teacher_payments.json'),
 }
 
 function loadJson(path, fallback = []) {
@@ -70,6 +73,38 @@ function removeAdmissionsByPhones(phones = []) {
   const rows = loadJson(PATHS.admissionsQueue, [])
   const next = rows.filter((r) => !targets.has(normalizePhone(r.mobile)))
   if (next.length !== rows.length) saveJson(PATHS.admissionsQueue, next)
+}
+
+function nextTeacherId(users) {
+  const nums = users
+    .filter((u) => u.role === 'teacher')
+    .map((u) => Number(String(u.id || '').replace(/^TCH-/, '')))
+    .filter((n) => Number.isFinite(n))
+  const max = nums.length ? Math.max(...nums) : 0
+  return `TCH-${String(max + 1).padStart(3, '0')}`
+}
+
+function normalizeTeacherUsername(input, fallbackId) {
+  const raw = String(input || '').trim().toLowerCase()
+  if (raw) return raw.replace(/[^a-z0-9._-]/g, '')
+  return String(fallbackId || '').toLowerCase()
+}
+
+function teacherPublicShape(u) {
+  return {
+    id: String(u.id),
+    name: String(u.name || u.email || u.id),
+    username: String(u.username || u.email || u.id),
+    mobile: String(u.mobile || ''),
+    email: String(u.email || ''),
+    qualification: String(u.qualification || ''),
+    expertise: String(u.expertise || ''),
+    profilePhotoUrl: String(u.profilePhotoUrl || ''),
+    assignedCourseIds: Array.isArray(u.assignedCourseIds) ? u.assignedCourseIds : [],
+    perClassRate: Number(u.perClassRate) || 0,
+    status: String(u.status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active',
+    role: u.role,
+  }
 }
 
 function makeStudentId(name, phone) {
@@ -369,15 +404,394 @@ router.post('/students/reset-password', auth, allowRoles(['admin']), (req, res) 
   res.json({ success: true })
 })
 
+router.post('/admins/reset-password', auth, allowRoles(['admin']), (req, res) => {
+  const { adminEmail, newPassword } = req.body || {}
+  if (!String(adminEmail || '').trim() || !newPassword) {
+    return res.status(400).json({ error: 'adminEmail and newPassword are required' })
+  }
+  const result = adminResetAdminPassword(String(adminEmail).trim(), String(newPassword))
+  if (!result.ok) return res.status(400).json({ error: result.error })
+  res.json({ success: true })
+})
+
 router.get('/teachers', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
   const users = loadJson(PATHS.users, [])
-  const teachers = users
-    .filter((u) => u.role === 'teacher')
-    .map((u) => ({ id: String(u.id), name: String(u.name || u.email || u.id) }))
+  const teachers = users.filter((u) => u.role === 'teacher').map((u) => teacherPublicShape(u))
   if (!teachers.some((t) => t.id === 'NILanchal25')) {
-    teachers.unshift({ id: 'NILanchal25', name: 'NILanchal25 (Default)' })
+    teachers.unshift({
+      id: 'NILanchal25',
+      name: 'NILanchal25 (Default)',
+      username: 'nilanchal25',
+      mobile: '',
+      email: '',
+      qualification: '',
+      expertise: '',
+      profilePhotoUrl: '',
+      assignedCourseIds: [],
+      perClassRate: 0,
+      status: 'active',
+      role: 'teacher',
+    })
   }
   res.json({ teachers })
+})
+
+router.post('/teachers', auth, allowRoles(['admin']), (req, res) => {
+  const {
+    name,
+    mobile,
+    email = '',
+    qualification = '',
+    expertise = '',
+    assignedCourseIds = [],
+    username = '',
+    password = '',
+    profilePhotoUrl = '',
+    perClassRate = 0,
+  } = req.body || {}
+  if (!name || !mobile || !password) return res.status(400).json({ error: 'name, mobile and password are required' })
+  const users = loadJson(PATHS.users, [])
+  const teacherId = nextTeacherId(users)
+  const uName = normalizeTeacherUsername(username, teacherId)
+  const phone = normalizePhone(mobile)
+  if (phone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
+  if (users.some((u) => u.role === 'teacher' && String(u.username || '').toLowerCase() === uName)) {
+    return res.status(409).json({ error: 'Username already exists' })
+  }
+  if (users.some((u) => u.role === 'teacher' && normalizePhone(u.mobile) === phone)) {
+    return res.status(409).json({ error: 'Mobile already exists for another teacher' })
+  }
+  const next = {
+    id: teacherId,
+    role: 'teacher',
+    name: String(name).trim(),
+    mobile: phone,
+    email: String(email || '').trim(),
+    username: uName,
+    qualification: String(qualification || '').trim(),
+    expertise: String(expertise || '').trim(),
+    assignedCourseIds: Array.isArray(assignedCourseIds) ? [...new Set(assignedCourseIds.map(String))] : [],
+    passwordHash: hashPassword(String(password)),
+    profilePhotoUrl: String(profilePhotoUrl || ''),
+    perClassRate: Number(perClassRate) || 0,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+  }
+  users.push(next)
+  saveJson(PATHS.users, users)
+  res.json({ success: true, teacher: teacherPublicShape(next) })
+})
+
+router.put('/teachers/:id', auth, allowRoles(['admin']), (req, res) => {
+  const users = loadJson(PATHS.users, [])
+  const idx = users.findIndex((u) => u.role === 'teacher' && String(u.id) === req.params.id)
+  if (idx < 0) return res.status(404).json({ error: 'Teacher not found' })
+  const prev = users[idx]
+  const nextPhone = req.body?.mobile ? normalizePhone(req.body.mobile) : normalizePhone(prev.mobile)
+  if (nextPhone && nextPhone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
+  if (
+    nextPhone &&
+    users.some((u) => u.id !== prev.id && u.role === 'teacher' && normalizePhone(u.mobile) === nextPhone)
+  ) {
+    return res.status(409).json({ error: 'Mobile already exists for another teacher' })
+  }
+  const nextUsername = req.body?.username ? normalizeTeacherUsername(req.body.username, prev.id) : prev.username
+  if (
+    nextUsername &&
+    users.some((u) => u.id !== prev.id && u.role === 'teacher' && String(u.username || '').toLowerCase() === nextUsername)
+  ) {
+    return res.status(409).json({ error: 'Username already exists' })
+  }
+  users[idx] = {
+    ...prev,
+    ...req.body,
+    mobile: nextPhone || '',
+    username: nextUsername,
+    assignedCourseIds: Array.isArray(req.body?.assignedCourseIds)
+      ? [...new Set(req.body.assignedCourseIds.map(String))]
+      : prev.assignedCourseIds || [],
+    perClassRate: req.body?.perClassRate != null ? Number(req.body.perClassRate) || 0 : Number(prev.perClassRate) || 0,
+    status: String(req.body?.status || prev.status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active',
+    updatedAt: new Date().toISOString(),
+  }
+  // Admin can reset password while editing teacher profile.
+  if (req.body?.password) users[idx].passwordHash = hashPassword(String(req.body.password))
+  saveJson(PATHS.users, users)
+  res.json({ success: true, teacher: teacherPublicShape(users[idx]) })
+})
+
+router.patch('/teachers/:id/status', auth, allowRoles(['admin']), (req, res) => {
+  const users = loadJson(PATHS.users, [])
+  const idx = users.findIndex((u) => u.role === 'teacher' && String(u.id) === req.params.id)
+  if (idx < 0) return res.status(404).json({ error: 'Teacher not found' })
+  const status = String(req.body?.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active'
+  users[idx] = { ...users[idx], status, updatedAt: new Date().toISOString() }
+  saveJson(PATHS.users, users)
+  res.json({ success: true, teacher: teacherPublicShape(users[idx]) })
+})
+
+router.delete('/teachers/:id', auth, allowRoles(['admin']), (req, res) => {
+  const users = loadJson(PATHS.users, [])
+  const idx = users.findIndex((u) => u.role === 'teacher' && String(u.id) === req.params.id)
+  if (idx < 0) return res.status(404).json({ error: 'Teacher not found' })
+  const teacherId = String(users[idx].id)
+  const batches = loadJson(PATHS.batches, [])
+  const linked = batches.some((b) => {
+    const ids = normalizeTeacherIds(b.teacherIds?.length ? b.teacherIds : b.teacherId || '')
+    return ids.includes(teacherId)
+  })
+  if (linked) {
+    users[idx] = { ...users[idx], status: 'inactive', updatedAt: new Date().toISOString() }
+    saveJson(PATHS.users, users)
+    return res.status(409).json({
+      error: 'Teacher has assigned batches. Teacher was deactivated (soft delete) instead.',
+      softDeleted: true,
+      teacher: teacherPublicShape(users[idx]),
+    })
+  }
+  const next = users.filter((u) => String(u.id) !== teacherId)
+  saveJson(PATHS.users, next)
+  res.json({ success: true, deleted: true })
+})
+
+router.get('/teachers/attendance', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const teacherIdParam = String(req.query.teacherId || '')
+  const month = String(req.query.month || '')
+  const courseId = String(req.query.courseId || '')
+  const batches = loadJson(PATHS.batches, [])
+  const list = loadJson(PATHS.teacherAttendance, [])
+  const me = getAuthUser(req)
+  const teacherId = req.auth.role === 'teacher' ? String(me?.id || '') : teacherIdParam
+  const batchById = new Map(batches.map((b) => [String(b.id), b]))
+  const rows = list.filter((r) => {
+    if (teacherId && String(r.teacherId) !== teacherId) return false
+    if (month && monthKey(r.date) !== month) return false
+    const b = batchById.get(String(r.batchId || ''))
+    const cid = String(r.courseId || b?.courseId || '')
+    if (courseId && normCourseId(cid) !== normCourseId(courseId)) return false
+    return true
+  })
+  res.json({ attendance: rows.slice().reverse() })
+})
+
+router.post('/teachers/attendance', auth, allowRoles(['admin']), (req, res) => {
+  const { teacherId, batchId, date, status } = req.body || {}
+  if (!teacherId || !batchId || !date || !['present', 'absent'].includes(String(status || ''))) {
+    return res.status(400).json({ error: 'teacherId, batchId, date and status(present/absent) are required' })
+  }
+  const users = loadJson(PATHS.users, [])
+  const teacher = users.find((u) => u.role === 'teacher' && String(u.id) === String(teacherId))
+  if (!teacher) return res.status(404).json({ error: 'Teacher not found' })
+  const batches = loadJson(PATHS.batches, [])
+  const batch = batches.find((b) => String(b.id) === String(batchId))
+  if (!batch) return res.status(404).json({ error: 'Batch not found' })
+  const teacherIds = normalizeTeacherIds(batch.teacherIds?.length ? batch.teacherIds : batch.teacherId || '')
+  if (!teacherIds.includes(String(teacherId))) {
+    return res.status(400).json({ error: 'Teacher is not assigned to this batch' })
+  }
+  const list = loadJson(PATHS.teacherAttendance, [])
+  const d = parseDate(date)
+  const idx = list.findIndex(
+    (r) => String(r.teacherId) === String(teacherId) && String(r.batchId) === String(batchId) && String(r.date) === d
+  )
+  const nextRow = {
+    id: idx >= 0 ? list[idx].id : `tatt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    teacherId: String(teacherId),
+    batchId: String(batchId),
+    courseId: String(batch.courseId || ''),
+    date: d,
+    status: String(status),
+    markedBy: req.auth.userId,
+    updatedAt: new Date().toISOString(),
+    createdAt: idx >= 0 ? list[idx].createdAt : new Date().toISOString(),
+  }
+  if (idx >= 0) list[idx] = nextRow
+  else list.push(nextRow)
+  saveJson(PATHS.teacherAttendance, list)
+  res.json({ success: true, attendance: nextRow })
+})
+
+router.get('/teachers/attendance-requests', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const month = String(req.query.month || '')
+  const status = String(req.query.status || '')
+  const teacherIdParam = String(req.query.teacherId || '')
+  const me = getAuthUser(req)
+  const teacherId = req.auth.role === 'teacher' ? String(me?.id || '') : teacherIdParam
+  const rows = loadJson(PATHS.teacherAttendanceRequests, []).filter((r) => {
+    if (teacherId && String(r.teacherId) !== teacherId) return false
+    if (month && monthKey(r.date) !== month) return false
+    if (status && String(r.status || '') !== status) return false
+    return true
+  })
+  res.json({ requests: rows.slice().reverse() })
+})
+
+router.post('/teachers/attendance-requests', auth, allowRoles(['teacher']), (req, res) => {
+  const me = getAuthUser(req)
+  const teacherId = String(me?.id || '')
+  if (!teacherId) return res.status(401).json({ error: 'Teacher not found' })
+  const { batchId, date, status = 'present', note = '' } = req.body || {}
+  if (!batchId || !date || !['present', 'absent'].includes(String(status))) {
+    return res.status(400).json({ error: 'batchId, date, status(present/absent) are required' })
+  }
+  const batches = loadJson(PATHS.batches, [])
+  const batch = batches.find((b) => String(b.id) === String(batchId))
+  if (!batch) return res.status(404).json({ error: 'Batch not found' })
+  const teacherIds = normalizeTeacherIds(batch.teacherIds?.length ? batch.teacherIds : batch.teacherId || '')
+  if (!teacherIds.includes(teacherId)) return res.status(403).json({ error: 'You are not assigned to this batch' })
+  const d = parseDate(date)
+  const existingAttendance = loadJson(PATHS.teacherAttendance, []).some(
+    (r) => String(r.teacherId) === teacherId && String(r.batchId) === String(batchId) && String(r.date) === d
+  )
+  if (existingAttendance) {
+    return res.status(409).json({ error: 'Attendance already marked for this teacher, batch and date' })
+  }
+  const requests = loadJson(PATHS.teacherAttendanceRequests, [])
+  const dupPending = requests.some(
+    (r) =>
+      String(r.teacherId) === teacherId &&
+      String(r.batchId) === String(batchId) &&
+      String(r.date) === d &&
+      String(r.status) === 'pending'
+  )
+  if (dupPending) return res.status(409).json({ error: 'Pending request already exists for this batch and date' })
+  const next = {
+    id: `tattreq-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    teacherId,
+    batchId: String(batchId),
+    courseId: String(batch.courseId || ''),
+    date: d,
+    attendanceStatus: String(status),
+    note: String(note || ''),
+    status: 'pending',
+    requestedAt: new Date().toISOString(),
+  }
+  requests.push(next)
+  saveJson(PATHS.teacherAttendanceRequests, requests)
+  res.json({ success: true, request: next })
+})
+
+router.post('/teachers/attendance-requests/:id/approve', auth, allowRoles(['admin']), (req, res) => {
+  const requests = loadJson(PATHS.teacherAttendanceRequests, [])
+  const idx = requests.findIndex((r) => String(r.id) === String(req.params.id))
+  if (idx < 0) return res.status(404).json({ error: 'Request not found' })
+  const row = requests[idx]
+  if (String(row.status) !== 'pending') return res.status(400).json({ error: 'Request already processed' })
+  const att = loadJson(PATHS.teacherAttendance, [])
+  const aIdx = att.findIndex(
+    (r) => String(r.teacherId) === String(row.teacherId) && String(r.batchId) === String(row.batchId) && String(r.date) === String(row.date)
+  )
+  const nextAtt = {
+    id: aIdx >= 0 ? att[aIdx].id : `tatt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    teacherId: String(row.teacherId),
+    batchId: String(row.batchId),
+    courseId: String(row.courseId || ''),
+    date: String(row.date),
+    status: String(row.attendanceStatus || 'present'),
+    markedBy: req.auth.userId,
+    updatedAt: new Date().toISOString(),
+    createdAt: aIdx >= 0 ? att[aIdx].createdAt : new Date().toISOString(),
+  }
+  if (aIdx >= 0) att[aIdx] = nextAtt
+  else att.push(nextAtt)
+  saveJson(PATHS.teacherAttendance, att)
+  requests[idx] = {
+    ...row,
+    status: 'approved',
+    approvedBy: req.auth.userId,
+    approvedAt: new Date().toISOString(),
+  }
+  saveJson(PATHS.teacherAttendanceRequests, requests)
+  res.json({ success: true, request: requests[idx], attendance: nextAtt })
+})
+
+router.post('/teachers/attendance-requests/:id/reject', auth, allowRoles(['admin']), (req, res) => {
+  const requests = loadJson(PATHS.teacherAttendanceRequests, [])
+  const idx = requests.findIndex((r) => String(r.id) === String(req.params.id))
+  if (idx < 0) return res.status(404).json({ error: 'Request not found' })
+  if (String(requests[idx].status) !== 'pending') return res.status(400).json({ error: 'Request already processed' })
+  requests[idx] = {
+    ...requests[idx],
+    status: 'rejected',
+    rejectedBy: req.auth.userId,
+    rejectedAt: new Date().toISOString(),
+    rejectionNote: String(req.body?.note || ''),
+  }
+  saveJson(PATHS.teacherAttendanceRequests, requests)
+  res.json({ success: true, request: requests[idx] })
+})
+
+router.get('/teachers/payments', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const teacherIdParam = String(req.query.teacherId || '')
+  const month = String(req.query.month || '')
+  const courseId = String(req.query.courseId || '')
+  const me = getAuthUser(req)
+  const teacherId = req.auth.role === 'teacher' ? String(me?.id || '') : teacherIdParam
+  const batches = loadJson(PATHS.batches, [])
+  const batchById = new Map(batches.map((b) => [String(b.id), b]))
+  const rows = loadJson(PATHS.teacherPayments, []).filter((r) => {
+    if (teacherId && String(r.teacherId) !== teacherId) return false
+    if (month && monthKey(r.date) !== month) return false
+    const cid = String(r.courseId || batchById.get(String(r.batchId || ''))?.courseId || '')
+    if (courseId && normCourseId(cid) !== normCourseId(courseId)) return false
+    return true
+  })
+  const summary = {}
+  for (const r of rows) {
+    const tid = String(r.teacherId)
+    summary[tid] ||= { teacherId: tid, classes: 0, amount: 0 }
+    summary[tid].classes += Number(r.classesCount) || 0
+    summary[tid].amount += Number(r.totalAmount) || 0
+  }
+  res.json({ payments: rows.slice().reverse(), summary: Object.values(summary) })
+})
+
+router.post('/teachers/payments', auth, allowRoles(['admin']), (req, res) => {
+  const { teacherId, batchId, date, classesCount = 1, rate, bonus = 0, note = '' } = req.body || {}
+  if (!teacherId || !batchId || !date) return res.status(400).json({ error: 'teacherId, batchId, date are required' })
+  const users = loadJson(PATHS.users, [])
+  const teacher = users.find((u) => u.role === 'teacher' && String(u.id) === String(teacherId))
+  if (!teacher) return res.status(404).json({ error: 'Teacher not found' })
+  const batches = loadJson(PATHS.batches, [])
+  const batch = batches.find((b) => String(b.id) === String(batchId))
+  if (!batch) return res.status(404).json({ error: 'Batch not found' })
+  const attendance = loadJson(PATHS.teacherAttendance, [])
+  const d = parseDate(date)
+  const attendancePresent = attendance.some(
+    (a) =>
+      String(a.teacherId) === String(teacherId) &&
+      String(a.batchId) === String(batchId) &&
+      String(a.date) === d &&
+      String(a.status) === 'present'
+  )
+  if (!attendancePresent) {
+    return res.status(400).json({ error: 'Payment allowed only when teacher attendance is marked present for that batch/date' })
+  }
+  const list = loadJson(PATHS.teacherPayments, [])
+  if (list.some((r) => String(r.teacherId) === String(teacherId) && String(r.batchId) === String(batchId) && String(r.date) === d)) {
+    return res.status(409).json({ error: 'Payment entry already exists for same teacher, batch and date' })
+  }
+  const effectiveRate = Number(rate != null ? rate : teacher.perClassRate) || 0
+  const cls = Math.max(1, Number(classesCount) || 1)
+  const extra = Number(bonus) || 0
+  const total = cls * effectiveRate + extra
+  const next = {
+    id: `tpay-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    teacherId: String(teacherId),
+    batchId: String(batchId),
+    courseId: String(batch.courseId || ''),
+    date: d,
+    classesCount: cls,
+    rate: effectiveRate,
+    bonus: extra,
+    totalAmount: total,
+    note: String(note || ''),
+    createdBy: req.auth.userId,
+    createdAt: new Date().toISOString(),
+  }
+  list.push(next)
+  saveJson(PATHS.teacherPayments, list)
+  res.json({ success: true, payment: next })
 })
 
 // ===== Courses =====
@@ -1091,6 +1505,9 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
   const fees = loadJson(PATHS.fees, [])
   const attendance = loadJson(PATHS.attendance, [])
   const admissions = loadJson(PATHS.admissionsQueue, [])
+  const users = loadJson(PATHS.users, [])
+  const teacherAttendance = loadJson(PATHS.teacherAttendance, [])
+  const teacherPayments = loadJson(PATHS.teacherPayments, [])
 
   const today = parseDate(new Date().toISOString())
   const currentMonth = monthKey(today)
@@ -1149,6 +1566,37 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
 
+  const teacherMap = new Map(users.filter((u) => u.role === 'teacher').map((u) => [String(u.id), u]))
+  const teacherAttendanceById = {}
+  const teacherPresentById = {}
+  const teacherEarningsTrend = {}
+  const teacherClassesTrend = {}
+  for (const a of teacherAttendance) {
+    const tid = String(a.teacherId || '')
+    if (!tid) continue
+    teacherAttendanceById[tid] = (teacherAttendanceById[tid] || 0) + 1
+    if (String(a.status) === 'present') teacherPresentById[tid] = (teacherPresentById[tid] || 0) + 1
+    const m = monthKey(a.date || a.createdAt)
+    teacherClassesTrend[m] = (teacherClassesTrend[m] || 0) + (String(a.status) === 'present' ? 1 : 0)
+  }
+  for (const p of teacherPayments) {
+    const m = monthKey(p.date || p.createdAt)
+    teacherEarningsTrend[m] = (teacherEarningsTrend[m] || 0) + (Number(p.totalAmount) || 0)
+  }
+  const topPerformingTeachers = Object.keys(teacherAttendanceById)
+    .map((tid) => {
+      const total = teacherAttendanceById[tid] || 0
+      const presentCount = teacherPresentById[tid] || 0
+      return {
+        teacherId: tid,
+        name: String(teacherMap.get(tid)?.name || tid),
+        consistency: total ? Math.round((presentCount / total) * 100) : 0,
+        total,
+      }
+    })
+    .sort((a, b) => b.consistency - a.consistency || b.total - a.total)
+    .slice(0, 10)
+
   res.json({
     totals: {
       totalStudents: students.length,
@@ -1169,6 +1617,11 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
       activeStudents: activeStudentCount,
       conversionRate,
       referralPerformance,
+    },
+    teacherInsights: {
+      topPerformingTeachers,
+      teacherClassesTrend,
+      teacherEarningsTrend,
     },
     courseWiseStudents: courseWise,
     studentGrowth: growthMap,

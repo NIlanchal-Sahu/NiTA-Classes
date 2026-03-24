@@ -8,6 +8,7 @@ import {
   getValidCourseId,
   getAttendanceFor,
   recordClassAndDeduct,
+  getTotalClassesFromWallet,
   isVvipActive,
   purchaseUnlimitedMonth,
 } from "../student.js";
@@ -180,6 +181,17 @@ function isCourseUnlockedForStudent(studentId, courseId) {
   );
 }
 
+function isCourseAccessibleForAuthUser(authUser, student, courseId) {
+  const target = normalizeCourseId(courseId);
+  if (!target) return false;
+  if (student?.id && isCourseUnlockedForStudent(student.id, target)) return true;
+  if (student?.batchId) {
+    const batch = loadJson(ACADEMY_BATCHES_PATH).find((b) => b.id === student.batchId);
+    if (normalizeCourseId(batch?.courseId) === target) return true;
+  }
+  return false;
+}
+
 function getFlatChapterOrder(courseNode) {
   const modules = (courseNode?.modules || []).slice().sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
   const ids = [];
@@ -190,12 +202,112 @@ function getFlatChapterOrder(courseNode) {
   return ids;
 }
 
+function sumWalletClassesByUser(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const uid = String(r.studentId || "");
+    if (!uid) continue;
+    const cnt = Number(r.classesCount) || 0;
+    map.set(uid, (map.get(uid) || 0) + cnt);
+  }
+  return map;
+}
+
+function monthlyAttendancePctForUser(rows, userId, month) {
+  const dim = daysInMonthString(month);
+  const uniqueDays = new Set(
+    rows
+      .filter((x) => x.studentId === userId && monthKey(x.date) === month && (Number(x.classesCount) || 0) > 0)
+      .map((x) => String(x.date || "").slice(0, 10)),
+  ).size;
+  return {
+    presentDays: uniqueDays,
+    percentage: dim ? Math.round((uniqueDays / dim) * 100) : 0,
+  };
+}
+
+function computeCurrentStreak(walletRows, userId) {
+  const dates = Array.from(
+    new Set(
+      walletRows
+        .filter((x) => x.studentId === userId && (Number(x.classesCount) || 0) > 0)
+        .map((x) => String(x.date || "").slice(0, 10))
+        .filter(Boolean),
+    ),
+  ).sort();
+  if (dates.length === 0) return 0;
+  let streak = 1;
+  for (let i = dates.length - 1; i > 0; i -= 1) {
+    const d1 = new Date(`${dates[i]}T00:00:00.000Z`).getTime();
+    const d0 = new Date(`${dates[i - 1]}T00:00:00.000Z`).getTime();
+    if ((d1 - d0) / 86400000 === 1) streak += 1;
+    else break;
+  }
+  return streak;
+}
+
+function computeCompetitionScore({ totalClasses, attendancePct, enrolledCount, completedCount, referralRewards, streak }) {
+  return (
+    (Number(totalClasses) || 0) * 10 +
+    (Number(attendancePct) || 0) * 2 +
+    (Number(enrolledCount) || 0) * 120 +
+    (Number(completedCount) || 0) * 180 +
+    Math.floor((Number(referralRewards) || 0) / 10) +
+    (Number(streak) || 0) * 15
+  );
+}
+
+function getUnlockStartByCourse(enrollments, studentId) {
+  const out = new Map();
+  for (const e of enrollments) {
+    if (e.studentId !== studentId) continue;
+    const courseId = normalizeCourseId(e.courseId);
+    if (!courseId || courseId === "trial-course") continue;
+    const start = String(e.startDate || e.createdAt || "").slice(0, 10);
+    if (!start) continue;
+    const prev = out.get(courseId);
+    if (!prev || start < prev) out.set(courseId, start);
+  }
+  return out;
+}
+
+function computeAttendanceFromConductedClasses({
+  attendanceRows,
+  enrollments,
+  studentId,
+}) {
+  const unlockStartByCourse = getUnlockStartByCourse(enrollments, studentId);
+  if (unlockStartByCourse.size === 0) {
+    return { percentage: 0, conductedCount: 0, presentCount: 0 };
+  }
+
+  const conductedSet = new Set();
+  const presentSet = new Set();
+  for (const row of attendanceRows) {
+    const courseId = normalizeCourseId(row.courseId);
+    const unlockStart = unlockStartByCourse.get(courseId);
+    if (!unlockStart) continue;
+    const date = String(row.date || "").slice(0, 10);
+    if (!date || date < unlockStart) continue;
+    const key = `${courseId}|${date}`;
+    conductedSet.add(key);
+    if (String(row.studentId || "") === String(studentId) && String(row.status || "").toLowerCase() === "present") {
+      presentSet.add(key);
+    }
+  }
+  const conductedCount = conductedSet.size;
+  const presentCount = presentSet.size;
+  const percentage = conductedCount ? Math.round((presentCount / conductedCount) * 100) : 0;
+  return { percentage, conductedCount, presentCount };
+}
+
 router.get("/profile", studentAuth, (req, res) => {
   const user = getUserById(req.auth.userId);
   if (!user) return res.status(401).json({ error: "User not found" });
+  const syncedTotal = getTotalClassesFromWallet(req.auth.userId);
   res.json({
     walletBalance: Number(user.walletBalance) ?? 0,
-    totalClassesAttended: Number(user.totalClassesAttended) ?? 0,
+    totalClassesAttended: syncedTotal,
     vvipValidUntil: user.vvipValidUntil || null,
   });
 });
@@ -203,12 +315,19 @@ router.get("/profile", studentAuth, (req, res) => {
 router.post("/scan", studentAuth, (req, res) => {
   const { courseId, date, confirmMultiple } = req.body || {};
   const studentId = req.auth.userId;
+  const authUser = getUserById(studentId);
+  const student = resolveStudentRecord(authUser);
   const d = (date && String(date).slice(0, 10)) || today();
 
   const validId = getValidCourseId(courseId);
   if (!validId) {
     return res.status(400).json({
       error: "Invalid course. Scan the correct QR code for the class.",
+    });
+  }
+  if (!isCourseAccessibleForAuthUser(authUser, student, validId)) {
+    return res.status(403).json({
+      error: "Course is locked for this student. Unlock/enroll first.",
     });
   }
 
@@ -310,16 +429,8 @@ function daysInMonthString(ym) {
   return new Date(y, m, 0).getDate();
 }
 
-/**
- * Attendance for calendar:
- * - Primary: wallet pay-for-class rows in `attendance.json` (studentId = auth user id)
- * - Optional: academy_attendance.json (studentId = academy student id, manual present/absent)
- * - No courseId: aggregate all courses — a day is "present" if any class was paid/attended
- * - With courseId: only that course's sessions count for that day
- */
+/** Attendance for calendar comes from paid wallet classes only. */
 router.get("/portal/attendance", studentAuth, (req, res) => {
-  const authUser = getUserById(req.auth.userId);
-  const student = resolveStudentRecord(authUser);
   const month = String(req.query.month || monthKey(today()));
   const courseFilter = String(req.query.courseId || "").trim()
     ? normalizeCourseId(req.query.courseId)
@@ -339,28 +450,10 @@ router.get("/portal/attendance", studentAuth, (req, res) => {
     if (!d) continue;
     const cnt = Number(r.classesCount) || 0;
     if (!dayMap.has(d)) {
-      dayMap.set(d, { classesCount: 0, academyPresent: false, academyAbsent: false });
+      dayMap.set(d, { classesCount: 0 });
     }
     const e = dayMap.get(d);
     e.classesCount += cnt;
-  }
-
-  if (student) {
-    const academyRows = loadJson(ACADEMY_ATTENDANCE_PATH).filter(
-      (r) => r.studentId === student.id && monthKey(r.date) === month,
-    );
-    for (const r of academyRows) {
-      if (courseFilter && normalizeCourseId(r.courseId) !== courseFilter) continue;
-      const d = String(r.date || "").slice(0, 10);
-      if (!d) continue;
-      if (!dayMap.has(d)) {
-        dayMap.set(d, { classesCount: 0, academyPresent: false, academyAbsent: false });
-      }
-      const e = dayMap.get(d);
-      const st = String(r.status || "").toLowerCase();
-      if (st === "present") e.academyPresent = true;
-      if (st === "absent") e.academyAbsent = true;
-    }
   }
 
   const dim = daysInMonthString(month);
@@ -368,14 +461,12 @@ router.get("/portal/attendance", studentAuth, (req, res) => {
   const attendance = [];
 
   for (const [date, e] of [...dayMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const paidOrAttended = e.classesCount > 0;
-    const present = paidOrAttended || e.academyPresent;
-    const absent = e.academyAbsent && !present;
+    const present = e.classesCount > 0;
     if (present) presentDayCount += 1;
     attendance.push({
       id: `day-${date}-${courseFilter || "all"}`,
       date,
-      status: present ? "present" : absent ? "absent" : "none",
+      status: present ? "present" : "none",
       classesCount: e.classesCount,
     });
   }
@@ -383,7 +474,7 @@ router.get("/portal/attendance", studentAuth, (req, res) => {
   const monthlyPercentage = dim ? Math.round((presentDayCount / dim) * 100) : 0;
 
   res.json({
-    studentId: student?.id || null,
+    studentId: req.auth.userId,
     month,
     courseId: courseFilter || null,
     attendance,
@@ -583,7 +674,7 @@ router.post("/portal/courses/unlock", studentAuth, (req, res) => {
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   const already = enrollments.some(
     (e) => e.studentId === student.id && normalizeCourseId(e.courseId) === courseId
-  ) || normalizeCourseId(student.courseEnrolled) === courseId;
+  );
   if (already) return res.json({ success: true, alreadyUnlocked: true, message: "Course already unlocked." });
 
   if (!confirmUnlock) {
@@ -801,7 +892,7 @@ router.post("/portal/course-content/:courseId/chapters/:chapterId/complete", stu
 router.get("/portal/materials", studentAuth, (req, res) => {
   const authUser = getUserById(req.auth.userId);
   const student = resolveStudentRecord(authUser);
-  const courseId = String(req.query.courseId || student?.courseEnrolled || "");
+  const courseId = String(req.query.courseId || "");
   const batchId = String(req.query.batchId || student?.batchId || "");
   const notes = loadJson(ACADEMY_NOTES_PATH).filter(
     (n) => (!courseId || n.courseId === courseId || !n.courseId) && (!batchId || n.batchId === batchId || !n.batchId),
@@ -857,18 +948,145 @@ router.post("/portal/certificates/request", studentAuth, (req, res) => {
 router.get("/portal/dashboard", studentAuth, (req, res) => {
   const authUser = getUserById(req.auth.userId);
   const student = resolveStudentRecord(authUser);
-  const attendance = student
-    ? loadJson(ACADEMY_ATTENDANCE_PATH).filter((a) => a.studentId === student.id)
-    : [];
-  const present = attendance.filter((x) => x.status === "present").length;
-  const attendancePct = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
+  const currentMonth = monthKey(today());
+  const walletRows = loadJson(WALLET_ATTENDANCE_PATH);
+  const academyAttendanceRows = loadJson(ACADEMY_ATTENDANCE_PATH);
+  const allEnrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+  const attendanceFromConducted = computeAttendanceFromConductedClasses({
+    attendanceRows: academyAttendanceRows,
+    enrollments: allEnrollments,
+    studentId: student?.id,
+  });
+  const attendancePct = attendanceFromConducted.percentage;
   const payouts = loadJson(REFERRAL_PAYOUTS_PATH).filter((p) => p.referrerUserId === req.auth.userId);
   const rewards = payouts.reduce((a, b) => a + (Number(b.amount) || 0), 0);
+  const totalClassesAttended = getTotalClassesFromWallet(req.auth.userId);
+  const myEnrollments = allEnrollments.filter((e) => e.studentId === student?.id && normalizeCourseId(e.courseId) !== "trial-course");
+  const enrolledCount = new Set(myEnrollments.map((e) => normalizeCourseId(e.courseId))).size;
+  const completedCount = myEnrollments.filter((e) => String(e.status || "").toLowerCase() === "completed").length;
+  const streak = computeCurrentStreak(walletRows, req.auth.userId);
+  const competitionScore = computeCompetitionScore({
+    totalClasses: totalClassesAttended,
+    attendancePct,
+    enrolledCount,
+    completedCount,
+    referralRewards: rewards,
+    streak,
+  });
+
+  const achievementCards = [
+    {
+      id: "att-75",
+      title: "Attendance Star",
+      description: "Reach 75% monthly attendance",
+      icon: "⭐",
+      progress: Math.min(75, attendancePct),
+      target: 75,
+      unit: "%",
+      achieved: attendancePct >= 75,
+    },
+    {
+      id: "cls-25",
+      title: "Class Warrior",
+      description: "Attend 25 paid classes",
+      icon: "🔥",
+      progress: Math.min(25, totalClassesAttended),
+      target: 25,
+      unit: "classes",
+      achieved: totalClassesAttended >= 25,
+    },
+    {
+      id: "crs-2",
+      title: "Course Explorer",
+      description: "Unlock 2 courses",
+      icon: "📘",
+      progress: Math.min(2, enrolledCount),
+      target: 2,
+      unit: "courses",
+      achieved: enrolledCount >= 2,
+    },
+    {
+      id: "cmp-1",
+      title: "Course Finisher",
+      description: "Complete 1 course",
+      icon: "🏁",
+      progress: Math.min(1, completedCount),
+      target: 1,
+      unit: "courses",
+      achieved: completedCount >= 1,
+    },
+    {
+      id: "strk-7",
+      title: "Streak Champion",
+      description: "Maintain 7-day class streak",
+      icon: "⚡",
+      progress: Math.min(7, streak),
+      target: 7,
+      unit: "days",
+      achieved: streak >= 7,
+    },
+  ];
+
   const achievements = [];
   if (attendancePct >= 75) achievements.push("Attendance Star");
-  if ((Number(authUser?.totalClassesAttended) || 0) >= 20) achievements.push("20 Classes Milestone");
+  if (totalClassesAttended >= 20) achievements.push("20 Classes Milestone");
+  if (enrolledCount >= 2) achievements.push("Course Explorer");
+  if (completedCount >= 1) achievements.push("Course Finisher");
+  if (streak >= 7) achievements.push("Streak Champion");
   if (rewards > 0) achievements.push("Referral Earner");
-  const courseProgress = Math.min(100, Math.round(((Number(authUser?.totalClassesAttended) || 0) / 100) * 100));
+  const courseProgress = Math.min(100, Math.round((totalClassesAttended / 100) * 100));
+
+  const students = loadJson(ACADEMY_STUDENTS_PATH);
+  const users = getUsers().filter((u) => u.role === "student");
+  const studentByUser = new Map(
+    students
+      .filter((s) => s.accountUserId)
+      .map((s) => [String(s.accountUserId), s]),
+  );
+  const classesByUser = sumWalletClassesByUser(walletRows);
+  const payoutByUser = new Map();
+  for (const p of loadJson(REFERRAL_PAYOUTS_PATH)) {
+    const uid = String(p.referrerUserId || "");
+    payoutByUser.set(uid, (payoutByUser.get(uid) || 0) + (Number(p.amount) || 0));
+  }
+  const competitionRows = users
+    .filter((u) => studentByUser.has(String(u.id)))
+    .map((u) => {
+      const linkedStudent = studentByUser.get(String(u.id)) || null;
+      const enrs = allEnrollments.filter((e) => e.studentId === linkedStudent?.id && normalizeCourseId(e.courseId) !== "trial-course");
+      const unlocked = new Set(enrs.map((e) => normalizeCourseId(e.courseId))).size;
+      const completed = enrs.filter((e) => String(e.status || "").toLowerCase() === "completed").length;
+      const acc = computeAttendanceFromConductedClasses({
+        attendanceRows: academyAttendanceRows,
+        enrollments: allEnrollments,
+        studentId: linkedStudent?.id,
+      });
+      const monthly = acc.percentage;
+      const totalClasses = classesByUser.get(String(u.id)) || 0;
+      const referralRewards = payoutByUser.get(String(u.id)) || 0;
+      const userStreak = computeCurrentStreak(walletRows, u.id);
+      const points = computeCompetitionScore({
+        totalClasses,
+        attendancePct: monthly,
+        enrolledCount: unlocked,
+        completedCount: completed,
+        referralRewards,
+        streak: userStreak,
+      });
+      return {
+        userId: u.id,
+        name: u.name || String(u.email || "").split("@")[0] || "Student",
+        points,
+        totalClasses,
+        attendancePct: monthly,
+        enrolledCount: unlocked,
+        completedCount: completed,
+      };
+    });
+  const ranked = competitionRows.sort((a, b) => b.points - a.points).map((x, i) => ({ ...x, rank: i + 1 }));
+  const leaderboard = ranked.slice(0, 10);
+  const myRank = ranked.find((x) => x.userId === req.auth.userId)?.rank || null;
+
   res.json({
     attendancePercentage: attendancePct,
     achievements,
@@ -876,6 +1094,16 @@ router.get("/portal/dashboard", studentAuth, (req, res) => {
     rewards,
     earnedByReferring: rewards,
     walletBalance: Number(authUser?.walletBalance) || 0,
+    totalClassesAttended,
+    currentStreak: streak,
+    enrolledCourseCount: enrolledCount,
+    completedCourseCount: completedCount,
+    competitionScore,
+    rank: myRank || null,
+    achievementCards,
+    leaderboard,
+    classesConductedCount: attendanceFromConducted.conductedCount,
+    classesPresentCount: attendanceFromConducted.presentCount,
   });
 });
 

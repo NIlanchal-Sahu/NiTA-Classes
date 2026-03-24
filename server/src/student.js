@@ -46,6 +46,13 @@ export function getAttendanceFor(studentId, courseId, date) {
   return r ? r.classesCount : 0;
 }
 
+export function getTotalClassesFromWallet(studentId) {
+  const records = getAttendance();
+  return records
+    .filter((x) => x.studentId === studentId)
+    .reduce((sum, x) => sum + (Number(x.classesCount) || 0), 0);
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -67,6 +74,19 @@ export function recordClassAndDeduct(studentId, courseId, date) {
   const user = getUserById(studentId);
   if (!user || user.role !== "student")
     return { ok: false, error: "Student not found" };
+  const users = getUsers();
+  const u = users.find((x) => x.id === studentId);
+  if (!u) return { ok: false, error: "Student not found" };
+  const vvip = isVvipActive(u);
+  if (!vvip) {
+    const balance = Number(u.walletBalance) ?? 0;
+    if (balance < PRICE_PER_CLASS)
+      return {
+        ok: false,
+        error: "Insufficient wallet balance. Add money to continue.",
+      };
+  }
+
   const d = date || today();
   const records = getAttendance();
   let r = records.find(
@@ -78,19 +98,14 @@ export function recordClassAndDeduct(studentId, courseId, date) {
   }
   r.classesCount += 1;
   saveAttendance(records);
-  const users = getUsers();
-  const u = users.find((x) => x.id === studentId);
-  const vvip = isVvipActive(u);
+
   if (!vvip) {
-    const balance = Number(u.walletBalance) ?? 0;
-    if (balance < PRICE_PER_CLASS)
-      return {
-        ok: false,
-        error: "Insufficient wallet balance. Add money to continue.",
-      };
     u.walletBalance = (Number(u.walletBalance) ?? 0) - PRICE_PER_CLASS;
   }
-  u.totalClassesAttended = (Number(u.totalClassesAttended) ?? 0) + 1;
+  // Keep counter synchronized with wallet attendance rows to avoid drift.
+  u.totalClassesAttended = records
+    .filter((x) => x.studentId === studentId)
+    .reduce((sum, x) => sum + (Number(x.classesCount) || 0), 0);
   saveUsers(users);
   return {
     ok: true,

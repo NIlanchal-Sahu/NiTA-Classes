@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { academyApi } from '../api/adminAcademy'
+import { useAuth } from '../context/AuthContext'
 
 function TinyBars({ data, color = 'bg-violet-500' }) {
   const entries = Object.entries(data || {}).sort((a, b) => a[0].localeCompare(b[0])).slice(-8)
@@ -27,9 +28,14 @@ function TinyBars({ data, color = 'bg-violet-500' }) {
 }
 
 export default function AdminDashboard() {
+  const { user } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [adminResetEmail, setAdminResetEmail] = useState('')
+  const [adminResetPassword, setAdminResetPassword] = useState('')
+  const [adminResetSaving, setAdminResetSaving] = useState(false)
+  const [adminResetMsg, setAdminResetMsg] = useState('')
 
   const courseRows = useMemo(() => Object.entries(data?.courseWiseStudents || {}).sort((a, b) => b[1] - a[1]), [data])
   const referralRows = useMemo(() => data?.admissionsAnalytics?.referralPerformance || [], [data])
@@ -48,6 +54,24 @@ export default function AdminDashboard() {
       }
     })()
   }, [])
+
+  const submitAdminReset = async (e) => {
+    e.preventDefault()
+    setAdminResetMsg('')
+    setAdminResetSaving(true)
+    try {
+      await academyApi.resetAdminPassword({
+        adminEmail: adminResetEmail,
+        newPassword: adminResetPassword,
+      })
+      setAdminResetMsg('Admin password reset successfully.')
+      setAdminResetPassword('')
+    } catch (e1) {
+      setAdminResetMsg(e1.message || 'Failed to reset admin password')
+    } finally {
+      setAdminResetSaving(false)
+    }
+  }
 
   return (
     <div>
@@ -92,6 +116,64 @@ export default function AdminDashboard() {
           <TinyBars data={data?.revenueTrend || {}} color="bg-emerald-500" />
         </div>
       </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6">
+          <h2 className="text-lg font-semibold text-white">Teacher Classes Trend</h2>
+          <TinyBars data={data?.teacherInsights?.teacherClassesTrend || {}} color="bg-indigo-500" />
+        </div>
+        <div className="rounded-2xl border border-gray-700 bg-gray-800 p-6">
+          <h2 className="text-lg font-semibold text-white">Teacher Earnings Trend</h2>
+          <TinyBars data={data?.teacherInsights?.teacherEarningsTrend || {}} color="bg-fuchsia-500" />
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white">Top Performing Teachers</h2>
+        <div className="mt-3 space-y-2">
+          {(data?.teacherInsights?.topPerformingTeachers || []).map((t) => (
+            <div key={t.teacherId} className="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm">
+              <span className="text-gray-200">{t.name}</span>
+              <span className="text-emerald-300">{t.consistency}% consistency</span>
+            </div>
+          ))}
+          {(data?.teacherInsights?.topPerformingTeachers || []).length === 0 && (
+            <p className="text-sm text-gray-500">No teacher attendance data yet.</p>
+          )}
+        </div>
+      </div>
+
+      {user?.role === 'admin' && (
+        <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
+          <h2 className="text-lg font-semibold text-white">Admin Password Reset</h2>
+          <p className="mt-1 text-sm text-gray-400">Reset password for admin accounts from inside portal.</p>
+          <form onSubmit={submitAdminReset} className="mt-4 grid gap-3 sm:grid-cols-3">
+            <input
+              type="email"
+              required
+              value={adminResetEmail}
+              onChange={(e) => setAdminResetEmail(e.target.value)}
+              placeholder="Admin email"
+              className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+            />
+            <input
+              type="password"
+              required
+              value={adminResetPassword}
+              onChange={(e) => setAdminResetPassword(e.target.value)}
+              placeholder="New password"
+              className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+            />
+            <button
+              disabled={adminResetSaving}
+              className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+            >
+              {adminResetSaving ? 'Updating...' : 'Reset Admin Password'}
+            </button>
+          </form>
+          {adminResetMsg && <p className="mt-2 text-sm text-gray-300">{adminResetMsg}</p>}
+        </div>
+      )}
 
       <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
         <h2 className="text-lg font-semibold text-white">Admissions Funnel & Conversion</h2>

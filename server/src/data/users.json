@@ -1,17 +1,17 @@
 [
   {
     "id": "admin-1",
-    "email": "admin@nitaclasses.com",
-    "passwordHash": "$2b$10$65rarSUxciXhaDVuWbsjkep.l0yVBbq0Lg0wzm3BirE.Z443SgvOm",
+    "email": "admin@nitaclasses.in",
+    "passwordHash": "$2b$10$EIOloKz5d6.44ZXddpUjpeaW814Q7uNm94cPNYmwsff200oTXNTTq",
     "role": "admin",
     "name": "Admin"
   },
   {
-    "id": "teacher-1",
-    "email": "teacher@nitaclasses.com",
-    "passwordHash": "$2b$10$65rarSUxciXhaDVuWbsjkep.l0yVBbq0Lg0wzm3BirE.Z443SgvOm",
-    "role": "teacher",
-    "name": "Teacher"
+    "id": "admin-2",
+    "email": "contact@nitaclasses.in",
+    "passwordHash": "$2b$10$Qh5sAlsW0TEbshVRz0oTZ.O7Ea36.repG7W6BPAa5373osMnsdfki",
+    "role": "admin",
+    "name": "Admin Contact"
   },
   {
     "id": "student-1773761641870",
@@ -53,7 +53,7 @@
     "name": "Rasmita Sahu",
     "role": "student",
     "passwordHash": "$2b$10$cRBSxAF8e7UIFWlwe9shTOtodcbl1RCDMF7JhDKSQNXFk7W7pWUDi",
-    "walletBalance": 1491,
+    "walletBalance": 1192,
     "totalClassesAttended": 1,
     "vvipValidUntil": null
   }

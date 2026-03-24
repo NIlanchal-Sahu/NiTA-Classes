@@ -9,6 +9,7 @@ const COURSE_OPTIONS = [
   { id: 'ai-associate', label: 'Artificial Intelligent Associate (AI Development Course with Python)' },
   { id: 'ai-video-creation', label: 'AI Video Creation Course' },
 ]
+const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/G5HVGAshx7r7BYnz7PoeRs?mode=gi_t'
 
 export default function Admission() {
   const [form, setForm] = useState({
@@ -157,6 +158,19 @@ export default function Admission() {
               >
                 Go to Login
               </Link>
+              <a
+                href={WHATSAPP_GROUP_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 ml-0 inline-flex btn-touch rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700 sm:ml-3"
+              >
+                Join Batch Group and Continue
+              </a>
+              <p className="mt-3 text-sm text-gray-700">
+                <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noreferrer" className="font-semibold text-green-700 underline">
+                  Join Our Batch Group to get all class updates
+                </a>
+              </p>
             </div>
           )}
 
@@ -170,6 +184,21 @@ export default function Admission() {
               <Link to="/login" className="mt-3 inline-block font-semibold text-primary-700 underline">
                 Go to Login
               </Link>
+              <div className="mt-3">
+                <a
+                  href={WHATSAPP_GROUP_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                >
+                  Join Batch Group and Continue
+                </a>
+              </div>
+              <p className="mt-2">
+                <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noreferrer" className="font-semibold text-green-700 underline">
+                  Join Our Batch Group to get all class updates
+                </a>
+              </p>
             </div>
           )}
         </div>

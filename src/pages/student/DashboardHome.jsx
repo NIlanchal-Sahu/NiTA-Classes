@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useEffect } from 'react'
 import { studentPortalApi } from '../../api/student'
 
+const DEFAULT_BATCH_GROUP_URL = 'https://chat.whatsapp.com/G5HVGAshx7r7BYnz7PoeRs?mode=gi_t'
+
 function WalletIcon({ className }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,6 +63,13 @@ export default function DashboardHome() {
   }, [])
 
   const name = user?.name || user?.email?.split('@')[0] || 'Student'
+  const profileBatchId = profile?.student?.batchId || ''
+  const displayBatchName = coursesData?.assignedBatch?.name || coursesData?.assignedBatch?.title || profileBatchId || '—'
+  const batchGroupUrl =
+    coursesData?.assignedBatch?.whatsappGroupLink ||
+    coursesData?.assignedBatch?.batchGroupLink ||
+    coursesData?.assignedBatch?.groupLink ||
+    DEFAULT_BATCH_GROUP_URL
 
   const unlockModalFee = unlockModal
     ? unlockModal.mode === 'renew'
@@ -130,8 +139,18 @@ export default function DashboardHome() {
         <div className="mt-2 grid gap-2 text-sm text-gray-300 sm:grid-cols-2 lg:grid-cols-4">
           <div>Student ID: <span className="text-white">{profile?.student?.id || '—'}</span></div>
           <div>Phone: <span className="text-white">{profile?.student?.phone || '—'}</span></div>
-          <div>Class/Batch: <span className="text-white">{profile?.student?.batchId || '—'}</span></div>
+          <div>Class/Batch: <span className="text-white">{displayBatchName}</span></div>
           <div>Admission: <span className="text-white">{profile?.student?.admissionDate || '—'}</span></div>
+        </div>
+        <div className="mt-3">
+          <a
+            href={batchGroupUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+          >
+            Join Batch Group
+          </a>
         </div>
       </div>
 

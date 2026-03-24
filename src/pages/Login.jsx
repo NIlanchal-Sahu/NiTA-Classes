@@ -136,9 +136,9 @@ export default function Login() {
               className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder={
                 role === 'admin'
-                  ? 'admin@nitaclasses.com'
+                  ? 'Enter admin email'
                   : role === 'teacher'
-                    ? 'teacher@nitaclasses.com'
+                    ? 'Enter teacher email'
                     : 'e.g. NITA20260321 or 10-digit mobile'
               }
               required
@@ -163,7 +163,7 @@ export default function Login() {
             disabled={loading}
             className="btn-touch w-full rounded-xl bg-primary-600 py-4 font-semibold text-white hover:bg-primary-700 disabled:opacity-70 transition"
           >
-            {loading ? 'Signing in...' : role === 'admin' ? 'Admin Login' : 'Student Login'}
+            {loading ? 'Signing in...' : role === 'admin' ? 'Admin Login' : role === 'teacher' ? 'Teacher Login' : 'Student Login'}
           </button>
         </form>
       ) : (
@@ -237,7 +237,7 @@ export default function Login() {
       )}
 
       <p className="mt-6 text-center text-sm text-gray-500">
-        Admin demo: admin@nitaclasses.com / admin123. Teacher demo: teacher@nitaclasses.com / admin123.
+        Use your assigned credentials to sign in. Contact admin if you need help.
       </p>
       <p className="mt-2 text-center">
         <Link to="/" className="text-sm font-medium text-primary-600 hover:underline">

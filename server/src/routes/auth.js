@@ -5,11 +5,33 @@ import {
   verifyOtp,
   verifyToken,
   getUserById,
+  getUsers,
+  saveUsers,
   changePassword,
 } from '../auth.js'
 import { getStudentAvatarPublicUrl } from '../studentProfileUtils.js'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { existsSync, readFileSync } from 'fs'
 
 const router = Router()
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const WALLET_ATTENDANCE_PATH = join(__dirname, '..', 'data', 'attendance.json')
+
+function loadWalletAttendance() {
+  if (!existsSync(WALLET_ATTENDANCE_PATH)) return []
+  try {
+    return JSON.parse(readFileSync(WALLET_ATTENDANCE_PATH, 'utf8') || '[]')
+  } catch {
+    return []
+  }
+}
+
+function getWalletClassesTotal(userId) {
+  return loadWalletAttendance()
+    .filter((x) => x.studentId === userId)
+    .reduce((sum, x) => sum + (Number(x.classesCount) || 0), 0)
+}
 
 const authMiddleware = (req, res, next) => {
   const auth = req.headers.authorization
@@ -80,8 +102,17 @@ router.get('/me', authMiddleware, (req, res) => {
   }
   if (user.studentId) payload.studentId = user.studentId
   if (user.role === 'student') {
+    const syncedTotal = getWalletClassesTotal(user.id)
+    if ((Number(user.totalClassesAttended) || 0) !== syncedTotal) {
+      const users = getUsers()
+      const idx = users.findIndex((u) => u.id === user.id)
+      if (idx >= 0) {
+        users[idx] = { ...users[idx], totalClassesAttended: syncedTotal }
+        saveUsers(users)
+      }
+    }
     payload.walletBalance = Number(user.walletBalance) ?? 0
-    payload.totalClassesAttended = Number(user.totalClassesAttended) ?? 0
+    payload.totalClassesAttended = syncedTotal
     payload.vvipValidUntil = user.vvipValidUntil || null
     const avatarUrl = getStudentAvatarPublicUrl(user.id)
     if (avatarUrl) payload.avatarUrl = avatarUrl

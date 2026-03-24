@@ -116,6 +116,21 @@ export function adminResetStudentPassword(studentIdOrPhone, newPassword) {
   return { ok: true }
 }
 
+/** Admin: reset admin password by admin email */
+export function adminResetAdminPassword(adminEmail, newPassword) {
+  if (!newPassword || String(newPassword).length < 6) {
+    return { ok: false, error: 'New password must be at least 6 characters' }
+  }
+  const email = String(adminEmail || '').trim().toLowerCase()
+  if (!email) return { ok: false, error: 'Admin email is required' }
+  const users = getUsers()
+  const idx = users.findIndex((u) => u.role === 'admin' && String(u.email || '').toLowerCase() === email)
+  if (idx < 0) return { ok: false, error: 'Admin account not found' }
+  users[idx] = { ...users[idx], passwordHash: hashPassword(String(newPassword)) }
+  saveUsers(users)
+  return { ok: true }
+}
+
 function userToPublic(user) {
   const base = {
     id: user.id,

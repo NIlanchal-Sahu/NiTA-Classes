@@ -8,6 +8,8 @@ export default function MyCourses() {
   const [student, setStudent] = useState(null)
   const [assignedBatch, setAssignedBatch] = useState(null)
   const [loading, setLoading] = useState(false)
+  const courseNames = courses.map((c) => c.name).filter(Boolean)
+  const primaryBatchName = assignedBatch?.name || assignedBatch?.title || student?.batchId || '—'
 
   useEffect(() => {
     ;(async () => {
@@ -32,8 +34,8 @@ export default function MyCourses() {
       <p className="mt-1 text-gray-400">Enrolled course details, duration, and upcoming batches.</p>
 
       <div className="mt-4 rounded-xl border border-gray-700 bg-gray-800 p-4 text-sm text-gray-300">
-        Enrolled Course ID: <span className="text-white">{student?.courseEnrolled || '—'}</span> · Batch:{' '}
-        <span className="text-white">{student?.batchId || '—'}</span>
+        Course Name: <span className="text-white">{courseNames.join(', ') || '—'}</span> · Batch Name:{' '}
+        <span className="text-white">{primaryBatchName}</span>
         {assignedBatch && (
           <div className="mt-2 text-gray-400">
             Timing: <span className="text-white">{assignedBatch.timing || '—'}</span> · Teacher:{' '}
