@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { academyApi } from '../api/adminAcademy'
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([])
+  const [courses, setCourses] = useState([])
+  const [batches, setBatches] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [profile, setProfile] = useState(null)
+  const [studentView, setStudentView] = useState(null)
+  const [detailTab, setDetailTab] = useState('profile')
+  const [mobileSearch, setMobileSearch] = useState('')
   const [loading, setLoading] = useState(false)
+  const [viewLoading, setViewLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
@@ -25,14 +31,55 @@ export default function AdminStudents() {
     setLoading(true)
     setError('')
     try {
-      const data = await academyApi.getStudents()
-      setStudents(data.students || [])
+      const [studentData, courseData, batchData] = await Promise.all([
+        academyApi.getStudents(),
+        academyApi.getCourses(),
+        academyApi.getBatches(),
+      ])
+      setStudents(studentData.students || [])
+      setCourses(courseData.courses || [])
+      setBatches(batchData.batches || [])
     } catch (e) {
       setError(e.message || 'Failed to load')
     } finally {
       setLoading(false)
     }
   }
+
+  const courseMap = useMemo(
+    () => new Map((courses || []).map((c) => [String(c.id), c.name || c.id])),
+    [courses]
+  )
+  const batchMap = useMemo(
+    () => new Map((batches || []).map((b) => [String(b.id), b.name || b.id])),
+    [batches]
+  )
+
+  const normalizedMobileSearch = useMemo(() => String(mobileSearch || '').replace(/\D/g, ''), [mobileSearch])
+
+  function feeBadge(status) {
+    const s = String(status || '').toLowerCase()
+    if (s === 'paid') return 'bg-emerald-600/20 text-emerald-300 border-emerald-600'
+    if (s === 'discounted') return 'bg-amber-600/20 text-amber-200 border-amber-600'
+    if (s === 'pending') return 'bg-red-600/20 text-red-200 border-red-600'
+    return 'bg-gray-600/20 text-gray-200 border-gray-600'
+  }
+
+  function attendanceBadge(pct) {
+    const n = Number(pct) || 0
+    if (n >= 75) return 'bg-emerald-600/20 text-emerald-300 border-emerald-600'
+    if (n >= 50) return 'bg-amber-600/20 text-amber-200 border-amber-600'
+    return 'bg-red-600/20 text-red-200 border-red-600'
+  }
+
+  const filteredStudents = useMemo(() => {
+    if (!normalizedMobileSearch) return students
+    return (students || []).filter((s) => String(s.phone || '').includes(normalizedMobileSearch))
+  }, [students, normalizedMobileSearch])
+  const selectedStudent = useMemo(
+    () => (profile?.student ? profile.student : students.find((s) => s.id === selectedId) || null),
+    [profile, students, selectedId]
+  )
 
   useEffect(() => {
     refresh()
@@ -91,13 +138,55 @@ export default function AdminStudents() {
 
   const openProfile = async (id) => {
     setSelectedId(id)
+    setDetailTab('profile')
     setProfile(null)
     setError('')
     try {
-      const out = await academyApi.getStudentProfile(id)
+      const [out, dashboard] = await Promise.all([
+        academyApi.getStudentProfile(id),
+        academyApi.getStudentDashboardView(id),
+      ])
       setProfile(out)
+      setStudentView(dashboard)
     } catch (e) {
       setError(e.message || 'Failed to load profile')
+    }
+  }
+
+  const updateFeeStatus = async (studentId, nextStatus) => {
+    setError('')
+    try {
+      await academyApi.updateStudent(studentId, { enrollmentFeeStatus: nextStatus })
+      setStudents((prev) =>
+        prev.map((s) => (s.id === studentId ? { ...s, enrollmentFeeStatus: nextStatus } : s))
+      )
+      if (selectedId === studentId) {
+        setProfile((prev) =>
+          prev ? { ...prev, student: { ...(prev.student || {}), enrollmentFeeStatus: nextStatus } } : prev
+        )
+      }
+    } catch (e) {
+      setError(e.message || 'Failed to update fee status')
+    }
+  }
+
+  const openStudentViewOnly = async (id) => {
+    setSelectedId(id)
+    setDetailTab('dashboard')
+    setProfile(null)
+    setViewLoading(true)
+    setError('')
+    try {
+      const [out, dashboard] = await Promise.all([
+        academyApi.getStudentProfile(id),
+        academyApi.getStudentDashboardView(id),
+      ])
+      setProfile(out)
+      setStudentView(dashboard)
+    } catch (e) {
+      setError(e.message || 'Failed to load student dashboard view')
+    } finally {
+      setViewLoading(false)
     }
   }
 
@@ -163,6 +252,26 @@ export default function AdminStudents() {
         <div className="mt-6 text-gray-400">Loading...</div>
       ) : (
         <div className="mt-6 overflow-x-auto">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-300">Search by Mobile Number</label>
+              <input
+                className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                placeholder="Enter mobile (10-digit)"
+                value={mobileSearch}
+                onChange={(e) => setMobileSearch(e.target.value)}
+              />
+            </div>
+            {mobileSearch && (
+              <button
+                type="button"
+                className="btn-touch rounded-lg bg-gray-700 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-600"
+                onClick={() => setMobileSearch('')}
+              >
+                Clear
+              </button>
+            )}
+          </div>
           <table className="min-w-full border border-gray-700 rounded-xl">
             <thead className="bg-gray-800 text-gray-200">
               <tr>
@@ -176,23 +285,34 @@ export default function AdminStudents() {
               </tr>
             </thead>
             <tbody className="bg-gray-900">
-              {students.map((s) => (
+              {filteredStudents.map((s) => (
                 <tr key={s.id} className="border-t border-gray-800">
                   <td className="px-4 py-3 text-sm text-gray-100">{s.id}</td>
                   <td className="px-4 py-3 text-sm text-gray-100">{s.name || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-300">{s.phone || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-300">{s.courseEnrolled || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-300">{s.batchId || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-300">{s.enrollmentFeeStatus || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">{courseMap.get(String(s.courseEnrolled || '')) || s.courseEnrolled || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">{batchMap.get(String(s.batchId || '')) || s.batchId || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">
+                    <select
+                      className={`rounded border px-2 py-1 text-xs ${feeBadge(s.enrollmentFeeStatus || 'pending')}`}
+                      value={s.enrollmentFeeStatus || 'pending'}
+                      onChange={(e) => updateFeeStatus(s.id, e.target.value)}
+                    >
+                      <option value="paid">paid</option>
+                      <option value="pending">pending</option>
+                      <option value="discounted">discounted</option>
+                    </select>
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex gap-2">
                       <button onClick={() => openProfile(s.id)} className="rounded bg-gray-700 px-2 py-1 text-xs text-white hover:bg-gray-600">Profile</button>
+                      <button onClick={() => openStudentViewOnly(s.id)} className="rounded bg-violet-700 px-2 py-1 text-xs text-white hover:bg-violet-600">View as Student</button>
                       <button onClick={() => removeStudent(s.id)} className="rounded bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-600">Delete</button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {students.length === 0 && (
+              {filteredStudents.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-6 text-sm text-gray-500">
                     No students found.
@@ -211,25 +331,188 @@ export default function AdminStudents() {
             <div className="mt-3 text-gray-400">Loading profile...</div>
           ) : (
             <>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
-                  <div className="text-xs text-gray-400">Name</div>
-                  <div className="mt-1 text-sm text-white">{profile.student?.name}</div>
-                </div>
-                <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
-                  <div className="text-xs text-gray-400">Admission Date</div>
-                  <div className="mt-1 text-sm text-white">{profile.student?.admissionDate || '—'}</div>
-                </div>
-                <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
-                  <div className="text-xs text-gray-400">Enrollment Fee Status</div>
-                  <div className="mt-1 text-sm text-white">{profile.student?.enrollmentFeeStatus || '—'}</div>
-                </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('profile')}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                    detailTab === 'profile'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-gray-900 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('dashboard')}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                    detailTab === 'dashboard'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-gray-900 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  Student Dashboard
+                </button>
               </div>
-              <div className="mt-4 text-sm text-gray-300">
-                Enrollments: <span className="font-semibold text-white">{profile.enrollments?.length || 0}</span> | Payments:{' '}
-                <span className="font-semibold text-white">{profile.payments?.length || 0}</span> | Attendance Records:{' '}
-                <span className="font-semibold text-white">{profile.attendance?.length || 0}</span>
-              </div>
+              {detailTab === 'profile' ? (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Student Name</div>
+                      <div className="mt-1 text-sm font-semibold text-white">{selectedStudent?.name || '—'}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Mobile</div>
+                      <div className="mt-1 text-sm font-semibold text-white">{selectedStudent?.phone || '—'}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Course</div>
+                      <div className="mt-1 text-sm font-semibold text-white">
+                        {courseMap.get(String(selectedStudent?.courseEnrolled || '')) || selectedStudent?.courseEnrolled || '—'}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Batch</div>
+                      <div className="mt-1 text-sm font-semibold text-white">
+                        {batchMap.get(String(selectedStudent?.batchId || '')) || selectedStudent?.batchId || '—'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Admission Date</div>
+                      <div className="mt-1 text-sm font-semibold text-white">{selectedStudent?.admissionDate || '—'}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Enrollment Fee Status</div>
+                      <div className="mt-2">
+                        <select
+                          className={`rounded border px-2 py-1 text-xs ${feeBadge(selectedStudent?.enrollmentFeeStatus || 'pending')}`}
+                          value={selectedStudent?.enrollmentFeeStatus || 'pending'}
+                          onChange={(e) => selectedStudent?.id && updateFeeStatus(selectedStudent.id, e.target.value)}
+                        >
+                          <option value="paid">paid</option>
+                          <option value="pending">pending</option>
+                          <option value="discounted">discounted</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Total Enrollments</div>
+                      <div className="mt-1 text-sm font-semibold text-white">{profile.enrollments?.length || 0}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                      <div className="text-xs text-gray-400">Attendance Records</div>
+                      <div className="mt-1 text-sm font-semibold text-white">{profile.attendance?.length || 0}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-sm text-gray-300">
+                    Enrollments: <span className="font-semibold text-white">{profile.enrollments?.length || 0}</span> | Payments:{' '}
+                    <span className="font-semibold text-white">{profile.payments?.length || 0}</span> | Attendance Records:{' '}
+                    <span className="font-semibold text-white">{profile.attendance?.length || 0}</span>
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 lg:col-span-1">
+                      <h4 className="text-sm font-semibold text-white">Recent Enrollments</h4>
+                      <div className="mt-2 space-y-2 text-xs text-gray-300">
+                        {(profile.enrollments || []).slice(0, 5).map((e) => (
+                          <div key={e.id} className="rounded border border-gray-700 bg-gray-800 p-2">
+                            <div className="font-medium text-white">
+                              {courseMap.get(String(e.courseId || '')) || e.courseId || '—'}
+                            </div>
+                            <div>Date: {String(e.createdAt || '').slice(0, 10) || '—'}</div>
+                            <div>Status: {e.status || 'active'}</div>
+                          </div>
+                        ))}
+                        {(profile.enrollments || []).length === 0 && <p className="text-gray-500">No enrollment records.</p>}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 lg:col-span-1">
+                      <h4 className="text-sm font-semibold text-white">Recent Payments</h4>
+                      <div className="mt-2 space-y-2 text-xs text-gray-300">
+                        {(profile.payments || []).slice(0, 5).map((p) => (
+                          <div key={p.id} className="rounded border border-gray-700 bg-gray-800 p-2">
+                            <div className="font-medium text-white">₹{Number(p.amount) || 0}</div>
+                            <div>Date: {p.date || String(p.createdAt || '').slice(0, 10) || '—'}</div>
+                            <div>Status: {p.feeStatus || '—'}</div>
+                          </div>
+                        ))}
+                        {(profile.payments || []).length === 0 && <p className="text-gray-500">No payment records.</p>}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 lg:col-span-1">
+                      <h4 className="text-sm font-semibold text-white">Recent Attendance</h4>
+                      <div className="mt-2 space-y-2 text-xs text-gray-300">
+                        {(profile.attendance || []).slice(0, 5).map((a) => (
+                          <div key={a.id} className="rounded border border-gray-700 bg-gray-800 p-2">
+                            <div className="font-medium text-white">{a.date || '—'}</div>
+                            <div>Course: {courseMap.get(String(a.courseId || '')) || a.courseId || '—'}</div>
+                            <div>Status: {a.status || '—'}</div>
+                          </div>
+                        ))}
+                        {(profile.attendance || []).length === 0 && <p className="text-gray-500">No attendance records.</p>}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-4 rounded-xl border border-violet-700/40 bg-violet-900/10 p-4">
+                  <h3 className="text-sm font-semibold text-white">Student Dashboard View (Admin)</h3>
+                  {viewLoading ? (
+                    <p className="mt-2 text-sm text-gray-400">Loading dashboard...</p>
+                  ) : (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Wallet Balance</p>
+                        <p className="mt-1 text-lg font-semibold text-white">₹{studentView?.walletBalance ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Attendance %</p>
+                      <p className={`mt-1 inline-flex items-center rounded border px-2 py-1 text-lg font-semibold ${attendanceBadge(studentView?.attendancePercentage ?? 0)}`}>
+                        {studentView?.attendancePercentage ?? 0}%
+                      </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Classes (Present/Conducted)</p>
+                        <p className="mt-1 text-lg font-semibold text-white">
+                          {studentView?.classesPresentCount ?? 0}/{studentView?.classesConductedCount ?? 0}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Total Classes Attended</p>
+                        <p className="mt-1 text-lg font-semibold text-white">{studentView?.totalClassesAttended ?? 0}</p>
+                      </div>
+                    </div>
+                  )}
+                  {!viewLoading && (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Monthly Attendance %</p>
+                        <p className="mt-1 text-lg font-semibold text-white">{studentView?.monthlyAttendancePercentage ?? 0}%</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Fee Status</p>
+                      <p className={`mt-1 inline-flex items-center rounded border px-2 py-1 text-lg font-semibold ${feeBadge(studentView?.feeStatus || 'pending')}`}>
+                        {studentView?.feeStatus || 'pending'}
+                      </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Course</p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {courseMap.get(String(studentView?.courseId || '')) || studentView?.courseId || '—'}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                        <p className="text-xs text-gray-400">Batch</p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {batchMap.get(String(studentView?.batchId || '')) || studentView?.batchId || '—'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

@@ -21,8 +21,9 @@
     "fatherName": "Father Name",
     "batchId": "batch-1774229789714",
     "admissionDate": "2026-03-22",
-    "enrollmentFeeStatus": "pending",
+    "enrollmentFeeStatus": "paid",
     "accountUserId": "auth-1774146766572",
-    "createdAt": "2026-03-22T02:32:46.824Z"
+    "createdAt": "2026-03-22T02:32:46.824Z",
+    "updatedAt": "2026-03-25T06:27:21.858Z"
   }
 ]

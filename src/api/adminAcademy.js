@@ -45,6 +45,7 @@ export const academyApi = {
   updateStudent: (id, body) => request(`/students/${id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(body) }),
   deleteStudent: (id) => request(`/students/${id}`, { method: 'DELETE', headers: headers(false) }),
   getStudentProfile: (id) => request(`/students/${id}`, { headers: headers(false) }),
+  getStudentDashboardView: (id) => request(`/students/${id}/dashboard-view`, { headers: headers(false) }),
   addEnrollment: (id, body) => request(`/students/${id}/enrollments`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
 
   getCourses: () => request('/courses', { headers: headers(false) }),

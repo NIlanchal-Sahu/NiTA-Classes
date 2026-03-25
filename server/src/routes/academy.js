@@ -29,6 +29,7 @@ const PATHS = {
   teacherAttendance: join(__dirname, '..', 'data', 'teacher_attendance.json'),
   teacherAttendanceRequests: join(__dirname, '..', 'data', 'teacher_attendance_requests.json'),
   teacherPayments: join(__dirname, '..', 'data', 'teacher_payments.json'),
+  walletAttendance: join(__dirname, '..', 'data', 'attendance.json'),
 }
 
 function loadJson(path, fallback = []) {
@@ -73,6 +74,46 @@ function removeAdmissionsByPhones(phones = []) {
   const rows = loadJson(PATHS.admissionsQueue, [])
   const next = rows.filter((r) => !targets.has(normalizePhone(r.mobile)))
   if (next.length !== rows.length) saveJson(PATHS.admissionsQueue, next)
+}
+
+function normalizeCourseIds(rawCourses, rawCourse) {
+  const base = Array.isArray(rawCourses) ? rawCourses : rawCourse ? [rawCourse] : []
+  return [...new Set(base.map((x) => String(x || '').trim()).filter(Boolean))]
+}
+
+function isConvertedAdmissionRow(row, students, users, studentEnrollments) {
+  const phone = normalizePhone(row?.mobile)
+  if (!phone) return false
+  const student = students.find((s) => normalizePhone(s.phone) === phone)
+  const user = users.find((u) => u.role === 'student' && normalizePhone(u.email) === phone)
+  if (!student || !user) return false
+  return studentEnrollments.some(
+    (e) =>
+      String(e.studentId || '') === String(student.id || '') &&
+      normCourseId(e.courseId) !== 'trial-course'
+  )
+}
+
+function reconcileAdmissionsQueueRows() {
+  const rows = loadJson(PATHS.admissionsQueue, [])
+  if (!rows.length) return rows
+  const students = loadJson(PATHS.students, [])
+  const users = loadJson(PATHS.users, [])
+  const studentEnrollments = loadJson(PATHS.enrollments, [])
+  const next = rows
+    .map((r) => {
+      const courseIds = normalizeCourseIds(r.courseIds, r.course)
+      return {
+        ...r,
+        mobile: normalizePhone(r.mobile),
+        courseIds,
+        course: courseIds[0] || '',
+        status: r.status || 'queued',
+      }
+    })
+    .filter((r) => !isConvertedAdmissionRow(r, students, users, studentEnrollments))
+  if (next.length !== rows.length) saveJson(PATHS.admissionsQueue, next)
+  return next
 }
 
 function nextTeacherId(users) {
@@ -326,6 +367,64 @@ router.get('/students/:id', auth, allowRoles(['admin', 'teacher']), (req, res) =
     enrollments: enrollments.filter((x) => x.studentId === student.id).slice().reverse(),
     payments: fees.filter((x) => x.studentId === student.id).slice().reverse(),
     attendance: attendance.filter((x) => x.studentId === student.id).slice().reverse(),
+  })
+})
+
+router.get('/students/:id/dashboard-view', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const students = loadJson(PATHS.students, [])
+  const student = students.find((s) => s.id === req.params.id)
+  if (!student) return res.status(404).json({ error: 'Student not found' })
+  const users = loadJson(PATHS.users, [])
+  const authUser = users.find((u) => String(u.id) === String(student.accountUserId) && u.role === 'student') || null
+  const walletAttendance = loadJson(PATHS.walletAttendance, [])
+  const academyAttendance = loadJson(PATHS.attendance, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+
+  const today = parseDate(new Date().toISOString())
+  const currentMonth = monthKey(today)
+  const attendanceRows = academyAttendance.filter((a) => String(a.studentId) === String(student.id))
+  const monthRows = attendanceRows.filter((a) => monthKey(a.date) === currentMonth)
+  const monthPresent = monthRows.filter((a) => String(a.status) === 'present').length
+  const monthAttendancePct = monthRows.length ? Math.round((monthPresent / monthRows.length) * 100) : 0
+
+  const unlockByCourse = new Map()
+  for (const e of enrollments) {
+    if (String(e.studentId) !== String(student.id)) continue
+    const cid = normCourseId(e.courseId)
+    if (!cid || cid === 'trial-course') continue
+    const start = parseDate(e.startDate || e.createdAt || '')
+    if (!start) continue
+    if (!unlockByCourse.has(cid) || start < unlockByCourse.get(cid)) unlockByCourse.set(cid, start)
+  }
+  const conducted = new Set()
+  const present = new Set()
+  for (const r of attendanceRows) {
+    const cid = normCourseId(r.courseId)
+    const unlockDate = unlockByCourse.get(cid)
+    const date = parseDate(r.date)
+    if (!cid || !unlockDate || !date || date < unlockDate) continue
+    const key = `${cid}|${date}`
+    conducted.add(key)
+    if (String(r.status) === 'present') present.add(key)
+  }
+  const attendancePct = conducted.size ? Math.round((present.size / conducted.size) * 100) : 0
+
+  const totalClassesAttended = walletAttendance
+    .filter((x) => String(x.studentId) === String(student.accountUserId || ''))
+    .reduce((sum, x) => sum + (Number(x.classesCount) || 0), 0)
+
+  res.json({
+    studentId: student.id,
+    name: student.name || '',
+    walletBalance: Number(authUser?.walletBalance) || 0,
+    totalClassesAttended,
+    attendancePercentage: attendancePct,
+    monthlyAttendancePercentage: monthAttendancePct,
+    classesConductedCount: conducted.size,
+    classesPresentCount: present.size,
+    feeStatus: String(student.enrollmentFeeStatus || 'pending'),
+    batchId: String(student.batchId || ''),
+    courseId: String(student.courseEnrolled || ''),
   })
 })
 
@@ -1504,7 +1603,7 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
   const batches = loadJson(PATHS.batches, [])
   const fees = loadJson(PATHS.fees, [])
   const attendance = loadJson(PATHS.attendance, [])
-  const admissions = loadJson(PATHS.admissionsQueue, [])
+  const admissions = reconcileAdmissionsQueueRows()
   const users = loadJson(PATHS.users, [])
   const teacherAttendance = loadJson(PATHS.teacherAttendance, [])
   const teacherPayments = loadJson(PATHS.teacherPayments, [])
