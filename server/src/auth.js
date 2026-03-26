@@ -1,10 +1,11 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { existsSync } from 'fs'
 import { getStudentAvatarPublicUrl } from './studentProfileUtils.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { applyReferralCodeToStudent } from './referrals.js'
+import { readJsonSync, writeJsonSync } from './services/sheetsJsonStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const USERS_PATH = join(__dirname, 'data', 'users.json')
@@ -28,12 +29,11 @@ function normalizeIdentifier(input) {
 }
 
 export function getUsers() {
-  if (!existsSync(USERS_PATH)) return []
-  return JSON.parse(readFileSync(USERS_PATH, 'utf8'))
+  return readJsonSync(USERS_PATH, [])
 }
 
 export function saveUsers(users) {
-  writeFileSync(USERS_PATH, JSON.stringify(users, null, 2), 'utf8')
+  writeJsonSync(USERS_PATH, users)
 }
 
 function generateOtp() {
@@ -210,7 +210,7 @@ export function verifyOtp(email, otp) {
   // Auto-apply referral code if present in latest enrollment (mobile-based) and not already linked.
   try {
     if (existsSync(ENROLLMENTS_PATH)) {
-      const list = JSON.parse(readFileSync(ENROLLMENTS_PATH, 'utf8') || '[]')
+      const list = readJsonSync(ENROLLMENTS_PATH, [])
       const mobile = String(normalized).replace(/\D/g, '')
       const match = list
         .slice()

@@ -1,13 +1,13 @@
 import { Router } from 'express'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { hashPassword, getUsers, saveUsers } from '../auth.js'
 import {
   generateNitaStudentId,
   defaultPasswordFromPhone,
   normalizePhoneDigits,
 } from '../enrollmentCredentials.js'
+import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -16,17 +16,11 @@ const STUDENTS_PATH = join(__dirname, '..', 'data', 'students.json')
 const STUDENT_ENROLLMENTS_PATH = join(__dirname, '..', 'data', 'student_enrollments.json')
 
 function loadJson(path) {
-  if (!existsSync(path)) return []
-  const raw = readFileSync(path, 'utf8') || '[]'
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return []
-  }
+  return readJsonSync(path, [])
 }
 
 function saveJson(path, data) {
-  writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
+  writeJsonSync(path, data)
 }
 
 function normalizeMobile(input) {

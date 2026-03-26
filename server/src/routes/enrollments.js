@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { verifyToken, getUsers, saveUsers } from '../auth.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -22,17 +22,11 @@ function studentAdminAuth(req, res, next) {
 }
 
 function loadJson(path) {
-  if (!existsSync(path)) return []
-  const raw = readFileSync(path, 'utf8') || '[]'
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return []
-  }
+  return readJsonSync(path, [])
 }
 
 function saveJson(path, data) {
-  writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
+  writeJsonSync(path, data)
 }
 
 function digits(input) {

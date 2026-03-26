@@ -1,9 +1,9 @@
 import { Router } from 'express'
 import { verifyToken, getUserById, getUsers, saveUsers } from '../auth.js'
 import { getAttendanceFor, getAttendanceFor as _getAttendanceFor } from '../student.js'
-import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { readJsonSync } from '../services/sheetsJsonStore.js'
 
 const router = Router()
 
@@ -24,8 +24,7 @@ const studentAuth = (req, res, next) => {
 }
 
 function loadJson(path) {
-  if (!existsSync(path)) return []
-  return JSON.parse(readFileSync(path, 'utf8'))
+  return readJsonSync(path, [])
 }
 
 function parseDateKey(d) {

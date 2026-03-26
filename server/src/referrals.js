@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { readJsonSync, writeJsonSync } from './services/sheetsJsonStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PARTNERS_PATH = join(__dirname, 'data', 'referrals.json')
@@ -9,17 +9,11 @@ const PAYOUTS_PATH = join(__dirname, 'data', 'referral_payouts.json')
 const ATTENDANCE_PATH = join(__dirname, 'data', 'attendance.json')
 
 function loadJson(path, fallback) {
-  if (!existsSync(path)) return fallback
-  const raw = readFileSync(path, 'utf8') || ''
-  try {
-    return JSON.parse(raw || JSON.stringify(fallback))
-  } catch {
-    return fallback
-  }
+  return readJsonSync(path, fallback)
 }
 
 function saveJson(path, data) {
-  writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
+  writeJsonSync(path, data)
 }
 
 export function getPartners() {

@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { verifyToken, getUserById } from "../auth.js";
 import { getUsers, saveUsers } from "../auth.js";
-import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import {
@@ -12,6 +11,7 @@ import {
   isVvipActive,
   purchaseUnlimitedMonth,
 } from "../student.js";
+import { readJsonSync, writeJsonSync } from "../services/sheetsJsonStore.js";
 
 const router = Router();
 const PRICE_PER_CLASS = 10;
@@ -51,16 +51,11 @@ const COURSE_DURATION_DAYS = {
 };
 
 function loadJson(path) {
-  if (!existsSync(path)) return [];
-  try {
-    return JSON.parse(readFileSync(path, "utf8") || "[]");
-  } catch {
-    return [];
-  }
+  return readJsonSync(path, []);
 }
 
 function saveJson(path, data) {
-  writeFileSync(path, JSON.stringify(data, null, 2), "utf8");
+  writeJsonSync(path, data);
 }
 
 function digits(input) {

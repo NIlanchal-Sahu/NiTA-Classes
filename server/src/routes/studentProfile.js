@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { join, dirname, extname } from 'path'
 import { fileURLToPath } from 'url'
 import { verifyToken, getUserById, getUsers, saveUsers } from '../auth.js'
 import { syncStudentProfileToGoogle, isGoogleConfigured } from '../services/googleProfileSync.js'
+import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROFILES_PATH = join(__dirname, '..', 'data', 'student_profiles.json')
@@ -17,16 +18,11 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024
 const router = Router()
 
 function loadJson(path, fallback = []) {
-  if (!existsSync(path)) return fallback
-  try {
-    return JSON.parse(readFileSync(path, 'utf8') || JSON.stringify(fallback))
-  } catch {
-    return fallback
-  }
+  return readJsonSync(path, fallback)
 }
 
 function saveJson(path, data) {
-  writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
+  writeJsonSync(path, data)
 }
 
 function studentAuth(req, res, next) {

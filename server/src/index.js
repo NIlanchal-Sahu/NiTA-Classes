@@ -13,6 +13,7 @@ import academyRoutes from './routes/academy.js'
 import studentProfileRoutes from './routes/studentProfile.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { bootstrapDataFromSheets } from './services/sheetsJsonStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -35,6 +36,12 @@ app.use('/api/admin/notifications', notificationsRoutes)
 
 app.get('/api/health', (_, res) => res.json({ ok: true }))
 
-app.listen(PORT, () => {
-  console.log(`Auth server running at http://localhost:${PORT}`)
-})
+bootstrapDataFromSheets()
+  .catch((e) => {
+    console.warn('[bootstrap] Google Sheets bootstrap failed:', e.message)
+  })
+  .finally(() => {
+    app.listen(PORT, () => {
+      console.log(`Auth server running at http://localhost:${PORT}`)
+    })
+  })

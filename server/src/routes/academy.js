@@ -1,8 +1,8 @@
 import { Router } from 'express'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { verifyToken, adminResetStudentPassword, adminResetAdminPassword, hashPassword } from '../auth.js'
+import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -33,16 +33,11 @@ const PATHS = {
 }
 
 function loadJson(path, fallback = []) {
-  if (!existsSync(path)) return fallback
-  try {
-    return JSON.parse(readFileSync(path, 'utf8') || JSON.stringify(fallback))
-  } catch {
-    return fallback
-  }
+  return readJsonSync(path, fallback)
 }
 
 function saveJson(path, data) {
-  writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
+  writeJsonSync(path, data)
 }
 
 function auth(req, res, next) {

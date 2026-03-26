@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { verifyToken } from '../auth.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
 
 const router = Router()
 
@@ -21,16 +21,11 @@ function adminAuth(req, res, next) {
 }
 
 function loadJson() {
-  if (!existsSync(NOTIFICATIONS_PATH)) return []
-  try {
-    return JSON.parse(readFileSync(NOTIFICATIONS_PATH, 'utf8') || '[]')
-  } catch {
-    return []
-  }
+  return readJsonSync(NOTIFICATIONS_PATH, [])
 }
 
 function saveJson(data) {
-  writeFileSync(NOTIFICATIONS_PATH, JSON.stringify(data, null, 2), 'utf8')
+  writeJsonSync(NOTIFICATIONS_PATH, data)
 }
 
 // MVP: admin can queue a notification (WhatsApp message template).

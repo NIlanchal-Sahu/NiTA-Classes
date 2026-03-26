@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { getUsers, saveUsers, getUserById } from "./auth.js";
+import { readJsonSync, writeJsonSync } from "./services/sheetsJsonStore.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ATTENDANCE_PATH = join(__dirname, "data", "attendance.json");
@@ -9,17 +9,15 @@ const COURSES_PATH = join(__dirname, "data", "courses.json");
 const PRICE_PER_CLASS = 10;
 
 function getCourses() {
-  if (!existsSync(COURSES_PATH)) return [];
-  return JSON.parse(readFileSync(COURSES_PATH, "utf8"));
+  return readJsonSync(COURSES_PATH, []);
 }
 
 function getAttendance() {
-  if (!existsSync(ATTENDANCE_PATH)) return [];
-  return JSON.parse(readFileSync(ATTENDANCE_PATH, "utf8"));
+  return readJsonSync(ATTENDANCE_PATH, []);
 }
 
 function saveAttendance(records) {
-  writeFileSync(ATTENDANCE_PATH, JSON.stringify(records, null, 2), "utf8");
+  writeJsonSync(ATTENDANCE_PATH, records);
 }
 
 export function getValidCourseId(courseId) {

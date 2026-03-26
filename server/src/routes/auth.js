@@ -12,19 +12,14 @@ import {
 import { getStudentAvatarPublicUrl } from '../studentProfileUtils.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { existsSync, readFileSync } from 'fs'
+import { readJsonSync } from '../services/sheetsJsonStore.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const WALLET_ATTENDANCE_PATH = join(__dirname, '..', 'data', 'attendance.json')
 
 function loadWalletAttendance() {
-  if (!existsSync(WALLET_ATTENDANCE_PATH)) return []
-  try {
-    return JSON.parse(readFileSync(WALLET_ATTENDANCE_PATH, 'utf8') || '[]')
-  } catch {
-    return []
-  }
+  return readJsonSync(WALLET_ATTENDANCE_PATH, [])
 }
 
 function getWalletClassesTotal(userId) {
