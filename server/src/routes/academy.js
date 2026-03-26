@@ -30,6 +30,10 @@ const PATHS = {
   teacherAttendanceRequests: join(__dirname, '..', 'data', 'teacher_attendance_requests.json'),
   teacherPayments: join(__dirname, '..', 'data', 'teacher_payments.json'),
   walletAttendance: join(__dirname, '..', 'data', 'attendance.json'),
+  removedStudents: join(__dirname, '..', 'data', 'removed_students.json'),
+  referralPartners: join(__dirname, '..', 'data', 'referrals.json'),
+  referralPayouts: join(__dirname, '..', 'data', 'referral_payouts.json'),
+  referralReviewRequests: join(__dirname, '..', 'data', 'referral_review_requests.json'),
 }
 
 function loadJson(path, fallback = []) {
@@ -350,6 +354,23 @@ router.get('/students', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
   res.json({ students: students.slice().reverse() })
 })
 
+router.get('/students/removed', auth, allowRoles(['admin']), (req, res) => {
+  const q = normalizePhone(req.query?.mobile || '')
+  const rows = loadJson(PATHS.removedStudents, [])
+  const filtered = q
+    ? rows.filter((r) => normalizePhone(r?.student?.phone || r?.mobile || '') === q)
+    : rows
+  res.json({ removedStudents: filtered.slice().reverse() })
+})
+
+router.delete('/students/removed/:recordId', auth, allowRoles(['admin']), (req, res) => {
+  const list = loadJson(PATHS.removedStudents, [])
+  const next = list.filter((x) => String(x.id || '') !== String(req.params.recordId || ''))
+  if (next.length === list.length) return res.status(404).json({ error: 'Removed student record not found' })
+  saveJson(PATHS.removedStudents, next)
+  res.json({ success: true })
+})
+
 router.get('/students/:id', auth, allowRoles(['admin', 'teacher']), (req, res) => {
   const students = loadJson(PATHS.students, [])
   const enrollments = loadJson(PATHS.enrollments, [])
@@ -461,10 +482,95 @@ router.put('/students/:id', auth, allowRoles(['admin']), (req, res) => {
 
 router.delete('/students/:id', auth, allowRoles(['admin']), (req, res) => {
   const students = loadJson(PATHS.students, [])
-  const next = students.filter((s) => s.id !== req.params.id)
-  if (next.length === students.length) return res.status(404).json({ error: 'Student not found' })
-  saveJson(PATHS.students, next)
-  res.json({ success: true })
+  const student = students.find((s) => String(s.id) === String(req.params.id))
+  if (!student) return res.status(404).json({ error: 'Student not found' })
+  const studentId = String(student.id || '')
+  const accountUserId = String(student.accountUserId || '')
+  const phone = normalizePhone(student.phone)
+
+  const users = loadJson(PATHS.users, [])
+  const user = users.find((u) => String(u.id || '') === accountUserId) || null
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const fees = loadJson(PATHS.fees, [])
+  const attendance = loadJson(PATHS.attendance, [])
+  const walletAttendance = loadJson(PATHS.walletAttendance, [])
+  const notifications = loadJson(PATHS.studentNotifications, [])
+  const profiles = loadJson(PATHS.studentProfiles, [])
+  const referralLinks = loadJson(PATHS.referralLinks, [])
+  const referralPartners = loadJson(PATHS.referralPartners, [])
+  const referralPayouts = loadJson(PATHS.referralPayouts, [])
+  const referralReviewRequests = loadJson(PATHS.referralReviewRequests, [])
+  const admissionsQueue = loadJson(PATHS.admissionsQueue, [])
+  const removed = loadJson(PATHS.removedStudents, [])
+
+  removed.push({
+    id: `removed-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    removedAt: new Date().toISOString(),
+    removedBy: String(req.auth.userId || ''),
+    mobile: phone,
+    student,
+    user,
+    enrollments: enrollments.filter((x) => String(x.studentId || '') === studentId),
+    fees: fees.filter((x) => String(x.studentId || '') === studentId),
+    academyAttendance: attendance.filter((x) => String(x.studentId || '') === studentId),
+    walletAttendance: walletAttendance.filter((x) => String(x.studentId || '') === accountUserId),
+    studentNotifications: notifications.filter((x) => {
+      const sid = String(x.studentId || x.recipientStudentId || '')
+      const uid = String(x.userId || x.authUserId || '')
+      const ph = normalizePhone(x.phone || x.mobile || '')
+      return sid === studentId || uid === accountUserId || (phone && ph === phone)
+    }),
+    studentProfiles: profiles.filter((x) => String(x.authUserId || '') === accountUserId),
+    referralLinks: referralLinks.filter(
+      (x) => String(x.referredStudentId || '') === accountUserId || String(x.referrerUserId || '') === accountUserId
+    ),
+    referralPartners: referralPartners.filter((x) => String(x.userId || '') === accountUserId),
+    referralPayouts: referralPayouts.filter(
+      (x) => String(x.referredStudentId || '') === accountUserId || String(x.referrerUserId || '') === accountUserId
+    ),
+    referralReviewRequests: referralReviewRequests.filter((x) => String(x.studentId || '') === accountUserId),
+    admissionsQueue: admissionsQueue.filter((x) => normalizePhone(x.mobile || '') === phone),
+  })
+
+  saveJson(PATHS.removedStudents, removed)
+  saveJson(PATHS.students, students.filter((s) => String(s.id) !== studentId))
+  saveJson(
+    PATHS.users,
+    users.filter((u) => String(u.id || '') !== accountUserId && !(u.role === 'student' && normalizePhone(u.email) === phone))
+  )
+  saveJson(PATHS.enrollments, enrollments.filter((x) => String(x.studentId || '') !== studentId))
+  saveJson(PATHS.fees, fees.filter((x) => String(x.studentId || '') !== studentId))
+  saveJson(PATHS.attendance, attendance.filter((x) => String(x.studentId || '') !== studentId))
+  saveJson(PATHS.walletAttendance, walletAttendance.filter((x) => String(x.studentId || '') !== accountUserId))
+  saveJson(
+    PATHS.studentNotifications,
+    notifications.filter((x) => {
+      const sid = String(x.studentId || x.recipientStudentId || '')
+      const uid = String(x.userId || x.authUserId || '')
+      const ph = normalizePhone(x.phone || x.mobile || '')
+      return sid !== studentId && uid !== accountUserId && (!phone || ph !== phone)
+    })
+  )
+  saveJson(PATHS.studentProfiles, profiles.filter((x) => String(x.authUserId || '') !== accountUserId))
+  saveJson(
+    PATHS.referralLinks,
+    referralLinks.filter(
+      (x) => String(x.referredStudentId || '') !== accountUserId && String(x.referrerUserId || '') !== accountUserId
+    )
+  )
+  saveJson(PATHS.referralPartners, referralPartners.filter((x) => String(x.userId || '') !== accountUserId))
+  saveJson(
+    PATHS.referralPayouts,
+    referralPayouts.filter(
+      (x) => String(x.referredStudentId || '') !== accountUserId && String(x.referrerUserId || '') !== accountUserId
+    )
+  )
+  saveJson(
+    PATHS.referralReviewRequests,
+    referralReviewRequests.filter((x) => String(x.studentId || '') !== accountUserId)
+  )
+  saveJson(PATHS.admissionsQueue, admissionsQueue.filter((x) => normalizePhone(x.mobile || '') !== phone))
+  res.json({ success: true, archived: true })
 })
 
 router.post('/students/:id/enrollments', auth, allowRoles(['admin', 'teacher']), (req, res) => {

@@ -26,6 +26,9 @@ export default function AdminStudents() {
   const [resetPwd, setResetPwd] = useState('')
   const [resetLoading, setResetLoading] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
+  const [removedMobile, setRemovedMobile] = useState('')
+  const [removedRows, setRemovedRows] = useState([])
+  const [removedLoading, setRemovedLoading] = useState(false)
 
   const refresh = async () => {
     setLoading(true)
@@ -200,6 +203,39 @@ export default function AdminStudents() {
     }
   }
 
+  const lookupRemovedByMobile = async () => {
+    const phone = String(removedMobile || '').replace(/\D/g, '').slice(-10)
+    if (phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number for removed student lookup')
+      return
+    }
+    setRemovedLoading(true)
+    setError('')
+    try {
+      const out = await academyApi.getRemovedStudents(phone)
+      setRemovedRows(out.removedStudents || [])
+    } catch (e) {
+      setError(e.message || 'Failed to load removed students')
+      setRemovedRows([])
+    } finally {
+      setRemovedLoading(false)
+    }
+  }
+
+  const deleteRemovedRecord = async (recordId) => {
+    if (!window.confirm('Delete this record from removed students list?')) return
+    setRemovedLoading(true)
+    setError('')
+    try {
+      await academyApi.deleteRemovedStudentRecord(recordId)
+      await lookupRemovedByMobile()
+    } catch (e) {
+      setError(e.message || 'Failed to delete removed student record')
+    } finally {
+      setRemovedLoading(false)
+    }
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-white">Student Lifecycle Management</h1>
@@ -255,6 +291,53 @@ export default function AdminStudents() {
           </button>
         </form>
         {resetMsg && <p className="mt-3 text-sm text-green-400">{resetMsg}</p>}
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white">Removed Students (Lookup by Mobile)</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          View archived deleted students and permanently remove archive records if required.
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div className="min-w-[220px] flex-1">
+            <label className="block text-xs text-gray-400">Mobile Number</label>
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+              placeholder="10-digit mobile"
+              value={removedMobile}
+              onChange={(e) => setRemovedMobile(e.target.value)}
+              inputMode="numeric"
+              maxLength={10}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={lookupRemovedByMobile}
+            disabled={removedLoading}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {removedLoading ? 'Checking...' : 'Check Removed List'}
+          </button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {(removedRows || []).map((r) => (
+            <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm">
+              <div className="text-gray-200">
+                <span className="font-semibold">{r?.student?.name || 'Student'}</span> - {r?.mobile || r?.student?.phone || '—'} - removed on{' '}
+                {String(r?.removedAt || '').slice(0, 10)}
+              </div>
+              <button
+                type="button"
+                onClick={() => deleteRemovedRecord(r.id)}
+                disabled={removedLoading}
+                className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                Delete Record
+              </button>
+            </div>
+          ))}
+          {removedRows.length === 0 && <p className="text-sm text-gray-500">No removed student records found for this mobile.</p>}
+        </div>
       </div>
 
       {error && <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-200">{error}</div>}

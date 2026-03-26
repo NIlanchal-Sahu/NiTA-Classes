@@ -46,6 +46,10 @@ export const academyApi = {
   deleteStudent: (id) => request(`/students/${id}`, { method: 'DELETE', headers: headers(false) }),
   getStudentProfile: (id) => request(`/students/${id}`, { headers: headers(false) }),
   getStudentDashboardView: (id) => request(`/students/${id}/dashboard-view`, { headers: headers(false) }),
+  getRemovedStudents: (mobile = '') =>
+    request(`/students/removed${mobile ? `?mobile=${encodeURIComponent(mobile)}` : ''}`, { headers: headers(false) }),
+  deleteRemovedStudentRecord: (recordId) =>
+    request(`/students/removed/${encodeURIComponent(recordId)}`, { method: 'DELETE', headers: headers(false) }),
   addEnrollment: (id, body) => request(`/students/${id}/enrollments`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
 
   getCourses: () => request('/courses', { headers: headers(false) }),
