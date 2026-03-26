@@ -13,7 +13,7 @@ import academyRoutes from './routes/academy.js'
 import studentProfileRoutes from './routes/studentProfile.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { bootstrapDataFromSheets } from './services/sheetsJsonStore.js'
+import { bootstrapDataFromSheets, getSheetsStoreStatus } from './services/sheetsJsonStore.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -35,6 +35,10 @@ app.use('/api/admin/batches', batchesRoutes)
 app.use('/api/admin/notifications', notificationsRoutes)
 
 app.get('/api/health', (_, res) => res.json({ ok: true }))
+app.get('/api/health/storage', (_, res) => {
+  const storage = getSheetsStoreStatus()
+  res.json({ ok: true, storage })
+})
 
 bootstrapDataFromSheets()
   .catch((e) => {

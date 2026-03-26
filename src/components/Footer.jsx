@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { WHATSAPP_NUMBER } from '../config'
 const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}`
+const centerMapUrl = 'https://maps.app.goo.gl/Xb25fpYRRNyiJa8c9'
 
 export default function Footer() {
   return (
@@ -29,11 +30,24 @@ export default function Footer() {
             <h4 className="text-sm font-semibold uppercase tracking-wider text-white">Contact</h4>
             <ul className="mt-3 space-y-2 text-sm">
               <li>
-                <a href={`tel:${WHATSAPP_NUMBER}`} className="hover:text-white transition">Phone</a>
+                <a href="tel:9986437890" className="hover:text-white transition">9986437890</a>
               </li>
               <li>
                 <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                   WhatsApp
+                </a>
+              </li>
+              <li className="leading-relaxed text-gray-300">
+                In front of State Bank of India (SBI), beside the Welding Shop, Main Road Chikiti Pentho - 761010.
+              </li>
+              <li>
+                <a
+                  href={centerMapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-accent-green hover:text-white transition"
+                >
+                  Open Center Location in Google Map
                 </a>
               </li>
             </ul>

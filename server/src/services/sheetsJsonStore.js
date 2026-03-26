@@ -13,6 +13,14 @@ let _authClient = null
 let _bootstrapped = false
 let _writeQueue = Promise.resolve()
 const _ensuredTabs = new Set()
+const _status = {
+  enabled: ENABLED,
+  configured: false,
+  spreadsheetIdPresent: Boolean(SHEET_ID),
+  serviceAccountPresent: false,
+  bootstrap: { attempted: false, ok: false, at: null, error: null, files: 0 },
+  mirror: { at: null, ok: null, error: null, tab: null },
+}
 
 function loadCredentials() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
@@ -33,6 +41,8 @@ function loadCredentials() {
 async function getSheetsClient() {
   if (_authClient && _sheets) return _sheets
   const creds = loadCredentials()
+  _status.serviceAccountPresent = Boolean(creds)
+  _status.configured = Boolean(creds && SHEET_ID && ENABLED)
   if (!creds || !SHEET_ID || !ENABLED) return null
   const { google } = await import('googleapis')
   _authClient = new google.auth.JWT({
@@ -108,16 +118,29 @@ function enqueueSheetMirror(path, data) {
           ],
         },
       })
+      _status.mirror = { at: new Date().toISOString(), ok: true, error: null, tab }
     })
-    .catch((e) => console.warn('[sheetsJsonStore] mirror write failed:', e.message))
+    .catch((e) => {
+      _status.mirror = {
+        at: new Date().toISOString(),
+        ok: false,
+        error: e.message,
+        tab: basename(String(path || ''), '.json'),
+      }
+      console.warn('[sheetsJsonStore] mirror write failed:', e.message)
+    })
 }
 
 export async function bootstrapDataFromSheets() {
   if (_bootstrapped) return
   _bootstrapped = true
+  _status.bootstrap.attempted = true
+  _status.bootstrap.at = new Date().toISOString()
   const sheets = await getSheetsClient()
   if (!sheets) {
     console.log('[sheetsJsonStore] Google Sheets DB disabled or not configured; using local JSON files')
+    _status.bootstrap.ok = false
+    _status.bootstrap.error = 'not_configured_or_disabled'
     return
   }
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
@@ -142,7 +165,21 @@ export async function bootstrapDataFromSheets() {
       }
     } catch (e) {
       console.warn('[sheetsJsonStore] bootstrap sync failed:', fileName, e.message)
+      _status.bootstrap.error = e.message
     }
   }
+  _status.bootstrap.ok = true
+  _status.bootstrap.files = files.length
+  _status.bootstrap.error = _status.bootstrap.error || null
   console.log('[sheetsJsonStore] Data bootstrap completed from Google Sheets')
+}
+
+export function getSheetsStoreStatus() {
+  const creds = loadCredentials()
+  return {
+    ..._status,
+    serviceAccountPresent: Boolean(creds),
+    configured: Boolean(_status.enabled && _status.spreadsheetIdPresent && creds),
+    bootstrapped: _bootstrapped,
+  }
 }
