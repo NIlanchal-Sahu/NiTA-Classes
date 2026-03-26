@@ -99,6 +99,39 @@ router.get('/', studentAdminAuth, (req, res) => {
   res.json({ enrollments: list.slice().reverse() })
 })
 
+router.get('/lookup-by-mobile', studentAdminAuth, (req, res) => {
+  const phone = normalizePhone(String(req.query?.mobile || ''))
+  if (!phone || phone.length !== 10) {
+    return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
+  }
+  const raw = loadJson(ENROLLMENTS_PATH)
+  const visible = reconcileAdmissionsQueue()
+  const rawMatches = raw.filter((x) => normalizePhone(x.mobile) === phone)
+  const visibleIds = new Set(visible.map((x) => String(x.id || '')))
+  const matches = rawMatches.map((row) => ({
+    ...row,
+    hiddenInVisibleQueue: !visibleIds.has(String(row.id || '')),
+  }))
+  res.json({
+    mobile: phone,
+    totalRawMatches: matches.length,
+    totalVisibleMatches: matches.filter((m) => !m.hiddenInVisibleQueue).length,
+    matches: matches.slice().reverse(),
+  })
+})
+
+router.delete('/cleanup-by-mobile/:mobile', studentAdminAuth, (req, res) => {
+  const phone = normalizePhone(req.params.mobile)
+  if (!phone || phone.length !== 10) {
+    return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
+  }
+  const list = loadJson(ENROLLMENTS_PATH)
+  const next = list.filter((x) => normalizePhone(x.mobile) !== phone)
+  const removed = list.length - next.length
+  if (removed > 0) saveJson(ENROLLMENTS_PATH, next)
+  res.json({ success: true, removed, mobile: phone })
+})
+
 router.post('/', studentAdminAuth, (req, res) => {
   const {
     name,

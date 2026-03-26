@@ -106,6 +106,9 @@ export default function AdminEnrollments() {
   const [submitting, setSubmitting] = useState(false)
   const [editingId, setEditingId] = useState('')
   const [editing, setEditing] = useState(null)
+  const [lookupMobile, setLookupMobile] = useState('')
+  const [lookupResult, setLookupResult] = useState(null)
+  const [lookupLoading, setLookupLoading] = useState(false)
 
   const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('nita_token') || ''}` })
 
@@ -209,6 +212,54 @@ export default function AdminEnrollments() {
     }
   }
 
+  const lookupByMobile = async () => {
+    const phone = String(lookupMobile || '').replace(/\D/g, '').slice(-10)
+    if (phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number for queue lookup')
+      return
+    }
+    setLookupLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/admin/enrollments/lookup-by-mobile?mobile=${encodeURIComponent(phone)}`, {
+        headers: authHeaders(),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Lookup failed')
+      setLookupResult(json)
+    } catch (e) {
+      setError(e.message || 'Lookup failed')
+      setLookupResult(null)
+    } finally {
+      setLookupLoading(false)
+    }
+  }
+
+  const cleanupByMobile = async () => {
+    const phone = String(lookupMobile || '').replace(/\D/g, '').slice(-10)
+    if (phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number for cleanup')
+      return
+    }
+    if (!window.confirm(`Delete ALL queue records for ${phone}?`)) return
+    setLookupLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/admin/enrollments/cleanup-by-mobile/${encodeURIComponent(phone)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Cleanup failed')
+      await refresh()
+      await lookupByMobile()
+    } catch (e) {
+      setError(e.message || 'Cleanup failed')
+    } finally {
+      setLookupLoading(false)
+    }
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-white">Admission / Enrollment Queue</h1>
@@ -290,6 +341,60 @@ export default function AdminEnrollments() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white">Queue Mobile Lookup / Manual Cleanup</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Use this when admission says "mobile already in queue" but nothing is visible in list.
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-[220px] flex-1">
+            <label className="block text-xs text-gray-400">Mobile Number</label>
+            <input
+              value={lookupMobile}
+              onChange={(e) => setLookupMobile(e.target.value)}
+              inputMode="numeric"
+              maxLength={10}
+              className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+              placeholder="10-digit mobile"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={lookupByMobile}
+            disabled={lookupLoading}
+            className="rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {lookupLoading ? 'Checking...' : 'Check in Queue'}
+          </button>
+          <button
+            type="button"
+            onClick={cleanupByMobile}
+            disabled={lookupLoading}
+            className="rounded bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            Remove from Queue
+          </button>
+        </div>
+        {lookupResult && (
+          <div className="mt-3 rounded-lg border border-gray-700 bg-gray-900 p-3 text-xs text-gray-200">
+            <p>
+              Mobile: <span className="font-semibold">{lookupResult.mobile}</span> | Raw matches:{' '}
+              <span className="font-semibold">{lookupResult.totalRawMatches}</span> | Visible matches:{' '}
+              <span className="font-semibold">{lookupResult.totalVisibleMatches}</span>
+            </p>
+            <div className="mt-2 space-y-1">
+              {(lookupResult.matches || []).map((m) => (
+                <div key={m.id} className="rounded border border-gray-700 px-2 py-1">
+                  <span className="font-semibold">{m.admissionId || m.id}</span> - {m.name || '—'} - {m.mobile || '—'}{' '}
+                  {m.hiddenInVisibleQueue ? <span className="text-amber-300">(hidden in visible queue)</span> : null}
+                </div>
+              ))}
+              {(lookupResult.matches || []).length === 0 ? <p className="text-gray-500">No queue records found for this mobile.</p> : null}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
