@@ -26,6 +26,7 @@ export default function Admission() {
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle') // idle | submitting | success | error
   const [enrollmentResult, setEnrollmentResult] = useState(null)
+  const [showResultModal, setShowResultModal] = useState(false)
   const [courseOpen, setCourseOpen] = useState(false)
   const [courseSearch, setCourseSearch] = useState('')
   const courseBoxRef = useRef(null)
@@ -91,6 +92,7 @@ export default function Admission() {
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.error || 'Failed to submit enrollment')
       setEnrollmentResult(j)
+      setShowResultModal(true)
 
       await fetch(FORM_ENDPOINT, {
         method: 'POST',
@@ -119,90 +121,18 @@ export default function Admission() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-12 sm:px-6 sm:py-16">
+      <h2
+        className="text-center text-4xl font-extrabold uppercase tracking-widest text-cyan-300 sm:text-5xl"
+        style={{
+          textShadow:
+            '0 0 8px rgba(34,211,238,0.95), 0 0 18px rgba(34,211,238,0.8), 0 0 28px rgba(167,139,250,0.7)',
+          animation: 'pulse 1.6s ease-in-out infinite',
+        }}
+      >
+        Signup For Free
+      </h2>
       <h1 className="text-3xl font-bold text-gray-900">Admission / Enrollment</h1>
       <p className="mt-2 text-gray-600">Fill the form below. We'll get in touch soon.</p>
-
-      {status === 'success' && (
-        <div className="mt-6 space-y-4">
-          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-green-800">
-            Thank you! Your enrollment request has been submitted successfully.
-          </div>
-
-          {enrollmentResult?.credentials && (
-            <div className="rounded-xl border-2 border-primary-200 bg-primary-50 p-5 text-gray-900">
-              <h2 className="text-lg font-bold text-primary-900">Your LMS login (save this)</h2>
-              <p className="mt-2 text-sm text-gray-700">
-                Use these to sign in to the student portal. You can log in with <strong>Student ID</strong> or{' '}
-                <strong>mobile number</strong> and the password below.
-              </p>
-              <dl className="mt-4 space-y-2 text-sm">
-                <div>
-                  <dt className="font-medium text-gray-600">Student ID</dt>
-                  <dd className="font-mono text-lg font-bold text-gray-900">{enrollmentResult.credentials.studentId}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-gray-600">Password</dt>
-                  <dd className="font-mono text-lg font-bold text-gray-900">{enrollmentResult.credentials.password}</dd>
-                </div>
-              </dl>
-              <p className="mt-2 text-sm text-gray-700">
-                Admission ID: <span className="font-semibold">{enrollmentResult?.enrollment?.admissionId || '—'}</span>
-              </p>
-              <p className="mt-4 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
-                <strong>Important:</strong> Note this down in a safe place. Change your password after first login in{' '}
-                <strong>Student → Settings</strong>.
-              </p>
-              <Link
-                to="/login"
-                className="mt-4 inline-flex btn-touch rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700"
-              >
-                Go to Login
-              </Link>
-              <a
-                href={WHATSAPP_GROUP_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 ml-0 inline-flex btn-touch rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700 sm:ml-3"
-              >
-                Join Batch Group and Continue
-              </a>
-              <p className="mt-3 text-sm text-gray-700">
-                <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noreferrer" className="font-semibold text-green-700 underline">
-                  Join Our Batch Group to get all class updates
-                </a>
-              </p>
-            </div>
-          )}
-
-          {enrollmentResult?.existingAccount && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900 text-sm">
-              {enrollmentResult.message ||
-                'You already have an account. Log in with your Student ID or mobile number and your password.'}
-              {enrollmentResult.studentId && (
-                <p className="mt-2 font-mono font-semibold">Student ID: {enrollmentResult.studentId}</p>
-              )}
-              <Link to="/login" className="mt-3 inline-block font-semibold text-primary-700 underline">
-                Go to Login
-              </Link>
-              <div className="mt-3">
-                <a
-                  href={WHATSAPP_GROUP_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                >
-                  Join Batch Group and Continue
-                </a>
-              </div>
-              <p className="mt-2">
-                <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noreferrer" className="font-semibold text-green-700 underline">
-                  Join Our Batch Group to get all class updates
-                </a>
-              </p>
-            </div>
-          )}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
         <div>
@@ -429,6 +359,70 @@ export default function Admission() {
       </form>
 
       <p className="mt-4 text-center text-sm text-gray-500">*Terms & Conditions Apply</p>
+
+      {showResultModal && status === 'success' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xl rounded-2xl border border-primary-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-lg font-bold text-primary-900">Admission Submitted Successfully</h2>
+              <button
+                type="button"
+                onClick={() => setShowResultModal(false)}
+                className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {enrollmentResult?.credentials ? (
+              <div className="mt-3">
+                <p className="text-sm text-gray-700">
+                  Use these to sign in to the student portal with <strong>Student ID</strong> or <strong>mobile number</strong>.
+                </p>
+                <dl className="mt-3 space-y-2 text-sm">
+                  <div>
+                    <dt className="font-medium text-gray-600">Student ID</dt>
+                    <dd className="font-mono text-lg font-bold text-gray-900">{enrollmentResult.credentials.studentId}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-600">Password</dt>
+                    <dd className="font-mono text-lg font-bold text-gray-900">{enrollmentResult.credentials.password}</dd>
+                  </div>
+                </dl>
+                <p className="mt-2 text-sm text-gray-700">
+                  Admission ID: <span className="font-semibold">{enrollmentResult?.enrollment?.admissionId || '—'}</span>
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900 text-sm">
+                {enrollmentResult?.message ||
+                  'You already have an account. Log in with your Student ID or mobile number and password.'}
+                {enrollmentResult?.studentId && (
+                  <p className="mt-2 font-mono font-semibold">Student ID: {enrollmentResult.studentId}</p>
+                )}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                to="/login"
+                className="inline-flex btn-touch rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700"
+              >
+                Go to Login
+              </Link>
+              <a
+                href={WHATSAPP_GROUP_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex btn-touch rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
+              >
+                Join Batch Group and Continue
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

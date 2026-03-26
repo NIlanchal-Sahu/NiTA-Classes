@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { hashPassword, getUsers, saveUsers } from '../auth.js'
+import { applyReferralCodeToStudent } from '../referrals.js'
 import {
   generateNitaStudentId,
   defaultPasswordFromPhone,
@@ -196,6 +197,10 @@ router.post('/', (req, res) => {
   }
   users.push(userRecord)
   saveUsers(users)
+  if (next.referralCode) {
+    // Link referral immediately on enrollment creation (without waiting for OTP login flow).
+    applyReferralCodeToStudent({ studentId: authUserId, referralCode: next.referralCode })
+  }
 
   const students = loadJson(STUDENTS_PATH)
   const studentRecord = {

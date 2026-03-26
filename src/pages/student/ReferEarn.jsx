@@ -35,7 +35,7 @@ export default function ReferEarn() {
 
   const shareText = useMemo(() => {
     if (!myCode) return ''
-    return `Join NITA Classes and use my referral code: ${myCode}`
+    return `Join NITA Classes and use my referral code: ${myCode}. Website: https://www.nitaclasses.in`
   }, [myCode])
 
   const waShare = useMemo(() => {
@@ -190,6 +190,24 @@ export default function ReferEarn() {
                   ))}
                   {filteredPayouts.length === 0 && (
                     <div className="text-sm text-gray-600">No payouts yet.</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="text-sm font-semibold text-gray-900">Students enrolled with your referral</div>
+                <div className="mt-3 space-y-2">
+                  {(data?.referredStudents || []).slice(0, 20).map((s) => (
+                    <div key={`${s.id}-${s.joinedAt}`} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">{s.name || 'Student'}</div>
+                        <div className="text-xs text-gray-600">Contact: {s.contact || '—'}</div>
+                      </div>
+                      <div className="text-xs text-gray-500">{String(s.joinedAt || '').slice(0, 10) || '—'}</div>
+                    </div>
+                  ))}
+                  {(data?.referredStudents || []).length === 0 && (
+                    <div className="text-sm text-gray-600">No referred students yet.</div>
                   )}
                 </div>
               </div>

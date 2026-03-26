@@ -151,8 +151,29 @@ export function loginWithPassword(email, password, role) {
   if (!user || user.role !== role) return { ok: false, error: 'Invalid login or role' }
   if (!user.passwordHash) return { ok: false, error: 'Password login not set. Use OTP or set password.' }
   if (!verifyPassword(password, user.passwordHash)) return { ok: false, error: 'Invalid password' }
+  if (user.role === 'student') {
+    // Ensure referral linking also works for password-login users (not only OTP flow).
+    tryApplyLatestReferralFromEnrollment(user)
+  }
   const token = signToken({ userId: user.id, email: user.email, role: user.role })
   return { ok: true, token, user: userToPublic(user) }
+}
+
+function tryApplyLatestReferralFromEnrollment(user) {
+  try {
+    if (!user || user.role !== 'student' || !existsSync(ENROLLMENTS_PATH)) return
+    const list = readJsonSync(ENROLLMENTS_PATH, [])
+    const mobile = String(user.email || '').replace(/\D/g, '')
+    if (!mobile) return
+    const match = list
+      .slice()
+      .reverse()
+      .find((e) => String(e.mobile || '').replace(/\D/g, '').slice(-10) === mobile.slice(-10))
+    const code = match?.referralCode
+    if (code) applyReferralCodeToStudent({ studentId: user.id, referralCode: code })
+  } catch {
+    // ignore referral auto-link errors
+  }
 }
 
 export function requestOtp(email, role) {
@@ -207,23 +228,8 @@ export function verifyOtp(email, otp) {
     saveUsers(users)
   }
 
-  // Auto-apply referral code if present in latest enrollment (mobile-based) and not already linked.
-  try {
-    if (existsSync(ENROLLMENTS_PATH)) {
-      const list = readJsonSync(ENROLLMENTS_PATH, [])
-      const mobile = String(normalized).replace(/\D/g, '')
-      const match = list
-        .slice()
-        .reverse()
-        .find((e) => String(e.mobile || '').replace(/\D/g, '').slice(-10) === mobile.slice(-10))
-      const code = match?.referralCode
-      if (code) {
-        applyReferralCodeToStudent({ studentId: userData.id, referralCode: code })
-      }
-    }
-  } catch {
-    // ignore referral auto-link errors
-  }
+  // Auto-apply referral from admissions queue (mobile-based).
+  tryApplyLatestReferralFromEnrollment({ id: userData.id, email: normalized, role: 'student' })
 
   const token = signToken({ userId: userData.id, email: userData.email, role: userData.role })
   return { ok: true, token, user: userData }

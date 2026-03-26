@@ -1,5 +1,8 @@
 import { Router } from 'express'
 import { verifyToken, getUsers, saveUsers } from '../auth.js'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { readJsonSync } from '../services/sheetsJsonStore.js'
 import {
   getPartners,
   savePartners,
@@ -15,6 +18,8 @@ import {
 } from '../referrals.js'
 
 const router = Router()
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const STUDENTS_PATH = join(__dirname, '..', 'data', 'students.json')
 
 function authRequired(req, res, next) {
   const auth = req.headers.authorization
@@ -87,11 +92,31 @@ router.post('/register', authRequired, studentOnly, (req, res) => {
 })
 
 router.get('/me', authRequired, studentOnly, (req, res) => {
+  const users = getUsers()
+  const academyStudents = readJsonSync(STUDENTS_PATH, [])
   const partners = getPartners()
   const partner = partners.find((p) => p.userId === req.auth.userId) || null
 
   const links = getReferralLinks().filter((l) => l.referrerUserId === req.auth.userId)
   const payouts = getReferralPayouts().filter((p) => p.referrerUserId === req.auth.userId).slice().reverse()
+  const referredStudents = links
+    .map((link) => {
+      const accountUser = users.find((u) => u.id === link.referredStudentId && u.role === 'student') || null
+      const academyStudent =
+        academyStudents.find((s) => String(s.accountUserId || '') === String(link.referredStudentId || '')) || null
+      return {
+        id: String(link.referredStudentId || ''),
+        name: academyStudent?.name || accountUser?.name || 'Student',
+        contact:
+          academyStudent?.phone ||
+          String(accountUser?.email || '')
+            .replace(/\D/g, '')
+            .slice(-10) ||
+          '—',
+        joinedAt: link.createdAt || '',
+      }
+    })
+    .sort((a, b) => String(b.joinedAt || '').localeCompare(String(a.joinedAt || '')))
 
   res.json({
     partner,
@@ -99,6 +124,7 @@ router.get('/me', authRequired, studentOnly, (req, res) => {
       totalReferred: links.length,
       totalPayouts: payouts.reduce((acc, p) => acc + (Number(p.amount) || 0), 0),
     },
+    referredStudents,
     recentPayouts: payouts.slice(0, 12),
   })
 })
