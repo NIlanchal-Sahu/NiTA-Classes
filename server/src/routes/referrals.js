@@ -15,6 +15,8 @@ import {
   generatePartnerCode,
   countClassesForStudentInMonth,
   applyReferralCodeToStudent,
+  getReferralReviewRequests,
+  saveReferralReviewRequests,
 } from '../referrals.js'
 
 const router = Router()
@@ -135,7 +137,52 @@ router.get('/admin/overview', authRequired, adminOnly, (_req, res) => {
     partners: getPartners(),
     links: getReferralLinks(),
     payouts: getReferralPayouts(),
+    reviewRequests: getReferralReviewRequests(),
   })
+})
+
+router.get('/admin/review-requests', authRequired, adminOnly, (_req, res) => {
+  const rows = getReferralReviewRequests().slice().reverse()
+  res.json({ requests: rows })
+})
+
+router.post('/admin/review-requests/:id/approve', authRequired, adminOnly, (req, res) => {
+  const rows = getReferralReviewRequests()
+  const idx = rows.findIndex((r) => r.id === req.params.id)
+  if (idx < 0) return res.status(404).json({ error: 'Review request not found' })
+  const row = rows[idx]
+  if (String(row.status) !== 'pending') return res.status(400).json({ error: 'Request already processed' })
+
+  const out = applyReferralCodeToStudent({ studentId: row.studentId, referralCode: row.referralCode })
+  if (!out.ok && !out.alreadyLinked) {
+    return res.status(400).json({ error: out.error || 'Failed to apply referral code' })
+  }
+
+  rows[idx] = {
+    ...row,
+    status: 'approved',
+    reviewedAt: new Date().toISOString(),
+    reviewedBy: String(req.auth.userId || ''),
+  }
+  saveReferralReviewRequests(rows)
+  res.json({ success: true, request: rows[idx], applyResult: out })
+})
+
+router.post('/admin/review-requests/:id/reject', authRequired, adminOnly, (req, res) => {
+  const rows = getReferralReviewRequests()
+  const idx = rows.findIndex((r) => r.id === req.params.id)
+  if (idx < 0) return res.status(404).json({ error: 'Review request not found' })
+  const row = rows[idx]
+  if (String(row.status) !== 'pending') return res.status(400).json({ error: 'Request already processed' })
+  rows[idx] = {
+    ...row,
+    status: 'rejected',
+    reviewNote: String(req.body?.note || '').trim(),
+    reviewedAt: new Date().toISOString(),
+    reviewedBy: String(req.auth.userId || ''),
+  }
+  saveReferralReviewRequests(rows)
+  res.json({ success: true, request: rows[idx] })
 })
 
 // Admin: run payouts for a month (YYYY-MM). Typically run on 1st for previous month.

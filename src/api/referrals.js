@@ -46,3 +46,32 @@ export async function adminRunPayouts(month) {
   return data
 }
 
+export async function adminGetReviewRequests() {
+  const res = await fetch('/api/student/referrals/admin/review-requests', { headers: authHeaders() })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to load referral review requests')
+  return data
+}
+
+export async function adminApproveReviewRequest(id) {
+  const res = await fetch(`/api/student/referrals/admin/review-requests/${encodeURIComponent(id)}/approve`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({}),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to approve referral request')
+  return data
+}
+
+export async function adminRejectReviewRequest(id, note = '') {
+  const res = await fetch(`/api/student/referrals/admin/review-requests/${encodeURIComponent(id)}/reject`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ note }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to reject referral request')
+  return data
+}
+

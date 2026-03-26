@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { hashPassword, getUsers, saveUsers } from '../auth.js'
-import { applyReferralCodeToStudent } from '../referrals.js'
+import { createReferralReviewRequest } from '../referrals.js'
 import {
   generateNitaStudentId,
   defaultPasswordFromPhone,
@@ -50,13 +50,6 @@ function makeAdmissionId(phone, existing, now = new Date()) {
   return out
 }
 
-function findStudentUserByPhone(phone) {
-  const p = normalizeMobile(phone)
-  return getUsers().find(
-    (u) => u.role === 'student' && normalizeMobile(u.email) === p,
-  )
-}
-
 function isConvertedAdmissionRow(row, students, users, studentEnrollments) {
   const phone = normalizeMobile(row?.mobile)
   if (!phone) return false
@@ -92,6 +85,27 @@ function reconcileAdmissionsQueue() {
   return next
 }
 
+function upsertQueueByMobile(list, entry) {
+  const phone = normalizeMobile(entry?.mobile)
+  const idx = list.findIndex((x) => normalizeMobile(x.mobile) === phone)
+  if (idx < 0) {
+    list.push(entry)
+    return { mode: 'created', enrollment: entry }
+  }
+  const prev = list[idx]
+  const updated = {
+    ...prev,
+    ...entry,
+    id: prev.id || entry.id,
+    admissionId: prev.admissionId || entry.admissionId,
+    createdAt: prev.createdAt || entry.createdAt,
+    updatedAt: new Date().toISOString(),
+    status: 'queued',
+  }
+  list[idx] = updated
+  return { mode: 'updated', enrollment: updated }
+}
+
 router.post('/', (req, res) => {
   const {
     name,
@@ -118,19 +132,10 @@ router.post('/', (req, res) => {
   if (phone.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile is required' })
 
   const list = reconcileAdmissionsQueue()
-  const duplicateInQueue = list.some((x) => normalizeMobile(x.mobile) === phone)
-  if (duplicateInQueue) {
-    return res.status(409).json({
-      error: 'Mobile number already exists in admission queue. Please contact WhatsApp support.',
-    })
-  }
-  const duplicateInStudent = loadJson(STUDENTS_PATH).some((s) => normalizeMobile(s.phone) === phone)
-  const duplicateInUser = getUsers().some((u) => u.role === 'student' && normalizeMobile(u.email) === phone)
-  if (duplicateInStudent || duplicateInUser) {
-    return res.status(409).json({
-      error: 'Mobile number already registered. Please contact WhatsApp support.',
-    })
-  }
+  const users = getUsers()
+  const students = loadJson(STUDENTS_PATH)
+  const existingUser = users.find((u) => u.role === 'student' && normalizeMobile(u.email) === phone) || null
+  const existingStudent = students.find((s) => normalizeMobile(s.phone) === phone) || null
   const now = new Date()
   const admissionId = makeAdmissionId(phone, list, now)
   const next = {
@@ -149,10 +154,52 @@ router.post('/', (req, res) => {
     status: 'queued',
     createdAt: now.toISOString(),
   }
-  list.push(next)
+  const queueWrite = upsertQueueByMobile(list, next)
   saveJson(ENROLLMENTS_PATH, list)
 
-  const users = getUsers()
+  // Existing account path: keep wallet/referrals untouched; only queue request and optional referral review.
+  if (existingUser || existingStudent) {
+    const linkedUserId = String(existingUser?.id || existingStudent?.accountUserId || '')
+    if (next.referralCode && linkedUserId) {
+      createReferralReviewRequest({
+        studentId: linkedUserId,
+        referralCode: next.referralCode,
+        source: 're-enrollment',
+        mobile: phone,
+      })
+    }
+    if (!existingStudent && existingUser) {
+      const recoveryRecord = {
+        id: existingUser.studentId || generateNitaStudentId(users.map((u) => u.studentId).filter(Boolean)),
+        name: String(existingUser.name || name || '').trim(),
+        phone,
+        courseEnrolled: String(courseIds[0] || '').trim(),
+        selectedCourseIds: courseIds,
+        highestQualification: String(highestQualification).trim(),
+        villageCity: String(villageCity).trim(),
+        gender: String(gender).trim(),
+        fatherName: fatherName ? String(fatherName).trim() : '',
+        batchId: '',
+        admissionDate: new Date().toISOString().slice(0, 10),
+        enrollmentFeeStatus: 'pending',
+        accountUserId: existingUser.id,
+        createdAt: new Date().toISOString(),
+      }
+      students.push(recoveryRecord)
+      saveJson(STUDENTS_PATH, students)
+    }
+    return res.json({
+      success: true,
+      existingAccount: true,
+      queueAction: queueWrite.mode,
+      enrollment: queueWrite.enrollment,
+      studentId: String(existingUser?.studentId || existingStudent?.id || ''),
+      walletBalancePreserved: Number(existingUser?.walletBalance || 0),
+      message:
+        'Existing account detected. Wallet balance is preserved. Referral code is sent for admin review.',
+    })
+  }
+
   const studentIds = users.map((u) => u.studentId).filter(Boolean)
   const studentId = generateNitaStudentId(studentIds)
   const plainPassword = defaultPasswordFromPhone(phone)
@@ -171,11 +218,14 @@ router.post('/', (req, res) => {
   users.push(userRecord)
   saveUsers(users)
   if (next.referralCode) {
-    // Link referral immediately on enrollment creation (without waiting for OTP login flow).
-    applyReferralCodeToStudent({ studentId: authUserId, referralCode: next.referralCode })
+    createReferralReviewRequest({
+      studentId: authUserId,
+      referralCode: next.referralCode,
+      source: 'new-enrollment',
+      mobile: phone,
+    })
   }
 
-  const students = loadJson(STUDENTS_PATH)
   const studentRecord = {
     id: studentId,
     name: String(name).trim(),
@@ -197,7 +247,8 @@ router.post('/', (req, res) => {
 
   return res.json({
     success: true,
-    enrollment: next,
+    queueAction: queueWrite.mode,
+    enrollment: queueWrite.enrollment,
     credentials: {
       studentId,
       password: plainPassword,

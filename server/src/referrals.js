@@ -7,6 +7,7 @@ const PARTNERS_PATH = join(__dirname, 'data', 'referrals.json')
 const LINKS_PATH = join(__dirname, 'data', 'referral_links.json')
 const PAYOUTS_PATH = join(__dirname, 'data', 'referral_payouts.json')
 const ATTENDANCE_PATH = join(__dirname, 'data', 'attendance.json')
+const REVIEW_REQUESTS_PATH = join(__dirname, 'data', 'referral_review_requests.json')
 
 function loadJson(path, fallback) {
   return readJsonSync(path, fallback)
@@ -39,6 +40,13 @@ export function saveReferralPayouts(list) {
 
 export function getAttendanceRecords() {
   return loadJson(ATTENDANCE_PATH, [])
+}
+
+export function getReferralReviewRequests() {
+  return loadJson(REVIEW_REQUESTS_PATH, [])
+}
+export function saveReferralReviewRequests(list) {
+  saveJson(REVIEW_REQUESTS_PATH, list)
 }
 
 export function normalizeCode(input) {
@@ -85,5 +93,33 @@ export function applyReferralCodeToStudent({ studentId, referralCode }) {
   })
   saveReferralLinks(links)
   return { ok: true, linked: true, referrerUserId: partner.userId }
+}
+
+export function createReferralReviewRequest({ studentId, referralCode, source = 'enrollment', mobile = '' }) {
+  const code = normalizeCode(referralCode)
+  if (!code || !studentId) return { ok: false, error: 'Missing studentId or referralCode' }
+
+  const links = getReferralLinks()
+  const existingLink = links.find((l) => String(l.referredStudentId) === String(studentId))
+  if (existingLink) return { ok: true, alreadyLinked: true }
+
+  const reqs = getReferralReviewRequests()
+  const idx = reqs.findIndex((r) => String(r.studentId) === String(studentId) && String(r.status) === 'pending')
+  const payload = {
+    id: `rr-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    studentId: String(studentId),
+    referralCode: code,
+    source: String(source || 'enrollment'),
+    mobile: String(mobile || ''),
+    status: 'pending',
+    requestedAt: new Date().toISOString(),
+  }
+  if (idx >= 0) {
+    reqs[idx] = { ...reqs[idx], ...payload, id: reqs[idx].id, requestedAt: reqs[idx].requestedAt }
+  } else {
+    reqs.push(payload)
+  }
+  saveReferralReviewRequests(reqs)
+  return { ok: true, queued: true }
 }
 

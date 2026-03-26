@@ -16,6 +16,7 @@ export default function AdminReferrals() {
   const [month, setMonth] = useState(prevMonthKey())
   const [running, setRunning] = useState(false)
   const [runMsg, setRunMsg] = useState('')
+  const [reviewBusyId, setReviewBusyId] = useState('')
 
   const totals = useMemo(() => {
     const partners = overview?.partners || []
@@ -63,6 +64,33 @@ export default function AdminReferrals() {
     }
   }
 
+  const approveRequest = async (id) => {
+    setReviewBusyId(id)
+    setError('')
+    try {
+      await referralsApi.adminApproveReviewRequest(id)
+      await load()
+    } catch (e) {
+      setError(e.message || 'Approve failed')
+    } finally {
+      setReviewBusyId('')
+    }
+  }
+
+  const rejectRequest = async (id) => {
+    const note = window.prompt('Optional reject note:', '') || ''
+    setReviewBusyId(id)
+    setError('')
+    try {
+      await referralsApi.adminRejectReviewRequest(id, note)
+      await load()
+    } catch (e) {
+      setError(e.message || 'Reject failed')
+    } finally {
+      setReviewBusyId('')
+    }
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-white">Referral Program</h1>
@@ -84,6 +112,73 @@ export default function AdminReferrals() {
             <div className="mt-1 text-sm text-gray-400">{x.t}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white">Referral review requests</h2>
+        <p className="mt-1 text-sm text-gray-400">Approve or reject referral codes submitted in new/re-enrollment.</p>
+        {loading ? (
+          <div className="mt-4 text-gray-400">Loading...</div>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="text-gray-300">
+                <tr>
+                  <th className="px-3 py-3">Requested At</th>
+                  <th className="px-3 py-3">Student</th>
+                  <th className="px-3 py-3">Mobile</th>
+                  <th className="px-3 py-3">Referral Code</th>
+                  <th className="px-3 py-3">Source</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-200 divide-y divide-gray-700">
+                {(overview?.reviewRequests || []).slice().reverse().map((r) => (
+                  <tr key={r.id}>
+                    <td className="px-3 py-3">{String(r.requestedAt || '').slice(0, 10)}</td>
+                    <td className="px-3 py-3">{r.studentId}</td>
+                    <td className="px-3 py-3">{r.mobile || '—'}</td>
+                    <td className="px-3 py-3 font-semibold">{r.referralCode}</td>
+                    <td className="px-3 py-3">{r.source || '—'}</td>
+                    <td className="px-3 py-3">{r.status || 'pending'}</td>
+                    <td className="px-3 py-3">
+                      {r.status === 'pending' ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => approveRequest(r.id)}
+                            disabled={reviewBusyId === r.id}
+                            className="rounded bg-emerald-600 px-2 py-1 text-xs text-white hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => rejectRequest(r.id)}
+                            disabled={reviewBusyId === r.id}
+                            className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-60"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">Reviewed</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {(overview?.reviewRequests || []).length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-4 text-gray-500">
+                      No referral review requests.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
