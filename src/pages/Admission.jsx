@@ -121,16 +121,26 @@ export default function Admission() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-12 sm:px-6 sm:py-16">
-      <h2
-        className="text-center text-4xl font-extrabold uppercase tracking-widest text-cyan-300 sm:text-5xl"
+      <style>{`
+        @keyframes neon-multi {
+          0% { color: #ff4d4f; text-shadow: 0 0 2px rgba(255,77,79,0.9), 0 0 8px rgba(255,77,79,0.45), 0 0 16px rgba(255,77,79,0.25); }
+          14% { color: #ff7a45; text-shadow: 0 0 2px rgba(255,122,69,0.9), 0 0 8px rgba(255,122,69,0.45), 0 0 16px rgba(255,122,69,0.25); }
+          28% { color: #fadb14; text-shadow: 0 0 2px rgba(250,219,20,0.9), 0 0 8px rgba(250,219,20,0.45), 0 0 16px rgba(250,219,20,0.25); }
+          42% { color: #52c41a; text-shadow: 0 0 2px rgba(82,196,26,0.9), 0 0 8px rgba(82,196,26,0.45), 0 0 16px rgba(82,196,26,0.25); }
+          56% { color: #13c2c2; text-shadow: 0 0 2px rgba(19,194,194,0.9), 0 0 8px rgba(19,194,194,0.45), 0 0 16px rgba(19,194,194,0.25); }
+          70% { color: #1677ff; text-shadow: 0 0 2px rgba(22,119,255,0.9), 0 0 8px rgba(22,119,255,0.45), 0 0 16px rgba(22,119,255,0.25); }
+          84% { color: #722ed1; text-shadow: 0 0 2px rgba(114,46,209,0.9), 0 0 8px rgba(114,46,209,0.45), 0 0 16px rgba(114,46,209,0.25); }
+          100% { color: #eb2f96; text-shadow: 0 0 2px rgba(235,47,150,0.9), 0 0 8px rgba(235,47,150,0.45), 0 0 16px rgba(235,47,150,0.25); }
+        }
+      `}</style>
+      <h3
+        className="text-center text-4xl font-extrabold uppercase tracking-widest sm:text-5xl"
         style={{
-          textShadow:
-            '0 0 8px rgba(34,211,238,0.95), 0 0 18px rgba(34,211,238,0.8), 0 0 28px rgba(167,139,250,0.7)',
-          animation: 'pulse 1.6s ease-in-out infinite',
+          animation: 'neon-multi 5.5s linear infinite',
         }}
       >
-        Signup For Free
-      </h2>
+        Enroll For Free
+      </h3>
       <h1 className="text-3xl font-bold text-gray-900">Admission / Enrollment</h1>
       <p className="mt-2 text-gray-600">Fill the form below. We'll get in touch soon.</p>
 

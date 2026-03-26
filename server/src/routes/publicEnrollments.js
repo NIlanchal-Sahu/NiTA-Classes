@@ -92,33 +92,6 @@ function reconcileAdmissionsQueue() {
   return next
 }
 
-function getNextSaturdayIso(baseDate = new Date()) {
-  const d = new Date(baseDate)
-  const day = d.getDay() // 0 Sun .. 6 Sat
-  const daysToSaturday = (6 - day + 7) % 7 || 7
-  d.setDate(d.getDate() + daysToSaturday)
-  return d.toISOString().slice(0, 10)
-}
-
-function ensureTrialEnrollment(studentId) {
-  const enr = loadJson(STUDENT_ENROLLMENTS_PATH)
-  const hasTrial = enr.some((e) => e.studentId === studentId && String(e.courseId) === 'trial-course')
-  if (hasTrial) return
-  enr.push({
-    id: `enr-${Date.now()}-trial`,
-    studentId,
-    courseId: 'trial-course',
-    batchId: '',
-    note: '1 week trial course',
-    isTrial: true,
-    status: 'active',
-    startDate: new Date().toISOString().slice(0, 10),
-    expiresAt: getNextSaturdayIso(),
-    createdAt: new Date().toISOString(),
-  })
-  saveJson(STUDENT_ENROLLMENTS_PATH, enr)
-}
-
 router.post('/', (req, res) => {
   const {
     name,
@@ -208,6 +181,7 @@ router.post('/', (req, res) => {
     name: String(name).trim(),
     phone,
     courseEnrolled: String(courseIds[0] || '').trim(),
+    selectedCourseIds: courseIds,
     highestQualification: String(highestQualification).trim(),
     villageCity: String(villageCity).trim(),
     gender: String(gender).trim(),
@@ -220,8 +194,6 @@ router.post('/', (req, res) => {
   }
   students.push(studentRecord)
   saveJson(STUDENTS_PATH, students)
-
-  ensureTrialEnrollment(studentId)
 
   return res.json({
     success: true,

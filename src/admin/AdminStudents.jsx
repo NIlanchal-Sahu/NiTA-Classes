@@ -76,6 +76,16 @@ export default function AdminStudents() {
     if (!normalizedMobileSearch) return students
     return (students || []).filter((s) => String(s.phone || '').includes(normalizedMobileSearch))
   }, [students, normalizedMobileSearch])
+  const formatCourseNames = (student) => {
+    const ids = Array.isArray(student?.selectedCourseIds)
+      ? student.selectedCourseIds
+      : student?.courseEnrolled
+        ? [student.courseEnrolled]
+        : []
+    if (!ids.length) return '—'
+    return ids.map((id) => courseMap.get(String(id)) || String(id)).join(', ')
+  }
+
   const selectedStudent = useMemo(
     () => (profile?.student ? profile.student : students.find((s) => s.id === selectedId) || null),
     [profile, students, selectedId]
@@ -290,7 +300,7 @@ export default function AdminStudents() {
                   <td className="px-4 py-3 text-sm text-gray-100">{s.id}</td>
                   <td className="px-4 py-3 text-sm text-gray-100">{s.name || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-300">{s.phone || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-300">{courseMap.get(String(s.courseEnrolled || '')) || s.courseEnrolled || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">{formatCourseNames(s)}</td>
                   <td className="px-4 py-3 text-sm text-gray-300">{batchMap.get(String(s.batchId || '')) || s.batchId || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-300">
                     <select
@@ -367,9 +377,9 @@ export default function AdminStudents() {
                       <div className="mt-1 text-sm font-semibold text-white">{selectedStudent?.phone || '—'}</div>
                     </div>
                     <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
-                      <div className="text-xs text-gray-400">Course</div>
+                      <div className="text-xs text-gray-400">Courses Selected (Signup)</div>
                       <div className="mt-1 text-sm font-semibold text-white">
-                        {courseMap.get(String(selectedStudent?.courseEnrolled || '')) || selectedStudent?.courseEnrolled || '—'}
+                        {formatCourseNames(selectedStudent)}
                       </div>
                     </div>
                     <div className="rounded-xl border border-gray-700 bg-gray-900 p-4">
