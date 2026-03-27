@@ -99,6 +99,7 @@ function CourseMultiSelect({ value, onChange, options, placeholder = 'Select cou
 
 export default function AdminEnrollments() {
   const [items, setItems] = useState([])
+  const [recentUnenrolled, setRecentUnenrolled] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -120,6 +121,11 @@ export default function AdminEnrollments() {
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'Failed to load')
       setItems(json.enrollments || [])
+
+      const recentRes = await fetch('/api/admin/enrollments/recent-unenrolled?limit=20', { headers: authHeaders() })
+      const recentJson = await recentRes.json().catch(() => ({}))
+      if (!recentRes.ok) throw new Error(recentJson.error || 'Failed to load recent admissions')
+      setRecentUnenrolled(recentJson.recentUnenrolled || [])
     } catch (e) {
       setError(e.message || 'Failed to load')
     } finally {
@@ -393,6 +399,47 @@ export default function AdminEnrollments() {
               ))}
               {(lookupResult.matches || []).length === 0 ? <p className="text-gray-500">No queue records found for this mobile.</p> : null}
             </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white">Recent Admissions (Not Enrolled to Any Course Yet)</h2>
+        {loading ? (
+          <div className="mt-4 text-gray-400">Loading...</div>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="text-gray-300">
+                <tr>
+                  <th className="px-3 py-3">Student ID</th>
+                  <th className="px-3 py-3">Name</th>
+                  <th className="px-3 py-3">Mobile</th>
+                  <th className="px-3 py-3">Selected Courses</th>
+                  <th className="px-3 py-3">Admission Date</th>
+                  <th className="px-3 py-3">Fee Status</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-200 divide-y divide-gray-700">
+                {(recentUnenrolled || []).map((r) => (
+                  <tr key={r.studentId || `${r.mobile}-${r.admissionDate}`}>
+                    <td className="px-3 py-3">{r.studentId || '—'}</td>
+                    <td className="px-3 py-3">{r.name || '—'}</td>
+                    <td className="px-3 py-3">{r.mobile || '—'}</td>
+                    <td className="px-3 py-3">{(r.selectedCourseIds || []).join(', ') || r.courseEnrolled || '—'}</td>
+                    <td className="px-3 py-3">{r.admissionDate || String(r.createdAt || '').slice(0, 10) || '—'}</td>
+                    <td className="px-3 py-3">{r.enrollmentFeeStatus || 'pending'}</td>
+                  </tr>
+                ))}
+                {(recentUnenrolled || []).length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-4 text-gray-500">
+                      No recent unenrolled admissions found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

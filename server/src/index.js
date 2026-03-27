@@ -21,7 +21,9 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 app.use(cors({ origin: true, credentials: true }))
-app.use(express.json({ limit: '2mb' }))
+// Allow larger JSON payloads for base64 profile photo uploads from admin forms.
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/uploads', express.static(join(__dirname, 'uploads')))
 app.use('/api/auth', authRoutes)
 app.use('/api/student', studentRoutes)

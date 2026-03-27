@@ -53,5 +53,27 @@
     "price": 10,
     "createdAt": "2026-03-17T00:00:00.000Z",
     "migratedFromLegacy": true
+  },
+  {
+    "id": "plus2-it-arts-science-oav",
+    "name": "+2 IT Arts/Science/OAV",
+    "description": "One-year academic support course aligned with school curriculum for +2 Arts/Science/OAV learners. Includes fundamentals of IT, office productivity tools, internet and digital safety, project-based practicals, chapter-wise revision, previous-year question practice, and exam preparation support.",
+    "duration": "1 Year",
+    "status": "active",
+    "priceType": "custom",
+    "price": 999,
+    "createdAt": "2026-03-17T00:00:00.000Z",
+    "migratedFromLegacy": false
+  },
+  {
+    "id": "oav-ict-6th-10th",
+    "name": "OAV - ICT 6th-10th",
+    "description": "One-year ICT foundation program mapped to OAV school curriculum for classes 6th to 10th. Covers digital literacy, typing basics, MS Office, internet research, coding fundamentals, safe technology use, practical lab activities, and class-wise test and assessment support.",
+    "duration": "1 Year",
+    "status": "active",
+    "priceType": "custom",
+    "price": 599,
+    "createdAt": "2026-03-17T00:00:00.000Z",
+    "migratedFromLegacy": false
   }
 ]

@@ -99,6 +99,41 @@ router.get('/', studentAdminAuth, (req, res) => {
   res.json({ enrollments: list.slice().reverse() })
 })
 
+router.get('/recent-unenrolled', studentAdminAuth, (req, res) => {
+  const limitRaw = Number(req.query?.limit)
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 30
+
+  const students = loadJson(STUDENTS_PATH)
+  const studentEnrollments = loadJson(STUDENT_ENROLLMENTS_PATH)
+  const hasNonTrialEnrollment = new Set(
+    studentEnrollments
+      .filter((e) => String(e.courseId || '').trim().toLowerCase() !== 'trial-course')
+      .map((e) => String(e.studentId || ''))
+      .filter(Boolean)
+  )
+
+  const rows = students
+    .filter((s) => !hasNonTrialEnrollment.has(String(s.id || '')))
+    .map((s) => ({
+      studentId: String(s.id || ''),
+      name: String(s.name || ''),
+      mobile: normalizePhone(s.phone),
+      admissionDate: String(s.admissionDate || '').slice(0, 10),
+      createdAt: String(s.createdAt || ''),
+      selectedCourseIds: Array.isArray(s.selectedCourseIds)
+        ? s.selectedCourseIds
+        : s.courseEnrolled
+          ? [s.courseEnrolled]
+          : [],
+      courseEnrolled: String(s.courseEnrolled || ''),
+      enrollmentFeeStatus: String(s.enrollmentFeeStatus || 'pending'),
+    }))
+    .sort((a, b) => String(b.createdAt || b.admissionDate || '').localeCompare(String(a.createdAt || a.admissionDate || '')))
+    .slice(0, limit)
+
+  res.json({ recentUnenrolled: rows })
+})
+
 router.get('/lookup-by-mobile', studentAdminAuth, (req, res) => {
   const phone = normalizePhone(String(req.query?.mobile || ''))
   if (!phone || phone.length !== 10) {

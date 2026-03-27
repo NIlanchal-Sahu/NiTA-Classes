@@ -101,6 +101,42 @@ const COURSE_DETAILS = [
       'Idea To Complete AI Video – LIVE Masterclass',
     ],
   },
+  {
+    id: 'plus2-it-arts-science-oav',
+    name: '+2 IT Arts/Science/OAV',
+    courseHour: '240 Hours',
+    certificationDuration: '1 Year (Academic Session)',
+    enrollmentFees: '999',
+    classFee: 'As per academic batch plan',
+    urgent: 'Structured yearly support as per school timetable',
+    level: 'School Curriculum Support',
+    content: [
+      'Computer fundamentals, digital literacy, and academic IT basics',
+      'Office tools: Word, Excel, PowerPoint, internet, and email practice',
+      'Chapter-wise support for +2 Arts/Science/OAV IT syllabus',
+      'Practical lab activities, assignments, and revision worksheets',
+      'Previous-year question practice and exam-oriented preparation',
+      'Doubt-clearing sessions and monthly progress tracking',
+    ],
+  },
+  {
+    id: 'oav-ict-6th-10th',
+    name: 'OAV - ICT 6th-10th',
+    courseHour: '180 Hours',
+    certificationDuration: '1 Year (School Curriculum Cycle)',
+    enrollmentFees: '599',
+    classFee: 'As per school-support batch plan',
+    urgent: 'Progressive foundation program for middle to secondary classes',
+    level: 'ICT Foundation (Class 6th-10th)',
+    content: [
+      'Digital literacy, computer operation, and safe internet usage',
+      'Typing, file management, and productivity tools (MS Office basics)',
+      'ICT topics aligned with OAV class-wise school curriculum',
+      'Hands-on practical sessions for school lab readiness',
+      'Activity-based learning, quizzes, and chapter tests',
+      'Exam support with concept revision and guided practice',
+    ],
+  },
 ]
 
 export default function Courses() {

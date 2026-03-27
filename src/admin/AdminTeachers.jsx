@@ -39,6 +39,7 @@ export default function AdminTeachers() {
   })
   const [editingTeacher, setEditingTeacher] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [newTeacherCredentials, setNewTeacherCredentials] = useState(null)
   const [attendanceForm, setAttendanceForm] = useState({ teacherId: '', batchId: '', date: new Date().toISOString().slice(0, 10), status: 'present' })
   const [requestForm, setRequestForm] = useState({ batchId: '', date: new Date().toISOString().slice(0, 10), status: 'present', note: '' })
   const [paymentForm, setPaymentForm] = useState({ teacherId: '', batchId: '', date: new Date().toISOString().slice(0, 10), classesCount: 1, rate: '', bonus: 0, note: '' })
@@ -115,7 +116,16 @@ export default function AdminTeachers() {
     setSaving(true)
     setError('')
     try {
-      await academyApi.createTeacher(newTeacher)
+      const plainPassword = String(newTeacher.password || '')
+      const out = await academyApi.createTeacher(newTeacher)
+      const created = out?.teacher || {}
+      setNewTeacherCredentials({
+        teacherId: created.id || '',
+        username: created.username || '',
+        email: created.email || '',
+        mobile: created.mobile || '',
+        password: plainPassword,
+      })
       setNewTeacher({
         name: '',
         mobile: '',
@@ -727,6 +737,52 @@ export default function AdminTeachers() {
           <h2 className="text-lg font-semibold text-white">Teacher Profile</h2>
           <p className="mt-2 text-sm text-gray-300">{selectedTeacher.name} · {selectedTeacher.mobile || 'No mobile'} · {selectedTeacher.email || 'No email'}</p>
           <p className="mt-1 text-xs text-gray-500">Assigned batches can be managed from Batch module.</p>
+        </div>
+      )}
+
+      {newTeacherCredentials && !isTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xl rounded-2xl border border-violet-500/40 bg-gray-900 p-5 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <h3 className="text-lg font-semibold text-white">Teacher Created Successfully</h3>
+              <button
+                type="button"
+                className="rounded px-2 py-1 text-gray-400 hover:bg-gray-800 hover:text-white"
+                onClick={() => setNewTeacherCredentials(null)}
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-gray-300">
+              Share these credentials with the teacher and ask them to change password after first login.
+            </p>
+            <div className="mt-4 rounded-xl border border-gray-700 bg-gray-800 p-4 text-sm text-gray-200">
+              <p><span className="text-gray-400">Teacher ID:</span> <span className="font-semibold">{newTeacherCredentials.teacherId || '—'}</span></p>
+              <p className="mt-1"><span className="text-gray-400">Username:</span> <span className="font-semibold">{newTeacherCredentials.username || '—'}</span></p>
+              <p className="mt-1"><span className="text-gray-400">Email:</span> <span className="font-semibold">{newTeacherCredentials.email || '—'}</span></p>
+              <p className="mt-1"><span className="text-gray-400">Mobile:</span> <span className="font-semibold">{newTeacherCredentials.mobile || '—'}</span></p>
+              <p className="mt-2"><span className="text-gray-400">Password:</span> <span className="font-mono font-semibold">{newTeacherCredentials.password || '—'}</span></p>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                className="rounded bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                onClick={() => {
+                  const txt = `Teacher ID: ${newTeacherCredentials.teacherId}\nUsername: ${newTeacherCredentials.username}\nEmail: ${newTeacherCredentials.email}\nMobile: ${newTeacherCredentials.mobile}\nPassword: ${newTeacherCredentials.password}`
+                  navigator.clipboard?.writeText(txt).catch(() => null)
+                }}
+              >
+                Copy Credentials
+              </button>
+              <button
+                type="button"
+                className="rounded border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
+                onClick={() => setNewTeacherCredentials(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

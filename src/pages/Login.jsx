@@ -124,12 +124,12 @@ export default function Login() {
           <div>
             <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">
               {role === 'admin' || role === 'teacher'
-                ? `${role[0].toUpperCase()}${role.slice(1)} email`
+                ? `${role[0].toUpperCase()}${role.slice(1)} login`
                 : 'Student ID / Mobile / Email'}
             </label>
             <input
               id="login-email"
-              type={role === 'student' ? 'text' : 'email'}
+              type={role === 'admin' ? 'email' : 'text'}
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -138,7 +138,7 @@ export default function Login() {
                 role === 'admin'
                   ? 'Enter admin email'
                   : role === 'teacher'
-                    ? 'Enter teacher email'
+                    ? 'Enter teacher email / username / mobile'
                     : 'e.g. NITA20260321 or 10-digit mobile'
               }
               required

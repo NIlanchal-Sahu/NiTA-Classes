@@ -3,5 +3,7 @@
   { "id": "cca", "name": "CCA (Computer Application - PGDCA / O Level)" },
   { "id": "spoken-english-mastery", "name": "Spoken English Mastery (Advance Level)" },
   { "id": "ai-associate", "name": "Artificial Intelligent Associate (AI Dev with Python)" },
-  { "id": "ai-video-creation", "name": "AI Video Creation Course" }
+  { "id": "ai-video-creation", "name": "AI Video Creation Course" },
+  { "id": "plus2-it-arts-science-oav", "name": "+2 IT Arts/Science/OAV" },
+  { "id": "oav-ict-6th-10th", "name": "OAV - ICT 6th-10th" }
 ]

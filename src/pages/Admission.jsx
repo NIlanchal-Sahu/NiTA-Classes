@@ -8,6 +8,8 @@ const COURSE_OPTIONS = [
   { id: 'spoken-english-mastery', label: 'Spoken English Mastery (Advance Level)' },
   { id: 'ai-associate', label: 'Artificial Intelligent Associate (AI Development Course with Python)' },
   { id: 'ai-video-creation', label: 'AI Video Creation Course' },
+  { id: 'plus2-it-arts-science-oav', label: '+2 IT Arts/Science/OAV (1 Year | Enroll Fee ₹999)' },
+  { id: 'oav-ict-6th-10th', label: 'OAV - ICT 6th-10th (1 Year | Enroll Fee ₹599)' },
 ]
 const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/G5HVGAshx7r7BYnz7PoeRs?mode=gi_t'
 

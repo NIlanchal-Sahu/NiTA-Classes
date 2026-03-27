@@ -50,6 +50,22 @@ const showcase = [
     bgClass: 'from-pink-100 via-rose-100 to-purple-100',
   },
   {
+    id: 'plus2-it',
+    title: '+2 IT Arts/Science/OAV: School Curriculum Support',
+    to: '/courses#plus2-it-arts-science-oav',
+    icon: '📘',
+    visual: '1 Year Academic IT Support',
+    bgClass: 'from-cyan-100 via-sky-100 to-blue-100',
+  },
+  {
+    id: 'oav-ict',
+    title: 'OAV - ICT 6th-10th: Foundation to Exam Readiness',
+    to: '/courses#oav-ict-6th-10th',
+    icon: '🏫',
+    visual: '1 Year ICT School Program',
+    bgClass: 'from-lime-100 via-emerald-100 to-teal-100',
+  },
+  {
     id: 'vvip',
     title: 'VVIP Offer: Unlimited classes for ₹699 / month',
     to: '/student/pay',
@@ -372,7 +388,7 @@ export default function Home() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { k: '₹10', t: 'Per class fee' },
-              { k: '5', t: 'Comprehensive courses' },
+              { k: '7', t: 'Comprehensive courses' },
               { k: '45 Days', t: 'Urgent certification (DCA/CCA/AI Associate)' },
               { k: '₹699', t: 'VVIP Unlimited Classes (1 month)' },
             ].map((x) => (

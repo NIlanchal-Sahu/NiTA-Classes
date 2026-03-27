@@ -64,6 +64,20 @@ export function findUserByEmail(email) {
   return getUsers().find((u) => String(u.email || '').toLowerCase() === normalized) || null
 }
 
+function findTeacherByLogin(identifier) {
+  const normalized = normalizeIdentifier(identifier)
+  const users = getUsers()
+  return (
+    users.find((u) => {
+      if (u.role !== 'teacher') return false
+      const email = String(u.email || '').toLowerCase()
+      const username = String(u.username || '').toLowerCase()
+      const mobile = String(u.mobile || '').replace(/\D/g, '')
+      return email === normalized || username === normalized || mobile === normalized
+    }) || null
+  )
+}
+
 /** Student: login with 10-digit phone, email, or Student ID (NITA…). Admin/Teacher: email only. */
 export function findUserByLogin(identifier) {
   const raw = String(identifier || '').trim()
@@ -146,7 +160,12 @@ function userToPublic(user) {
 }
 
 export function loginWithPassword(email, password, role) {
-  const user = role === 'student' ? findUserByLogin(email) : findUserByEmail(email)
+  const user =
+    role === 'student'
+      ? findUserByLogin(email)
+      : role === 'teacher'
+        ? findTeacherByLogin(email)
+        : findUserByEmail(email)
   if (!user || user.role !== role) return { ok: false, error: 'Invalid login or role' }
   if (!user.passwordHash) return { ok: false, error: 'Password login not set. Use OTP or set password.' }
   if (!verifyPassword(password, user.passwordHash)) return { ok: false, error: 'Invalid password' }
@@ -158,9 +177,14 @@ export function requestOtp(email, role) {
   const rawInput = String(email || '').trim()
   const normalized = normalizeIdentifier(rawInput)
   const users = getUsers()
-  let user = role === 'student' ? findUserByLogin(rawInput) : findUserByEmail(rawInput)
+  let user =
+    role === 'student'
+      ? findUserByLogin(rawInput)
+      : role === 'teacher'
+        ? findTeacherByLogin(rawInput)
+        : findUserByEmail(rawInput)
   if (role === 'admin' || role === 'teacher') {
-    if (!user || user.role !== role) return { ok: false, error: `No ${role} account with this email` }
+    if (!user || user.role !== role) return { ok: false, error: `No ${role} account with this login` }
   } else {
     if (!user) {
       user = { id: `student-${Date.now()}`, email: normalized, role: 'student', name: normalized.split('@')[0] }
