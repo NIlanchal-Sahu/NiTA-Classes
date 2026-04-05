@@ -64,7 +64,10 @@ export default function DashboardHome() {
 
   const name = user?.name || user?.email?.split('@')[0] || 'Student'
   const profileBatchId = profile?.student?.batchId || ''
-  const displayBatchName = coursesData?.assignedBatch?.name || coursesData?.assignedBatch?.title || profileBatchId || '—'
+  const displayBatchName =
+    coursesData?.assignedBatches?.length > 0
+      ? coursesData.assignedBatches.map((b) => b.name || b.title).filter(Boolean).join(', ')
+      : coursesData?.assignedBatch?.name || coursesData?.assignedBatch?.title || profileBatchId || '—'
   const batchGroupUrl =
     coursesData?.assignedBatch?.whatsappGroupLink ||
     coursesData?.assignedBatch?.batchGroupLink ||

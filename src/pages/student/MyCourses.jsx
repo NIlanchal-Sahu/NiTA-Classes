@@ -7,9 +7,13 @@ export default function MyCourses() {
   const [batches, setBatches] = useState([])
   const [student, setStudent] = useState(null)
   const [assignedBatch, setAssignedBatch] = useState(null)
+  const [assignedBatches, setAssignedBatches] = useState([])
   const [loading, setLoading] = useState(false)
   const courseNames = courses.map((c) => c.name).filter(Boolean)
-  const primaryBatchName = assignedBatch?.name || assignedBatch?.title || student?.batchId || '—'
+  const batchLabel =
+    assignedBatches.length > 0
+      ? assignedBatches.map((b) => b.name || b.title).filter(Boolean).join(', ')
+      : assignedBatch?.name || assignedBatch?.title || student?.batchId || '—'
 
   useEffect(() => {
     ;(async () => {
@@ -20,6 +24,7 @@ export default function MyCourses() {
         setBatches(out.upcomingBatches || [])
         setStudent(out.student || null)
         setAssignedBatch(out.assignedBatch || null)
+        setAssignedBatches(Array.isArray(out.assignedBatches) ? out.assignedBatches : [])
       } catch {
         // silent
       } finally {
@@ -35,15 +40,17 @@ export default function MyCourses() {
 
       <div className="mt-4 rounded-xl border border-gray-700 bg-gray-800 p-4 text-sm text-gray-300">
         Course Name: <span className="text-white">{courseNames.join(', ') || '—'}</span> · Batch Name:{' '}
-        <span className="text-white">{primaryBatchName}</span>
-        {assignedBatch && (
-          <div className="mt-2 text-gray-400">
-            Timing: <span className="text-white">{assignedBatch.timing || '—'}</span> · Teacher:{' '}
+        <span className="text-white">{batchLabel}</span>
+        {(assignedBatches.length ? assignedBatches : assignedBatch ? [assignedBatch] : []).map((b) => (
+          <div key={b.id} className="mt-2 text-gray-400">
+            <span className="text-white font-medium">{b.name || b.id}</span>
+            {' · '}
+            Timing: <span className="text-white">{b.timing || '—'}</span> · Teacher:{' '}
             <span className="text-white">
-              {(assignedBatch.teacherIds || [assignedBatch.teacherId]).filter(Boolean).join(', ') || '—'}
+              {(b.teacherIds || [b.teacherId]).filter(Boolean).join(', ') || '—'}
             </span>
           </div>
-        )}
+        ))}
       </div>
 
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

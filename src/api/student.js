@@ -94,6 +94,12 @@ export async function postStudentProfileUpload(formData) {
   return data
 }
 
+/** Public: optional Drive URLs for wallet QR images (no auth). */
+export async function getWalletQrConfig() {
+  const res = await fetch(`${API_BASE}/portal/wallet-qr-config`)
+  return res.json().catch(() => ({}))
+}
+
 export const studentPortalApi = {
   getProfile: () => portalGet('profile'),
   getClaimOptions: () => portalGet('claim-options'),
@@ -118,6 +124,7 @@ export const studentPortalApi = {
   notifyPaymentAttempt: (body) => portalPost('payment-attempt', body),
   getNotifications: () => portalGet('notifications'),
   markNotificationsRead: (ids) => portalPost('notifications/mark-read', { ids }),
+  getWalletQrConfig,
   getStudentProfileDetails: () => portalGet('student-profile'),
   updateStudentProfileDetails: (body) => portalPut('student-profile', body),
   uploadStudentProfileFiles: (formData) => postStudentProfileUpload(formData),

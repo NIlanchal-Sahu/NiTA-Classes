@@ -8,6 +8,11 @@ const router = Router()
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const NOTIFICATIONS_PATH = join(__dirname, '..', 'data', 'notifications.json')
+const STUDENT_NOTIFICATIONS_PATH = join(__dirname, '..', 'data', 'student_notifications.json')
+const USERS_PATH = join(__dirname, '..', 'data', 'users.json')
+const STUDENTS_PATH = join(__dirname, '..', 'data', 'students.json')
+const BATCHES_PATH = join(__dirname, '..', 'data', 'academy_batches.json')
+const ENROLLMENTS_PATH = join(__dirname, '..', 'data', 'student_enrollments.json')
 
 function adminAuth(req, res, next) {
   const auth = req.headers.authorization
@@ -26,6 +31,69 @@ function loadJson() {
 
 function saveJson(data) {
   writeJsonSync(NOTIFICATIONS_PATH, data)
+}
+
+function normCourseId(id) {
+  return String(id || '').trim().toLowerCase()
+}
+
+function pushPortalNotificationsForAdminBroadcast({ title, message, courseId, batchId, sendTo }) {
+  const users = readJsonSync(USERS_PATH, [])
+  const students = readJsonSync(STUDENTS_PATH, [])
+  const batches = readJsonSync(BATCHES_PATH, [])
+  const enrollments = readJsonSync(ENROLLMENTS_PATH, [])
+  const stuRows = readJsonSync(STUDENT_NOTIFICATIONS_PATH, [])
+  const cid = courseId ? normCourseId(courseId) : ''
+  const bid = batchId ? String(batchId) : ''
+  const st = sendTo ? String(sendTo) : 'all-students'
+
+  const text = [title, message].filter(Boolean).join('\n\n')
+  let targets = new Set()
+
+  if (st === 'all-students') {
+    for (const u of users) {
+      if (u.role === 'student' && u.id) targets.add(u.id)
+    }
+  } else if (st === 'course' && cid) {
+    for (const e of enrollments) {
+      if (normCourseId(e.courseId) !== cid) continue
+      const stu = students.find((s) => s.id === e.studentId)
+      if (stu?.accountUserId) targets.add(stu.accountUserId)
+    }
+    for (const b of batches) {
+      if (normCourseId(b.courseId) !== cid) continue
+      for (const sid of b.studentIds || []) {
+        const stu = students.find((x) => x.id === sid)
+        if (stu?.accountUserId) targets.add(stu.accountUserId)
+      }
+    }
+  }
+
+  if (bid) {
+    const b = batches.find((x) => String(x.id) === bid)
+    const allowed = new Set()
+    for (const sid of b?.studentIds || []) {
+      const stu = students.find((x) => x.id === sid)
+      if (stu?.accountUserId) allowed.add(stu.accountUserId)
+    }
+    targets = new Set([...targets].filter((uid) => allowed.has(uid)))
+  }
+
+  const now = new Date().toISOString()
+  for (const userId of targets) {
+    stuRows.push({
+      id: `stu-notif-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      userId,
+      title: String(title || ''),
+      message: text,
+      read: false,
+      popup: true,
+      fromAdmin: true,
+      type: 'admin_broadcast',
+      createdAt: now,
+    })
+  }
+  writeJsonSync(STUDENT_NOTIFICATIONS_PATH, stuRows)
 }
 
 // MVP: admin can queue a notification (WhatsApp message template).
@@ -51,6 +119,11 @@ router.post('/', adminAuth, (req, res) => {
   }
   list.push(next)
   saveJson(list)
+  try {
+    pushPortalNotificationsForAdminBroadcast({ title, message, courseId, batchId, sendTo })
+  } catch (e) {
+    console.warn('[notifications] student portal push failed:', e.message)
+  }
   res.json({ success: true, notification: next })
 })
 

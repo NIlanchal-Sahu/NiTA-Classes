@@ -48,14 +48,21 @@ const COURSE_DETAILS = [
     classFee: '10/class',
     urgent: 'Urgent Complete in 30 Days',
     level: 'Communication & Speaking Focus',
+    intro:
+      '90 din mein achhi English — bilkul basic se advanced tak. Grammar rules mein uljhe bina, easily bolna. Odia aur Hindi mein samjhaakar padhaaya jaata hai.',
     content: [
-      'From ABCD to Advanced Sentence Making',
-      'Vocabulary',
-      'Confidence Building',
-      'Colocations',
-      'English Presentation',
-      'Talking to Stranger (Online App)',
-      'Group Discussion',
+      'Bilkul basic se lekar advanced level tak poori training',
+      'English words bolne ka sahi tarika',
+      'Sentences banana — bina grammar rules mein uljhe',
+      'Do, Does, Has, Have, Had — easily',
+      'Introduction English mein kaise dein',
+      'English mein sawal aur jawab',
+      'Request, order, invitation, salaah dena',
+      'Kisi se kaam karwane wali baat kaise bolein',
+      'Could, Would, Should ka sahi use',
+      'Common mistakes theek karna aur confidence badhana',
+      'If wale conditional sentences',
+      'Tenses, Active–Passive, Narration, Causative verbs — roz-marra mein use',
     ],
   },
   {
@@ -222,6 +229,12 @@ export default function Courses() {
                   </p>
                   <p className="mt-1 text-sm text-red-600 font-medium">{course.urgent}</p>
                 </div>
+
+                {course.intro && (
+                  <p className="mt-5 rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm leading-relaxed text-gray-800">
+                    {course.intro}
+                  </p>
+                )}
 
                 <h3 className="mt-5 text-sm font-semibold text-gray-700">Course Content</h3>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-gray-600">

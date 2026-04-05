@@ -7,6 +7,39 @@ const MODE_OPTIONS = [
   { value: 'self-paced', label: 'Self-Paced (App-based)' },
 ]
 
+function formatTimingRange(start, end) {
+  if (!start || !end) return ''
+  const fmt = (t) => {
+    const parts = String(t).split(':')
+    const h = Number(parts[0])
+    const m = Number(parts[1]) || 0
+    if (Number.isNaN(h)) return t
+    const d = new Date()
+    d.setHours(h, m, 0, 0)
+    return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+  return `${fmt(start)} – ${fmt(end)}`
+}
+
+function parseTimingToTimes(timingStr) {
+  const s = String(timingStr || '').trim()
+  if (!s) return { start: '', end: '' }
+  const parts = s.split(/\s*[–—-]\s*/)
+  if (parts.length < 2) return { start: '', end: '' }
+  const tryParse = (chunk) => {
+    const x = chunk.trim()
+    const tryDate = new Date(`1970-01-01 ${x}`)
+    if (!Number.isNaN(tryDate.getTime())) return tryDate.toTimeString().slice(0, 5)
+    return ''
+  }
+  return { start: tryParse(parts[0]) || '', end: tryParse(parts[1]) || '' }
+}
+
+function displayTiming(t) {
+  if (!t) return '—'
+  return String(t).replace(/\s*-\s*/g, ' – ').replace(/\s+/g, ' ').trim()
+}
+
 function lifecycleStatus(batch) {
   const manual = String(batch?.status || '').toLowerCase()
   if (manual === 'completed' || manual === 'cancelled') return manual
@@ -40,7 +73,8 @@ export default function AdminBatches() {
   const [form, setForm] = useState({
     name: '',
     courseId: '',
-    timing: '',
+    timingStart: '',
+    timingEnd: '',
     mode: 'online',
     startDate: '',
     endDate: '',
@@ -93,11 +127,16 @@ export default function AdminBatches() {
     setSubmitting(true)
     setError('')
     try {
+      const timing = formatTimingRange(form.timingStart, form.timingEnd)
+      if (!timing) {
+        setError('Choose class start and end time (both fields).')
+        return
+      }
       await academyApi.createBatch({
         name: form.name,
         monthYear: form.startDate ? form.startDate.slice(0, 7) : '',
         courseId: form.courseId,
-        timing: form.timing,
+        timing,
         mode: form.mode,
         startDate: form.startDate,
         endDate: form.endDate,
@@ -107,7 +146,8 @@ export default function AdminBatches() {
       setForm({
         name: '',
         courseId: '',
-        timing: '',
+        timingStart: '',
+        timingEnd: '',
         mode: 'online',
         startDate: '',
         endDate: '',
@@ -127,10 +167,13 @@ export default function AdminBatches() {
   const startEdit = (it) => {
     setEditingId(it.id)
     setEditStudentSearch('')
+    const tr = parseTimingToTimes(it.timing)
     setEditing({
       name: it.name || '',
       courseId: it.courseId || '',
       timing: it.timing || '',
+      timingStart: tr.start,
+      timingEnd: tr.end,
       mode: it.mode || 'online',
       startDate: String(it.startDate || '').slice(0, 10),
       endDate: String(it.endDate || '').slice(0, 10),
@@ -145,10 +188,16 @@ export default function AdminBatches() {
     setSubmitting(true)
     setError('')
     try {
+      const timing =
+        formatTimingRange(editing.timingStart, editing.timingEnd) || editing.timing
+      if (!timing) {
+        setError('Choose class start and end time, or keep a valid timing text.')
+        return
+      }
       await academyApi.updateBatch(id, {
         name: editing.name,
         courseId: editing.courseId,
-        timing: editing.timing,
+        timing,
         mode: editing.mode,
         startDate: editing.startDate,
         endDate: editing.endDate,
@@ -213,16 +262,33 @@ export default function AdminBatches() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300">Timing</label>
-            <input className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={form.timing} onChange={(e) => setForm((p) => ({ ...p, timing: e.target.value }))} placeholder="7:00 PM - 8:00 PM" required />
-          </div>
-          <div>
             <label className="block text-sm font-medium text-gray-300">Start Date</label>
             <input type="date" className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} required />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300">End Date</label>
             <input type="date" className="mt-1 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} required />
+          </div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="block text-sm font-medium text-gray-300">Class time (start – end)</label>
+            <p className="mt-0.5 text-xs text-gray-500">Pick start and end; stored in a consistent 12-hour format.</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                type="time"
+                className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                value={form.timingStart}
+                onChange={(e) => setForm((p) => ({ ...p, timingStart: e.target.value }))}
+                required
+              />
+              <span className="text-gray-500">to</span>
+              <input
+                type="time"
+                className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                value={form.timingEnd}
+                onChange={(e) => setForm((p) => ({ ...p, timingEnd: e.target.value }))}
+                required
+              />
+            </div>
           </div>
           <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-gray-300">Teachers (multiple)</label>
@@ -329,17 +395,34 @@ export default function AdminBatches() {
                       <td className="px-3 py-3" colSpan={9}>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                           <input className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={editing.name} onChange={(e) => setEditing((p) => ({ ...p, name: e.target.value }))} />
+                          <select className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={editing.mode} onChange={(e) => setEditing((p) => ({ ...p, mode: e.target.value }))}>
+                            {MODE_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                          </select>
                           <select className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={editing.courseId} onChange={(e) => setEditing((p) => ({ ...p, courseId: e.target.value }))}>
                             <option value="">Select course</option>
                             {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
-                          <select className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={editing.mode} onChange={(e) => setEditing((p) => ({ ...p, mode: e.target.value }))}>
-                            {MODE_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                          </select>
-                          <input className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={editing.timing} onChange={(e) => setEditing((p) => ({ ...p, timing: e.target.value }))} />
                           <input type="date" className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={editing.startDate} onChange={(e) => setEditing((p) => ({ ...p, startDate: e.target.value }))} />
                           <input type="date" className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white" value={editing.endDate} onChange={(e) => setEditing((p) => ({ ...p, endDate: e.target.value }))} />
-                          <div className="rounded-lg border border-gray-700 bg-gray-900 p-2 sm:col-span-2">
+                          <div className="sm:col-span-2 lg:col-span-3">
+                            <p className="text-xs text-gray-400">Class time</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <input
+                                type="time"
+                                className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                                value={editing.timingStart || ''}
+                                onChange={(e) => setEditing((p) => ({ ...p, timingStart: e.target.value }))}
+                              />
+                              <span className="text-gray-500">to</span>
+                              <input
+                                type="time"
+                                className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"
+                                value={editing.timingEnd || ''}
+                                onChange={(e) => setEditing((p) => ({ ...p, timingEnd: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-gray-700 bg-gray-900 p-2 sm:col-span-2 lg:col-span-3">
                             <p className="mb-1 text-xs text-gray-400">Teachers (multiple)</p>
                             <div className="max-h-28 overflow-auto">
                               {teachers.map((t) => {
@@ -402,7 +485,7 @@ export default function AdminBatches() {
                       </td>
                       <td className="px-3 py-3">{it.courseId}</td>
                       <td className="px-3 py-3">{it.mode || 'online'}</td>
-                      <td className="px-3 py-3">{it.timing}</td>
+                      <td className="px-3 py-3">{displayTiming(it.timing)}</td>
                       <td className="px-3 py-3">{(it.teacherNames || it.teacherIds || [it.teacherId]).filter(Boolean).join(', ') || 'NILanchal25'}</td>
                       <td className="px-3 py-3">{it.startDate || '—'} / {it.endDate || '—'}</td>
                       <td className="px-3 py-3">{it.batchSize ?? (it.studentIds?.length || 0)}</td>

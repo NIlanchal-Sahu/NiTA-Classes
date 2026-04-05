@@ -3,6 +3,11 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { verifyToken, adminResetStudentPassword, adminResetAdminPassword, hashPassword } from '../auth.js'
 import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
+import {
+  isGoogleDriveReady,
+  ensurePaymentReceiptsFolder,
+  uploadDataUrlToDrive,
+} from '../services/googleProfileSync.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -210,6 +215,84 @@ function createTeacherNameMap(users) {
   // Requested default teacher when no assignment exists.
   out['NILanchal25'] = out['NILanchal25'] || 'NILanchal25'
   return out
+}
+
+function digitsOnly(input) {
+  return String(input || '').replace(/\D/g, '')
+}
+
+/** Academy student linked to auth user (for fees display / automation). */
+function resolveAcademyStudentFromAuthUserId(authUserId) {
+  const users = loadJson(PATHS.users, [])
+  const students = loadJson(PATHS.students, [])
+  const u = users.find((x) => x.id === authUserId)
+  if (!u) return { user: null, student: null }
+  let stu = students.find((s) => String(s.accountUserId) === String(authUserId))
+  if (!stu) {
+    const ed = digitsOnly(u.email).slice(-10)
+    if (ed.length >= 10) {
+      stu = students.find((s) => digitsOnly(s.phone).slice(-10) === ed) || null
+    }
+  }
+  if (!stu && u.name) {
+    const lower = String(u.name || '').toLowerCase()
+    stu = students.find((s) => String(s.name || '').toLowerCase() === lower) || null
+  }
+  return { user: u, student: stu }
+}
+
+function getStudentBatchIds(s) {
+  if (!s) return []
+  const legacy = s.batchId ? [String(s.batchId)] : []
+  const extra = Array.isArray(s.batchIds) ? s.batchIds.map(String) : []
+  return [...new Set([...extra, ...legacy].filter(Boolean))]
+}
+
+function addStudentToBatchMembership(student, batchId) {
+  const id = String(batchId || '')
+  if (!student || !id) return
+  if (!Array.isArray(student.batchIds)) {
+    student.batchIds = student.batchId ? [String(student.batchId)] : []
+  }
+  if (!student.batchIds.includes(id)) student.batchIds.push(id)
+  student.batchId = id
+}
+
+function removeStudentFromBatchMembership(student, batchId) {
+  const id = String(batchId || '')
+  if (!student || !id) return
+  student.batchIds = (Array.isArray(student.batchIds) ? student.batchIds : []).filter((x) => String(x) !== id)
+  if (String(student.batchId) === id) {
+    student.batchId = student.batchIds.length ? student.batchIds[student.batchIds.length - 1] : ''
+  }
+}
+
+function batchMemberCount(students, batchId) {
+  const bid = String(batchId || '')
+  return students.filter((s) => getStudentBatchIds(s).includes(bid)).length
+}
+
+/** Map batch teacher slot (id or legacy username) to users.json teacher id. */
+function resolveTeacherUserIdForAutomation(candidateId, users) {
+  const teachers = users.filter((u) => u.role === 'teacher' && String(u.status || 'active').toLowerCase() !== 'inactive')
+  const raw = String(candidateId || '').trim()
+  if (raw) {
+    let t = teachers.find((u) => String(u.id) === raw)
+    if (t) return t.id
+    const lower = raw.toLowerCase()
+    t = teachers.find((u) => String(u.username || '').toLowerCase() === lower)
+    if (t) return t.id
+    if (lower === 'nilanchal25' || raw === 'NILanchal25') {
+      t = teachers.find((u) => String(u.name || '').toLowerCase().includes('nilanchal'))
+      if (t) return t.id
+    }
+  }
+  const envId = process.env.DEFAULT_TEACHER_USER_ID
+  if (envId) {
+    const t = teachers.find((u) => String(u.id) === String(envId))
+    if (t) return t.id
+  }
+  return teachers[0]?.id || ''
 }
 
 function uniqueStudentIdsByPhone(studentIds, students) {
@@ -1232,7 +1315,7 @@ router.get('/batches', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
     teacherNames: normalizeTeacherIds(b.teacherIds?.length ? b.teacherIds : b.teacherId || 'NILanchal25').map(
       (id) => teacherNameMap[id] || id
     ),
-    batchSize: students.filter((s) => s.batchId === b.id).length,
+    batchSize: batchMemberCount(students, b.id),
   }))
   res.json({ batches: withSize.slice().reverse() })
 })
@@ -1331,10 +1414,10 @@ router.put('/batches/:id', auth, allowRoles(['admin', 'teacher']), (req, res) =>
   if (hasStudentIdsUpdate) {
     for (const s of students) {
       if (nextSet.has(s.id)) {
-        s.batchId = nextBatch.id
+        addStudentToBatchMembership(s, nextBatch.id)
         if (!s.courseEnrolled) s.courseEnrolled = String(nextBatch.courseId || s.courseEnrolled || '')
-      } else if (s.batchId === nextBatch.id && removedStudentIds.includes(s.id)) {
-        s.batchId = ''
+      } else if (removedStudentIds.includes(s.id)) {
+        removeStudentFromBatchMembership(s, nextBatch.id)
       }
     }
     saveJson(PATHS.students, students)
@@ -1571,7 +1654,16 @@ router.post('/fees/payments', auth, allowRoles(['admin']), (req, res) => {
 
 router.get('/fees/payment-requests', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
   const requests = loadJson(PATHS.paymentRequests, [])
-  res.json({ requests: requests.slice().reverse() })
+  const users = loadJson(PATHS.users, [])
+  const students = loadJson(PATHS.students, [])
+  const enriched = requests.map((r) => {
+    const { user: u, student: stu } = resolveAcademyStudentFromAuthUserId(r.authUserId)
+    const name = stu?.name || u?.name || '—'
+    const phone = stu?.phone || u?.mobile || u?.email || '—'
+    const viewUrl = r.receiptDriveUrl || r.screenshot || ''
+    return { ...r, studentName: name, studentPhone: phone, studentAcademyId: stu?.id || '', receiptViewUrl: viewUrl }
+  })
+  res.json({ requests: enriched.slice().reverse() })
 })
 
 router.get('/admin-alerts', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
@@ -1579,30 +1671,139 @@ router.get('/admin-alerts', auth, allowRoles(['admin', 'teacher']), (_req, res) 
   res.json({ alerts: alerts.slice().reverse() })
 })
 
-router.post('/fees/payment-requests/:id/approve', auth, allowRoles(['admin']), (req, res) => {
+router.post('/fees/payment-requests/:id/approve', auth, allowRoles(['admin']), async (req, res) => {
   const requests = loadJson(PATHS.paymentRequests, [])
   const idx = requests.findIndex((r) => r.id === req.params.id)
   if (idx < 0) return res.status(404).json({ error: 'Payment request not found' })
   if (requests[idx].status === 'approved') return res.json({ success: true, request: requests[idx] })
 
-  requests[idx].status = 'approved'
-  requests[idx].approvedAt = new Date().toISOString()
-  requests[idx].approvedBy = req.auth.userId
-  saveJson(PATHS.paymentRequests, requests)
+  const row = requests[idx]
+  const credited = Number(row.amount) || 0
+  const payDate = parseDate(row.createdAt || new Date().toISOString())
+
+  row.status = 'approved'
+  row.approvedAt = new Date().toISOString()
+  row.approvedBy = req.auth.userId
 
   const users = loadJson(PATHS.users, [])
-  const u = users.find((x) => x.id === requests[idx].authUserId && x.role === 'student')
-  const credited = Number(requests[idx].amount) || 0
+  const u = users.find((x) => x.id === row.authUserId && x.role === 'student')
   if (u) {
     u.walletBalance = (Number(u.walletBalance) || 0) + credited
     saveJson(PATHS.users, users)
   }
+
+  const { student: academyStudent } = resolveAcademyStudentFromAuthUserId(row.authUserId)
+
+  const fees = loadJson(PATHS.fees, [])
+  const alreadyFee = fees.some((f) => f.paymentRequestId === row.id)
+  if (academyStudent && credited > 0 && !alreadyFee) {
+    const modeLabel = String(row.mode || '').toLowerCase().includes('cash') ? 'cash' : 'upi'
+    fees.push({
+      id: `fee-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+      studentId: String(academyStudent.id),
+      amount: credited,
+      date: payDate,
+      mode: modeLabel,
+      feeStatus: 'paid',
+      note: `Wallet top-up (approved request ${row.id})`,
+      paymentRequestId: row.id,
+      source: 'wallet_topup_request',
+      createdAt: new Date().toISOString(),
+    })
+    saveJson(PATHS.fees, fees)
+  }
+
+  if (String(row.screenshot || '').startsWith('data:') && isGoogleDriveReady()) {
+    try {
+      const folderId = await ensurePaymentReceiptsFolder()
+      if (folderId) {
+        const ext = String(row.screenshot).includes('image/png') ? 'png' : 'jpg'
+        const link = await uploadDataUrlToDrive(row.screenshot, `receipt-${row.id}.${ext}`, folderId)
+        if (link) {
+          row.receiptDriveUrl = link
+          row.screenshot = ''
+        }
+      }
+    } catch (e) {
+      console.warn('[academy] Drive receipt upload failed:', e.message)
+    }
+  }
+
+  if (academyStudent && credited > 0) {
+    const batches = loadJson(PATHS.batches, [])
+    const batchIds = getStudentBatchIds(academyStudent)
+    let batch =
+      batchIds.map((bid) => batches.find((b) => String(b.id) === String(bid))).find(Boolean) || null
+    if (!batch) {
+      batch = batches.find((b) => Array.isArray(b.studentIds) && b.studentIds.includes(academyStudent.id)) || null
+    }
+    if (batch) {
+      const teacherSlot = normalizeTeacherIds(batch.teacherIds?.length ? batch.teacherIds : batch.teacherId || '')[0] || 'NILanchal25'
+      const teacherUserId = resolveTeacherUserIdForAutomation(teacherSlot, users)
+      if (teacherUserId) {
+        const tch = users.find((x) => x.role === 'teacher' && String(x.id) === String(teacherUserId))
+        const attList = loadJson(PATHS.teacherAttendance, [])
+        const payList = loadJson(PATHS.teacherPayments, [])
+        const d = payDate
+        const hasAtt = attList.some(
+          (a) =>
+            String(a.teacherId) === String(teacherUserId) &&
+            String(a.batchId) === String(batch.id) &&
+            String(a.date) === d &&
+            String(a.status) === 'present'
+        )
+        if (!hasAtt) {
+          attList.push({
+            id: `tatt-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            teacherId: String(teacherUserId),
+            batchId: String(batch.id),
+            courseId: String(batch.courseId || ''),
+            date: d,
+            status: 'present',
+            markedBy: 'system:wallet-approval',
+            note: 'Auto-marked when student wallet payment was approved',
+            createdAt: new Date().toISOString(),
+          })
+          saveJson(PATHS.teacherAttendance, attList)
+        }
+        const payDupSameDay = payList.some(
+          (p) =>
+            String(p.teacherId) === String(teacherUserId) && String(p.batchId) === String(batch.id) && String(p.date) === d
+        )
+        const payDupThisRequest = payList.some((p) => String(p.note || '').includes(`wallet-approval:${row.id}`))
+        if (!payDupSameDay && !payDupThisRequest && tch) {
+          const effectiveRate = Number(tch.perClassRate) || 0
+          const cls = 1
+          const total = cls * effectiveRate
+          payList.push({
+            id: `tpay-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            teacherId: String(teacherUserId),
+            batchId: String(batch.id),
+            courseId: String(batch.courseId || ''),
+            date: d,
+            classesCount: cls,
+            rate: effectiveRate,
+            bonus: 0,
+            totalAmount: total,
+            note: `auto:wallet-approval:${row.id}`,
+            createdBy: 'system:wallet-approval',
+            createdAt: new Date().toISOString(),
+          })
+          saveJson(PATHS.teacherPayments, payList)
+        }
+      }
+    }
+  }
+
+  saveJson(PATHS.paymentRequests, requests)
+
   const notifs = loadJson(PATHS.studentNotifications, [])
   notifs.push({
-    id: `stu-notif-${Date.now()}`,
-    userId: requests[idx].authUserId,
-    message: `₹${credited} (promotional offer credit) has been added successfully to your wallet.`,
+    id: `stu-notif-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    userId: row.authUserId,
+    message: `₹${credited} has been added to your wallet. Payment request approved.`,
     read: false,
+    type: 'payment_approved',
     createdAt: new Date().toISOString(),
   })
   saveJson(PATHS.studentNotifications, notifs)
@@ -1711,8 +1912,16 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
 
   const today = parseDate(new Date().toISOString())
   const currentMonth = monthKey(today)
-  const revenueDaily = fees.filter((x) => x.date === today).reduce((a, b) => a + (Number(b.amount) || 0), 0)
-  const revenueMonthly = fees.filter((x) => monthKey(x.date) === currentMonth).reduce((a, b) => a + (Number(b.amount) || 0), 0)
+  const isPaidFeeRow = (f) => {
+    const st = String(f?.feeStatus || 'paid').toLowerCase()
+    return st === 'paid' || st === 'discounted'
+  }
+  const revenueDaily = fees
+    .filter((x) => x.date === today && isPaidFeeRow(x))
+    .reduce((a, b) => a + (Number(b.amount) || 0), 0)
+  const revenueMonthly = fees
+    .filter((x) => monthKey(x.date) === currentMonth && isPaidFeeRow(x))
+    .reduce((a, b) => a + (Number(b.amount) || 0), 0)
 
   const present = attendance.filter((x) => x.status === 'present').length
   const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : 0
@@ -1748,6 +1957,7 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
   }
   const revenueMap = {}
   for (const f of fees) {
+    if (!isPaidFeeRow(f)) continue
     const m = monthKey(f.date || f.createdAt)
     revenueMap[m] = (revenueMap[m] || 0) + (Number(f.amount) || 0)
   }
@@ -1757,7 +1967,7 @@ router.get('/dashboard', auth, allowRoles(['admin', 'teacher']), (_req, res) => 
   for (const b of batches) {
     const status = computeBatchLifecycleStatus(b)
     statusBuckets[status] = (statusBuckets[status] || 0) + 1
-    batchStudentCount[b.id] = students.filter((s) => s.batchId === b.id).length
+    batchStudentCount[b.id] = batchMemberCount(students, b.id)
   }
 
   const coursePerformance = {}

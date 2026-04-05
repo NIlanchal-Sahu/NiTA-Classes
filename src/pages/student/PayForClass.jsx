@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { studentPortalApi, scanToPay, purchaseUnlimitedPromo } from '../../api/student'
+import { studentPortalApi, scanToPay, purchaseUnlimitedPromo, getWalletQrConfig } from '../../api/student'
 import {
   WALLET_PAYEE_NAME,
   WALLET_UPI_ID_PHONEPE,
@@ -73,6 +73,7 @@ export default function PayForClass() {
   const [qrImgError, setQrImgError] = useState(false)
   const [timerLeft, setTimerLeft] = useState(0)
   const timerRef = useRef(null)
+  const [driveQrUrls, setDriveQrUrls] = useState(null)
 
   const upiId =
     requestPlatform === 'phonepe'
@@ -81,12 +82,26 @@ export default function PayForClass() {
         ? WALLET_UPI_ID_AMAZONPAY
         : WALLET_UPI_ID_PAYTM
 
-  const qrImageSrc =
+  const driveUrlForPlatform =
     requestPlatform === 'phonepe'
-      ? WALLET_QR_IMAGES.phonepe
+      ? driveQrUrls?.phonepe
       : requestPlatform === 'amazonpay'
-        ? WALLET_QR_IMAGES.amazonpay
-        : WALLET_QR_IMAGES.paytm
+        ? driveQrUrls?.amazonpay
+        : driveQrUrls?.paytm
+  const qrImageSrc =
+    driveUrlForPlatform && String(driveUrlForPlatform).startsWith('http')
+      ? driveUrlForPlatform
+      : requestPlatform === 'phonepe'
+        ? WALLET_QR_IMAGES.phonepe
+        : requestPlatform === 'amazonpay'
+          ? WALLET_QR_IMAGES.amazonpay
+          : WALLET_QR_IMAGES.paytm
+
+  useEffect(() => {
+    getWalletQrConfig()
+      .then((cfg) => setDriveQrUrls(cfg))
+      .catch(() => setDriveQrUrls(null))
+  }, [])
 
   useEffect(() => {
     ;(async () => {

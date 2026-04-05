@@ -176,15 +176,39 @@ function isCourseUnlockedForStudent(studentId, courseId) {
   );
 }
 
+function studentBatchIdsForPortal(student) {
+  const legacy = student?.batchId ? [String(student.batchId)] : [];
+  const extra = Array.isArray(student?.batchIds) ? student.batchIds.map(String) : [];
+  return [...new Set([...extra, ...legacy].filter(Boolean))];
+}
+
 function isCourseAccessibleForAuthUser(authUser, student, courseId) {
   const target = normalizeCourseId(courseId);
   if (!target) return false;
   if (student?.id && isCourseUnlockedForStudent(student.id, target)) return true;
-  if (student?.batchId) {
-    const batch = loadJson(ACADEMY_BATCHES_PATH).find((b) => b.id === student.batchId);
+  const batches = loadJson(ACADEMY_BATCHES_PATH);
+  for (const bid of studentBatchIdsForPortal(student)) {
+    const batch = batches.find((b) => b.id === bid);
     if (normalizeCourseId(batch?.courseId) === target) return true;
   }
   return false;
+}
+
+function appendStudentNotification(userId, message, opts = {}) {
+  if (!userId) return;
+  const list = loadJson(STUDENT_NOTIFICATIONS_PATH);
+  list.push({
+    id: `stu-notif-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    userId,
+    message: String(message),
+    read: false,
+    createdAt: new Date().toISOString(),
+    ...(opts.type ? { type: opts.type } : {}),
+    ...(opts.popup != null ? { popup: opts.popup } : {}),
+    ...(opts.title ? { title: opts.title } : {}),
+    ...(opts.fromAdmin ? { fromAdmin: true } : {}),
+  });
+  saveJson(STUDENT_NOTIFICATIONS_PATH, list);
 }
 
 function getFlatChapterOrder(courseNode) {
@@ -340,6 +364,13 @@ router.post("/scan", studentAuth, (req, res) => {
     const status = result.error.includes("Insufficient") ? 400 : 500;
     return res.status(status).json({ error: result.error });
   }
+  appendStudentNotification(
+    studentId,
+    result.vvipFree
+      ? `Attendance recorded for ${result.courseName || validId} on ${d} (VVIP — no charge).`
+      : `Attendance recorded for ${result.courseName || validId} on ${d}. ₹${PRICE_PER_CLASS} deducted from wallet.`,
+    { type: "attendance_wallet" }
+  );
   const message = result.vvipFree
     ? "Attendance recorded. No charge (VVIP)."
     : `Attendance recorded. ₹${PRICE_PER_CLASS} deducted.`;
@@ -371,6 +402,15 @@ router.post("/promo/unlimited-month", studentAuth, (req, res) => {
     walletBalance: result.walletBalance,
     vvipValidUntil: result.vvipValidUntil,
     message: "You are now a VVIP Student! Unlimited classes for one month.",
+  });
+});
+
+/** Public: Drive-hosted wallet QR image URLs (avoid serving static payment QR from /public). */
+router.get("/portal/wallet-qr-config", (_req, res) => {
+  res.json({
+    phonepe: process.env.WALLET_QR_DRIVE_URL_PHONEPE || "",
+    amazonpay: process.env.WALLET_QR_DRIVE_URL_AMAZONPAY || "",
+    paytm: process.env.WALLET_QR_DRIVE_URL_PAYTM || "",
   });
 });
 
@@ -636,7 +676,12 @@ router.get("/portal/courses", studentAuth, (req, res) => {
         teacherId: teacherIds[0] || "",
       };
     });
-  const assignedBatch = student?.batchId ? mappedBatches.find((b) => b.id === student.batchId) || null : null;
+  const memberSet = new Set(studentBatchIdsForPortal(student));
+  const assignedBatches = mappedBatches.filter((b) => memberSet.has(b.id));
+  const assignedBatch =
+    assignedBatches.length > 0 ? assignedBatches[assignedBatches.length - 1] : student?.batchId
+      ? mappedBatches.find((b) => b.id === student.batchId) || null
+      : null;
   const upcomingBatches = mappedBatches.filter((b) => b.status === "upcoming").slice(0, 8);
   let trialInfo = null;
   if (trial) {
@@ -650,7 +695,15 @@ router.get("/portal/courses", studentAuth, (req, res) => {
       title: "1 Week Trial Course",
     };
   }
-  res.json({ student: student || null, assignedBatch, enrolledCourses, allCourses: enrichedCourses, upcomingBatches, trialInfo });
+  res.json({
+    student: student || null,
+    assignedBatch,
+    assignedBatches,
+    enrolledCourses,
+    allCourses: enrichedCourses,
+    upcomingBatches,
+    trialInfo,
+  });
 });
 
 router.post("/portal/courses/unlock", studentAuth, (req, res) => {
@@ -711,6 +764,12 @@ router.post("/portal/courses/unlock", studentAuth, (req, res) => {
   saveJson(ENROLLMENTS_HISTORY_PATH, enrollments);
   removeAdmissionQueueByPhone(student.phone || authUser.email || "");
 
+  appendStudentNotification(
+    req.auth.userId,
+    `Course unlocked: ${course.name || courseId}. ₹${unlockFee} deducted from your wallet.`,
+    { type: "course_unlock" }
+  );
+
   res.json({
     success: true,
     courseId,
@@ -756,6 +815,11 @@ router.post("/portal/courses/renew", studentAuth, (req, res) => {
     createdAt: new Date().toISOString(),
   });
   saveJson(ENROLLMENTS_HISTORY_PATH, enrollments);
+  appendStudentNotification(
+    req.auth.userId,
+    `Course renewed: ${course.name || courseId}. ₹${renewFee} deducted from wallet (40% renewal rate).`,
+    { type: "course_renew" }
+  );
   return res.json({
     success: true,
     courseId,

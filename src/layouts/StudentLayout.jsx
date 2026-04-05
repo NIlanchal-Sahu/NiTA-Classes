@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LOGO_SRC } from "../config";
 import { studentPortalApi } from "../api/student";
@@ -188,10 +188,29 @@ export default function StudentLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [enrolledCourseCount, setEnrolledCourseCount] = useState(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [popupQueue, setPopupQueue] = useState([]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const initial = (user?.name || user?.email || "S").charAt(0).toUpperCase();
   const vvip = user?.role === "student" && isVvip(user);
+
+  const loadNotifications = async () => {
+    try {
+      const { notifications: list } = await studentPortalApi.getNotifications();
+      const arr = list || [];
+      setNotifications(arr);
+      const popups = arr
+        .filter((n) => n.popup && n.fromAdmin && !n.read)
+        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+      setPopupQueue(popups);
+    } catch {
+      setNotifications([]);
+      setPopupQueue([]);
+    }
+  };
 
   useEffect(() => {
     if (user?.role !== "student") return;
@@ -212,8 +231,31 @@ export default function StudentLayout() {
     };
   }, [user?.id, user?.role]);
 
+  useEffect(() => {
+    if (user?.role !== "student") return;
+    loadNotifications();
+  }, [user?.id, user?.role, location.pathname]);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const currentPopup = popupQueue[0];
+
+  const markOneRead = async (id) => {
+    try {
+      await studentPortalApi.markNotificationsRead([id]);
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      setPopupQueue((q) => q.filter((n) => n.id !== id));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleMarkPopupRead = async () => {
+    if (!currentPopup) return;
+    await markOneRead(currentPopup.id);
+  };
+
   return (
-    <div className="flex min-h-screen bg-gray-900">
+    <div className="flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-gray-900">
       {/* Sidebar overlay (mobile) */}
       <div
         className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -224,7 +266,7 @@ export default function StudentLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-gray-800 border-r border-gray-700 lg:static lg:translate-x-0 transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-full max-h-[100dvh] w-64 flex-col overflow-hidden border-r border-gray-700 bg-gray-800 transition-transform duration-200 lg:static lg:max-h-[100dvh] lg:shrink-0 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -254,7 +296,7 @@ export default function StudentLayout() {
             </svg>
           </button>
         </div>
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 space-y-1">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -281,10 +323,10 @@ export default function StudentLayout() {
         </nav>
       </aside>
 
-      {/* Main content */}
-      <div className="flex flex-1 flex-col min-w-0">
+      {/* Main content — only this column scrolls; sidebar stays visible on desktop */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top header */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-gray-700 bg-gray-900 px-4 lg:px-8">
+        <header className="z-30 flex h-14 shrink-0 items-center justify-between border-b border-gray-700 bg-gray-900 px-4 lg:px-8">
           <button
             type="button"
             className="btn-touch -ml-2 rounded-lg p-2 text-gray-400 hover:bg-gray-800 lg:hidden"
@@ -332,25 +374,76 @@ export default function StudentLayout() {
             </div>
           )}
           <div className="flex items-center gap-2 sm:gap-4">
-            <button
-              type="button"
-              className="btn-touch rounded-lg p-2 text-gray-400 hover:bg-gray-800"
-              aria-label="Notifications"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="relative">
+              <button
+                type="button"
+                className="btn-touch relative rounded-lg p-2 text-gray-400 hover:bg-gray-800"
+                aria-label="Notifications"
+                aria-expanded={notifOpen}
+                onClick={() => setNotifOpen((o) => !o)}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold text-white">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </button>
+              {notifOpen && user?.role === "student" && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    aria-hidden
+                    onClick={() => setNotifOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(24rem,70vh)] w-[min(320px,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 py-2 shadow-xl">
+                    {notifications.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-gray-500">No notifications yet.</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`border-b border-gray-700/50 px-4 py-3 text-sm last:border-0 ${
+                            n.read ? "text-gray-500" : "text-gray-200"
+                          }`}
+                        >
+                          {n.title ? (
+                            <p className="font-semibold text-white">{n.title}</p>
+                          ) : null}
+                          <p className="mt-1 whitespace-pre-wrap">{n.message}</p>
+                          {n.type && (
+                            <p className="mt-1 text-[10px] uppercase tracking-wide text-gray-500">
+                              {n.type.replace(/_/g, " ")}
+                            </p>
+                          )}
+                          {!n.read && (
+                            <button
+                              type="button"
+                              className="mt-2 text-xs font-medium text-violet-400 hover:text-violet-300"
+                              onClick={() => markOneRead(n.id)}
+                            >
+                              Mark as read
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
             <div className="relative flex items-center gap-3">
               {vvip && (
                 <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-semibold text-amber-400 ring-1 ring-amber-500/50">
@@ -414,14 +507,42 @@ export default function StudentLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-8">
           <Outlet />
+          <footer className="mt-8 border-t border-gray-700 py-4 text-center text-sm text-gray-500">
+            © {new Date().getFullYear()} NITA Classes. All Rights Reserved.
+          </footer>
         </main>
-
-        <footer className="border-t border-gray-700 py-4 px-4 lg:px-8 text-center text-sm text-gray-500">
-          © {new Date().getFullYear()} NITA Classes. All Rights Reserved.
-        </footer>
       </div>
+
+      {user?.role === "student" && currentPopup && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-notif-title"
+        >
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-gray-600 bg-gray-800 p-6 shadow-xl">
+            {currentPopup.title ? (
+              <h2 id="admin-notif-title" className="text-lg font-semibold text-white">
+                {currentPopup.title}
+              </h2>
+            ) : (
+              <h2 id="admin-notif-title" className="text-lg font-semibold text-white">
+                Message from NITA
+              </h2>
+            )}
+            <p className="mt-3 whitespace-pre-wrap text-gray-200">{currentPopup.message}</p>
+            <button
+              type="button"
+              className="btn-touch mt-6 w-full rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 sm:w-auto"
+              onClick={handleMarkPopupRead}
+            >
+              Mark as read
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

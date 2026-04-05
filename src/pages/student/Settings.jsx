@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { studentPortalApi } from '../../api/student'
 import * as authApi from '../../api/auth'
 
 export default function Settings() {
   const { user, logout } = useAuth()
   const [profile, setProfile] = useState(null)
+  const [coursesLearning, setCoursesLearning] = useState(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -17,13 +18,49 @@ export default function Settings() {
   useEffect(() => {
     ;(async () => {
       try {
-        const out = await studentPortalApi.getProfile()
+        const [out, learn] = await Promise.all([
+          studentPortalApi.getProfile(),
+          studentPortalApi.getCoursesLearning().catch(() => null),
+        ])
         setProfile(out)
+        setCoursesLearning(learn)
       } catch {
-        // ignore
+        try {
+          const out = await studentPortalApi.getProfile()
+          setProfile(out)
+        } catch {
+          /* ignore */
+        }
       }
     })()
   }, [])
+
+  const batchDisplay = useMemo(() => {
+    const list =
+      Array.isArray(coursesLearning?.assignedBatches) && coursesLearning.assignedBatches.length > 0
+        ? coursesLearning.assignedBatches
+        : coursesLearning?.assignedBatch
+          ? [coursesLearning.assignedBatch]
+          : []
+    if (list.length) {
+      return list
+        .map((b) => {
+          const name = b.name || b.title || b.id || '—'
+          const timing = b.timing ? ` · ${b.timing}` : ''
+          return `${name}${timing}`
+        })
+        .join(' · ')
+    }
+    return profile?.student?.batchId || '—'
+  }, [coursesLearning, profile])
+
+  const courseDisplay = useMemo(() => {
+    const code = profile?.student?.courseEnrolled
+    if (!code) return '—'
+    const all = coursesLearning?.allCourses || []
+    const found = all.find((c) => String(c.id).toLowerCase() === String(code).toLowerCase())
+    return found?.name || code
+  }, [coursesLearning, profile])
 
   const handleChangePassword = async (e) => {
     e.preventDefault()
@@ -111,11 +148,11 @@ export default function Settings() {
             </div>
             <div>
               <dt className="text-gray-500">Class / Batch</dt>
-              <dd className="text-white">{profile?.student?.batchId || '—'}</dd>
+              <dd className="text-white">{batchDisplay}</dd>
             </div>
             <div>
               <dt className="text-gray-500">Course</dt>
-              <dd className="text-white">{profile?.student?.courseEnrolled || '—'}</dd>
+              <dd className="text-white">{courseDisplay}</dd>
             </div>
             <div>
               <dt className="text-gray-500">Admission Date</dt>

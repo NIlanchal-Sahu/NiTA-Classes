@@ -28,8 +28,8 @@ export const WALLET_UPI_ID_PAYTM = '9040358148@ptyes'
 export const WALLET_PAYMENT_TIMER_SECONDS = 300
 
 /**
- * QR images for scan & pay (place files in /public).
- * e.g. public/wallet-qr-phonepe.png — optional; falls back to UPI text if missing.
+ * Fallback QR paths when server env WALLET_QR_DRIVE_URL_* is not set (see server .env.example).
+ * Prefer hosting QR images in Google Drive and setting env vars so payment QRs are not in /public.
  */
 export const WALLET_QR_IMAGES = {
   phonepe: '/wallet-qr-phonepe.png',

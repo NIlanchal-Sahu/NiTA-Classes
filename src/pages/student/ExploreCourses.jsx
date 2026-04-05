@@ -3,12 +3,55 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { studentPortalApi } from '../../api/student'
 
+/** Renders academy course description: section titles 【】, bullets •, paragraphs. */
+function CourseDescriptionBody({ text }) {
+  const lines = text.split('\n')
+  const nodes = []
+  let bulletAcc = []
+  let key = 0
+  const flushBullets = () => {
+    if (bulletAcc.length === 0) return
+    nodes.push(
+      <ul key={`ul-${key++}`} className="mt-2 list-disc space-y-1.5 pl-5 text-gray-300">
+        {bulletAcc.map((item, j) => (
+          <li key={j}>{item}</li>
+        ))}
+      </ul>
+    )
+    bulletAcc = []
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim()
+    if (!t) continue
+    if (t.startsWith('【')) {
+      flushBullets()
+      nodes.push(
+        <p key={`sec-${key++}`} className="mt-4 font-semibold text-violet-200 first:mt-0">
+          {t}
+        </p>
+      )
+    } else if (t.startsWith('•')) {
+      bulletAcc.push(t.replace(/^•\s*/, ''))
+    } else {
+      flushBullets()
+      nodes.push(
+        <p key={`p-${key++}`} className="mt-3 text-gray-300 first:mt-0">
+          {t}
+        </p>
+      )
+    }
+  }
+  flushBullets()
+  return <div className="space-y-0">{nodes}</div>
+}
+
 export default function ExploreCourses() {
   const { user, refreshUser } = useAuth()
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [unlockModal, setUnlockModal] = useState(null) // { id, name, unlockFee }
+  const [infoModal, setInfoModal] = useState(null) // course object for details popup
   const walletBalance = Number(user?.walletBalance) || 0
 
   const load = async () => {
@@ -66,6 +109,15 @@ export default function ExploreCourses() {
               >
                 {c.unlocked ? 'UNLOCKED' : 'LOCKED'}
               </span>
+              <button
+                type="button"
+                onClick={() => setInfoModal(c)}
+                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-gray-900/80 text-sm font-bold text-white shadow hover:bg-violet-600/90"
+                aria-label={`Course info: ${c.name || c.title || c.id}`}
+                title="Course info"
+              >
+                i
+              </button>
             </div>
             <div className="p-4">
               <h3 className="font-semibold text-white line-clamp-2">{c.name || c.title}</h3>
@@ -114,6 +166,41 @@ export default function ExploreCourses() {
           </div>
         )}
       </div>
+
+      {infoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gray-700 bg-gray-800 p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-semibold text-white">{infoModal.name || infoModal.title || 'Course'}</h3>
+              <button
+                type="button"
+                onClick={() => setInfoModal(null)}
+                className="rounded-lg px-2 py-1 text-sm text-gray-400 hover:bg-gray-700 hover:text-white"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-violet-300">
+              Unlock fee: <span className="font-semibold text-white">₹{Number(infoModal.unlockFee) || 0}</span>
+            </p>
+            <div className="mt-4 text-sm leading-relaxed">
+              {infoModal.description ? (
+                <CourseDescriptionBody text={infoModal.description} />
+              ) : (
+                <p className="text-gray-300">Course details will appear here when provided by the academy.</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setInfoModal(null)}
+              className="mt-6 w-full rounded-lg border border-gray-600 py-2.5 text-sm font-medium text-gray-300 hover:bg-gray-700 sm:w-auto sm:px-6"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {unlockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

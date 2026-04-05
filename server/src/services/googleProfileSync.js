@@ -3,6 +3,7 @@
  * Set env vars (see docs/STUDENT_PROFILE_GOOGLE.md). If unset, functions no-op safely.
  */
 import { readFileSync, existsSync, createReadStream } from 'fs'
+import { Readable } from 'stream'
 import { dirname, join, basename } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -59,6 +60,11 @@ const SHARE_EMAIL = process.env.GOOGLE_DRIVE_SHARE_EMAIL || 'tech.nilanchala25@g
 
 export function isGoogleConfigured() {
   return !!(loadCredentials() && DRIVE_PARENT && SHEET_ID)
+}
+
+/** Service account + parent folder — enough for Drive uploads (fees receipts, etc.) */
+export function isGoogleDriveReady() {
+  return !!(loadCredentials() && DRIVE_PARENT)
 }
 
 /**
@@ -139,6 +145,95 @@ export async function uploadLocalFileToDrive(localPath, driveFileName, folderId)
     link = meta.data.webViewLink || meta.data.webContentLink
   }
   return link || (fileId ? `https://drive.google.com/file/d/${fileId}/view` : null)
+}
+
+/**
+ * Upload raw buffer (e.g. decoded payment screenshot) to Drive; returns view link.
+ */
+export async function uploadBufferToDrive(buffer, mimeType, driveFileName, folderId) {
+  const { drive } = await getClients()
+  if (!drive || !folderId || !buffer || !Buffer.isBuffer(buffer)) return null
+  const name = driveFileName || 'upload.bin'
+  const mime =
+    mimeType ||
+    (name.endsWith('.png')
+      ? 'image/png'
+      : name.match(/\.(jpg|jpeg)$/i)
+        ? 'image/jpeg'
+        : 'application/octet-stream')
+
+  const res = await drive.files.create({
+    requestBody: { name, parents: [folderId] },
+    media: { mimeType: mime, body: Readable.from(buffer) },
+    fields: 'id, webViewLink, webContentLink',
+  })
+  const fileId = res.data.id
+  let link = res.data.webViewLink || res.data.webContentLink || null
+  if (fileId && SHARE_EMAIL) {
+    try {
+      await drive.permissions.create({
+        fileId,
+        requestBody: { role: 'reader', type: 'user', emailAddress: SHARE_EMAIL },
+        sendNotificationEmail: false,
+      })
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  if (fileId && !link) {
+    const meta = await drive.files.get({ fileId, fields: 'webViewLink, webContentLink' })
+    link = meta.data.webViewLink || meta.data.webContentLink
+  }
+  return link || (fileId ? `https://drive.google.com/file/d/${fileId}/view` : null)
+}
+
+/**
+ * Parse data:image/...;base64,... and upload to a Drive folder.
+ */
+export async function uploadDataUrlToDrive(dataUrl, driveFileName, folderId) {
+  const raw = String(dataUrl || '')
+  const i = raw.indexOf('base64,')
+  if (i < 0 || !raw.startsWith('data:')) return null
+  const header = raw.slice(5, i - 1)
+  const mimeType = header.split(';')[0].trim() || 'application/octet-stream'
+  const b64 = raw.slice(i + 7).replace(/\s/g, '')
+  const buffer = Buffer.from(b64, 'base64')
+  if (!buffer.length) return null
+  return uploadBufferToDrive(buffer, mimeType, driveFileName, folderId)
+}
+
+/**
+ * Shared folder for wallet payment screenshots (under GOOGLE_DRIVE_PARENT_FOLDER_ID).
+ */
+export async function ensurePaymentReceiptsFolder() {
+  const { drive } = await getClients()
+  if (!drive || !DRIVE_PARENT) return null
+  const folderName = 'NITA_Payment_Receipts'
+  const q = `mimeType='application/vnd.google-apps.folder' and name='${folderName.replace(/'/g, "\\'")}' and '${DRIVE_PARENT}' in parents and trashed=false`
+  const existing = await drive.files.list({ q, fields: 'files(id,name)', pageSize: 1 })
+  if (existing.data.files?.length) return existing.data.files[0].id
+
+  const create = await drive.files.create({
+    requestBody: {
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [DRIVE_PARENT],
+    },
+    fields: 'id',
+  })
+  const folderId = create.data.id
+  if (SHARE_EMAIL && folderId) {
+    try {
+      await drive.permissions.create({
+        fileId: folderId,
+        requestBody: { role: 'writer', type: 'user', emailAddress: SHARE_EMAIL },
+        sendNotificationEmail: false,
+      })
+    } catch (e) {
+      console.warn('[googleProfileSync] Folder share failed:', e.message)
+    }
+  }
+  return folderId
 }
 
 const HEADERS = [
