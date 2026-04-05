@@ -29,6 +29,8 @@ export default function AdminStudents() {
   const [removedMobile, setRemovedMobile] = useState('')
   const [removedRows, setRemovedRows] = useState([])
   const [removedLoading, setRemovedLoading] = useState(false)
+  const [extBusyId, setExtBusyId] = useState('')
+  const [extAddById, setExtAddById] = useState({})
 
   const refresh = async () => {
     setLoading(true)
@@ -200,6 +202,26 @@ export default function AdminStudents() {
       setError(e.message || 'Failed to load student dashboard view')
     } finally {
       setViewLoading(false)
+    }
+  }
+
+  const addEnrollmentExtensionDays = async (enrollmentId) => {
+    const n = Number(extAddById[enrollmentId])
+    if (!Number.isFinite(n) || n === 0) {
+      setError('Enter a non-zero number of days to add (use negative to reduce).')
+      return
+    }
+    setExtBusyId(enrollmentId)
+    setError('')
+    try {
+      await academyApi.patchEnrollmentExtension(enrollmentId, { addValidityDays: Math.floor(n) })
+      const out = await academyApi.getStudentProfile(selectedId)
+      setProfile(out)
+      setExtAddById((p) => ({ ...p, [enrollmentId]: '' }))
+    } catch (e) {
+      setError(e.message || 'Failed to update extension')
+    } finally {
+      setExtBusyId('')
     }
   }
 
@@ -505,22 +527,56 @@ export default function AdminStudents() {
                     <span className="font-semibold text-white">{profile.payments?.length || 0}</span> | Attendance Records:{' '}
                     <span className="font-semibold text-white">{profile.attendance?.length || 0}</span>
                   </div>
-                  <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 lg:col-span-1">
-                      <h4 className="text-sm font-semibold text-white">Recent Enrollments</h4>
-                      <div className="mt-2 space-y-2 text-xs text-gray-300">
-                        {(profile.enrollments || []).slice(0, 5).map((e) => (
-                          <div key={e.id} className="rounded border border-gray-700 bg-gray-800 p-2">
-                            <div className="font-medium text-white">
-                              {courseMap.get(String(e.courseId || '')) || e.courseId || '—'}
+                  <div className="mt-4 rounded-xl border border-violet-700/30 bg-gray-900/50 p-4">
+                    <h4 className="text-sm font-semibold text-white">LMS course enrollments &amp; access</h4>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Student portal uses all rows for the same course (unlock, batch, renew). Access is at least 90 days or the course duration from each start date. Add extra validity days below if needed.
+                    </p>
+                    <div className="mt-3 space-y-3 text-xs text-gray-300">
+                      {(profile.enrollments || []).map((e) => (
+                        <div key={e.id} className="rounded-lg border border-gray-700 bg-gray-800 p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="font-semibold text-white">
+                                {courseMap.get(String(e.courseId || '')) || e.courseId || '—'}
+                              </div>
+                              <div className="mt-1 font-mono text-[11px] text-gray-500">ID: {e.id}</div>
+                              <div className="mt-1">
+                                Start: {String(e.startDate || '').slice(0, 10) || '—'} · Expires:{' '}
+                                {String(e.expiresAt || '').slice(0, 10) || '—'}
+                              </div>
+                              <div>Status: {e.status || 'active'}</div>
+                              <div>
+                                Admin extra days (total):{' '}
+                                <span className="font-semibold text-amber-200">{Number(e.validityExtensionDays) || 0}</span>
+                              </div>
                             </div>
-                            <div>Date: {String(e.createdAt || '').slice(0, 10) || '—'}</div>
-                            <div>Status: {e.status || 'active'}</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="number"
+                                placeholder="Days ±"
+                                className="w-24 rounded border border-gray-600 bg-gray-900 px-2 py-1 text-white"
+                                value={extAddById[e.id] ?? ''}
+                                onChange={(ev) =>
+                                  setExtAddById((p) => ({ ...p, [e.id]: ev.target.value }))
+                                }
+                              />
+                              <button
+                                type="button"
+                                disabled={extBusyId === e.id}
+                                onClick={() => addEnrollmentExtensionDays(e.id)}
+                                className="rounded bg-violet-600 px-3 py-1 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                              >
+                                {extBusyId === e.id ? '…' : 'Apply'}
+                              </button>
+                            </div>
                           </div>
-                        ))}
-                        {(profile.enrollments || []).length === 0 && <p className="text-gray-500">No enrollment records.</p>}
-                      </div>
+                        </div>
+                      ))}
+                      {(profile.enrollments || []).length === 0 && <p className="text-gray-500">No enrollment records.</p>}
                     </div>
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 lg:col-span-1">
                       <h4 className="text-sm font-semibold text-white">Recent Payments</h4>
                       <div className="mt-2 space-y-2 text-xs text-gray-300">

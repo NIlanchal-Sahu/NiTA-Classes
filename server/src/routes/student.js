@@ -169,6 +169,56 @@ function daysLeftUntil(isoDate) {
   return Math.max(0, Math.ceil((end - start) / 86400000));
 }
 
+/** Minimum LMS access: 90 days or catalog course duration, whichever is larger. */
+function minAccessDaysForCourse(courseId) {
+  const cid = normalizeCourseId(courseId);
+  const d = COURSE_DURATION_DAYS[cid] ?? 90;
+  return Math.max(90, d);
+}
+
+/**
+ * Merge all enrollment rows for a course (wallet + batch + renew) so one bad row cannot
+ * shorten access. Enforces min access from each row's start and from first join date.
+ */
+function computeCourseAccessFromEnrollments(studentId, courseId, enrollmentRows) {
+  const cid = normalizeCourseId(courseId);
+  const list = (enrollmentRows || []).filter(
+    (e) =>
+      String(e.studentId) === String(studentId) &&
+      normalizeCourseId(e.courseId) === cid &&
+      normalizeCourseId(e.courseId) !== "trial-course",
+  );
+  if (list.length === 0) return null;
+
+  let earliest = null;
+  let maxEnd = null;
+  const minDays = minAccessDaysForCourse(cid);
+
+  for (const e of list) {
+    const s = parseIsoDate(e.startDate || e.createdAt || today());
+    if (!earliest || s < earliest) earliest = s;
+    const expRaw = e.expiresAt
+      ? parseIsoDate(e.expiresAt)
+      : addDays(s, COURSE_DURATION_DAYS[cid] || 90);
+    const policyFromRow = addDays(s, minDays);
+    const rowEnd = expRaw > policyFromRow ? expRaw : policyFromRow;
+    if (!maxEnd || rowEnd > maxEnd) maxEnd = rowEnd;
+  }
+
+  const policyFromFirst = addDays(earliest, minDays);
+  let effectiveEnd = maxEnd > policyFromFirst ? maxEnd : policyFromFirst;
+
+  let extSum = 0;
+  for (const e of list) {
+    extSum += Number(e.validityExtensionDays) || 0;
+  }
+  if (extSum > 0) effectiveEnd = addDays(effectiveEnd, extSum);
+
+  const left = daysLeftUntil(effectiveEnd);
+  const completed = left === 0;
+  return { startDate: earliest, endDate: effectiveEnd, daysLeft: left, completed };
+}
+
 function isCourseUnlockedForStudent(studentId, courseId) {
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   return enrollments.some(
@@ -630,31 +680,52 @@ router.get("/portal/courses", studentAuth, (req, res) => {
     .slice()
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0] || null;
 
-  const enrollByCourse = {};
-  for (const e of enrollments) {
-    if (e.studentId !== student?.id) continue;
-    const cid = normalizeCourseId(e.courseId);
-    if (!cid || cid === "trial-course") continue;
-    if (!enrollByCourse[cid] || String(e.createdAt || "") > String(enrollByCourse[cid].createdAt || "")) {
-      enrollByCourse[cid] = e;
-    }
-  }
-
   const enrichedCourses = allCourses.map((c) => {
-    const enr = enrollByCourse[c.id] || null;
-    if (!enr) return { ...c, status: "locked", completed: false, daysLeft: 0 };
-    const startDate = parseIsoDate(enr.startDate || enr.createdAt || today());
-    const endDate = parseIsoDate(enr.expiresAt || addDays(startDate, COURSE_DURATION_DAYS[c.id] || 90));
-    const left = daysLeftUntil(endDate);
-    const completed = left === 0;
+    if (!enrolledIds.has(c.id)) return { ...c, status: "locked", completed: false, daysLeft: 0 };
+    let list = enrollments.filter(
+      (e) =>
+        e.studentId === student?.id &&
+        normalizeCourseId(e.courseId) === c.id &&
+        normalizeCourseId(e.courseId) !== "trial-course",
+    );
+    if (list.length === 0 && student?.batchId) {
+      const b = batches.find(
+        (b0) => String(b0.id) === String(student.batchId) && normalizeCourseId(b0.courseId) === c.id,
+      );
+      if (b) {
+        list = [
+          {
+            studentId: student.id,
+            courseId: c.id,
+            startDate: b.startDate || student.admissionDate,
+            expiresAt: b.endDate,
+            createdAt: b.createdAt || student.admissionDate,
+          },
+        ];
+      }
+    }
+    if (list.length === 0 && enrolledIds.has(c.id) && student) {
+      const start0 = parseIsoDate(student.admissionDate || today());
+      list = [
+        {
+          studentId: student.id,
+          courseId: c.id,
+          startDate: start0,
+          expiresAt: addDays(start0, minAccessDaysForCourse(c.id)),
+          createdAt: student.createdAt || today(),
+        },
+      ];
+    }
+    const access = computeCourseAccessFromEnrollments(student?.id, c.id, list);
+    if (!access) return { ...c, status: "locked", completed: false, daysLeft: 0 };
     const renewFee = Math.round((Number(c.unlockFee) || 0) * 0.6);
     return {
       ...c,
-      status: completed ? "completed" : "active",
-      completed,
-      startDate,
-      endDate,
-      daysLeft: left,
+      status: access.completed ? "completed" : "active",
+      completed: access.completed,
+      startDate: access.startDate,
+      endDate: access.endDate,
+      daysLeft: access.daysLeft,
       renewFee,
     };
   });
@@ -757,7 +828,7 @@ router.post("/portal/courses/unlock", studentAuth, (req, res) => {
     note: `Course unlocked from wallet. Fee deducted ₹${unlockFee}`,
     status: "active",
     startDate: today(),
-    expiresAt: addDays(today(), COURSE_DURATION_DAYS[courseId] || 90),
+    expiresAt: addDays(today(), minAccessDaysForCourse(courseId)),
     createdAt: new Date().toISOString(),
   };
   enrollments.push(nextEnrollment);
@@ -788,6 +859,40 @@ router.post("/portal/courses/renew", studentAuth, (req, res) => {
   if (!courseId) return res.status(400).json({ error: "courseId is required" });
   const course = getCourseCatalog().find((c) => normalizeCourseId(c.id) === courseId);
   if (!course) return res.status(404).json({ error: "Course not found" });
+
+  const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+  const batches = loadJson(ACADEMY_BATCHES_PATH);
+  let list = enrollments.filter(
+    (e) =>
+      e.studentId === student?.id &&
+      normalizeCourseId(e.courseId) === courseId &&
+      normalizeCourseId(e.courseId) !== "trial-course",
+  );
+  if (list.length === 0 && student?.batchId) {
+    const b = batches.find(
+      (b0) => String(b0.id) === String(student.batchId) && normalizeCourseId(b0.courseId) === courseId,
+    );
+    if (b) {
+      list = [
+        {
+          studentId: student.id,
+          courseId,
+          startDate: b.startDate || student.admissionDate,
+          expiresAt: b.endDate,
+          createdAt: b.createdAt || student.admissionDate,
+        },
+      ];
+    }
+  }
+  const access = computeCourseAccessFromEnrollments(student.id, courseId, list);
+  if (!access || !access.completed) {
+    return res.status(400).json({
+      error: "Renew is available only after your course access period has ended.",
+      daysLeft: access?.daysLeft ?? 0,
+      endDate: access?.endDate,
+    });
+  }
+
   const baseFee = Number(COURSE_UNLOCK_FEES[courseId] ?? course.unlockFee ?? 499);
   const renewFee = Math.round(baseFee * 0.6);
   const bal = Number(authUser.walletBalance) || 0;
@@ -802,7 +907,6 @@ router.post("/portal/courses/renew", studentAuth, (req, res) => {
   const idx = users.findIndex((u) => u.id === authUser.id);
   users[idx] = { ...users[idx], walletBalance: bal - renewFee };
   saveUsers(users);
-  const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   enrollments.push({
     id: `enr-${Date.now()}-renew`,
     studentId: student.id,
@@ -811,7 +915,7 @@ router.post("/portal/courses/renew", studentAuth, (req, res) => {
     note: `Course renewed at 40% discount. Fee deducted ₹${renewFee}`,
     status: "active",
     startDate: today(),
-    expiresAt: addDays(today(), COURSE_DURATION_DAYS[courseId] || 90),
+    expiresAt: addDays(today(), minAccessDaysForCourse(courseId)),
     createdAt: new Date().toISOString(),
   });
   saveJson(ENROLLMENTS_HISTORY_PATH, enrollments);

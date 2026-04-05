@@ -182,6 +182,27 @@ function normCourseId(id) {
   return String(id || '').trim().toLowerCase()
 }
 
+/** Align with student portal: at least 90 days or catalog duration from batch start. */
+const COURSE_DURATION_DAYS = {
+  dca: 90,
+  cca: 180,
+  'spoken-english-mastery': 90,
+  'ai-associate': 180,
+  'ai-video-creation': 60,
+}
+
+function minAccessDaysForCourse(courseId) {
+  const d = COURSE_DURATION_DAYS[normCourseId(courseId)] ?? 90
+  return Math.max(90, d)
+}
+
+function addDaysIso(isoStr, days) {
+  const base = parseDate(isoStr) || todayIso()
+  const d = new Date(`${base}T00:00:00.000Z`)
+  d.setUTCDate(d.getUTCDate() + Number(days || 0))
+  return d.toISOString().slice(0, 10)
+}
+
 function normMode(mode) {
   const m = String(mode || '').trim().toLowerCase()
   if (m === 'on-center' || m === 'offline' || m === 'oncenter') return 'on-center'
@@ -333,7 +354,9 @@ function upsertBatchEnrollments(enrollments, studentIds, courseId, batchId, star
   const course = String(courseId || '')
   const batch = String(batchId || '')
   const start = parseDate(startDate || now)
-  const expires = parseDate(endDate || start)
+  const batchEnd = parseDate(endDate || start)
+  const minAccessEnd = addDaysIso(start, minAccessDaysForCourse(course))
+  const expires = batchEnd > minAccessEnd ? batchEnd : minAccessEnd
   for (const sid of studentIds) {
     const studentId = String(sid || '')
     if (!studentId) continue
@@ -675,6 +698,41 @@ router.post('/students/:id/enrollments', auth, allowRoles(['admin', 'teacher']),
   saveJson(PATHS.enrollments, enrollments)
   removeAdmissionsByPhones([student.phone])
   res.json({ success: true, enrollment: next })
+})
+
+/** Extend LMS course access (mirrors to validityExtensionDays on student_enrollments). */
+router.patch('/enrollments/:enrollmentId', auth, allowRoles(['admin']), (req, res) => {
+  const enrollmentId = String(req.params.enrollmentId || '')
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const idx = enrollments.findIndex((e) => String(e.id) === enrollmentId)
+  if (idx < 0) return res.status(404).json({ error: 'Enrollment not found' })
+  const add = Number(req.body?.addValidityDays)
+  const set = Number(req.body?.validityExtensionDays)
+  if (Number.isFinite(add)) {
+    const n = Math.floor(add)
+    if (n < -3650 || n > 3650) {
+      return res.status(400).json({ error: 'addValidityDays must be between -3650 and 3650' })
+    }
+    enrollments[idx] = {
+      ...enrollments[idx],
+      validityExtensionDays: (Number(enrollments[idx].validityExtensionDays) || 0) + n,
+      updatedAt: new Date().toISOString(),
+    }
+  } else if (Number.isFinite(set)) {
+    const n = Math.floor(set)
+    if (n < 0 || n > 3650) {
+      return res.status(400).json({ error: 'validityExtensionDays must be between 0 and 3650' })
+    }
+    enrollments[idx] = {
+      ...enrollments[idx],
+      validityExtensionDays: n,
+      updatedAt: new Date().toISOString(),
+    }
+  } else {
+    return res.status(400).json({ error: 'Send addValidityDays (number) or validityExtensionDays (number)' })
+  }
+  saveJson(PATHS.enrollments, enrollments)
+  res.json({ success: true, enrollment: enrollments[idx] })
 })
 
 router.post('/students/reset-password', auth, allowRoles(['admin']), (req, res) => {

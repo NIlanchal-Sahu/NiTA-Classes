@@ -51,6 +51,12 @@ export const academyApi = {
   deleteRemovedStudentRecord: (recordId) =>
     request(`/students/removed/${encodeURIComponent(recordId)}`, { method: 'DELETE', headers: headers(false) }),
   addEnrollment: (id, body) => request(`/students/${id}/enrollments`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+  patchEnrollmentExtension: (enrollmentId, body) =>
+    request(`/enrollments/${encodeURIComponent(enrollmentId)}`, {
+      method: 'PATCH',
+      headers: headers(),
+      body: JSON.stringify(body),
+    }),
 
   getCourses: () => request('/courses', { headers: headers(false) }),
   createCourse: (body) => request('/courses', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
