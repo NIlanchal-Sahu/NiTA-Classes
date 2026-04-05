@@ -57,6 +57,8 @@ export const academyApi = {
       headers: headers(),
       body: JSON.stringify(body),
     }),
+  deleteEnrollment: (enrollmentId) =>
+    request(`/enrollments/${encodeURIComponent(enrollmentId)}`, { method: 'DELETE', headers: headers(false) }),
 
   getCourses: () => request('/courses', { headers: headers(false) }),
   createCourse: (body) => request('/courses', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),

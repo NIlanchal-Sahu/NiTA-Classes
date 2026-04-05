@@ -735,6 +735,15 @@ router.patch('/enrollments/:enrollmentId', auth, allowRoles(['admin']), (req, re
   res.json({ success: true, enrollment: enrollments[idx] })
 })
 
+router.delete('/enrollments/:enrollmentId', auth, allowRoles(['admin']), (req, res) => {
+  const enrollmentId = String(req.params.enrollmentId || '')
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const next = enrollments.filter((e) => String(e.id) !== enrollmentId)
+  if (next.length === enrollments.length) return res.status(404).json({ error: 'Enrollment not found' })
+  saveJson(PATHS.enrollments, next)
+  res.json({ success: true, removedId: enrollmentId })
+})
+
 router.post('/students/reset-password', auth, allowRoles(['admin']), (req, res) => {
   const { studentIdOrPhone, newPassword } = req.body || {}
   if (!String(studentIdOrPhone || '').trim() || !newPassword) {

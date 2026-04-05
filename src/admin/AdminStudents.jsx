@@ -225,6 +225,27 @@ export default function AdminStudents() {
     }
   }
 
+  const removeEnrollmentRow = async (enrollmentId) => {
+    if (
+      !window.confirm(
+        'Remove this enrollment row from LMS history? The student may lose access to that course if no other enrollment remains.',
+      )
+    ) {
+      return
+    }
+    setExtBusyId(enrollmentId)
+    setError('')
+    try {
+      await academyApi.deleteEnrollment(enrollmentId)
+      const out = await academyApi.getStudentProfile(selectedId)
+      setProfile(out)
+    } catch (e) {
+      setError(e.message || 'Failed to remove enrollment')
+    } finally {
+      setExtBusyId('')
+    }
+  }
+
   const lookupRemovedByMobile = async () => {
     const phone = String(removedMobile || '').replace(/\D/g, '').slice(-10)
     if (phone.length !== 10) {
@@ -568,6 +589,14 @@ export default function AdminStudents() {
                                 className="rounded bg-violet-600 px-3 py-1 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
                               >
                                 {extBusyId === e.id ? '…' : 'Apply'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={extBusyId === e.id}
+                                onClick={() => removeEnrollmentRow(e.id)}
+                                className="rounded border border-red-500/60 bg-red-950/40 px-3 py-1 text-xs font-semibold text-red-200 hover:bg-red-900/50 disabled:opacity-50"
+                              >
+                                Remove
                               </button>
                             </div>
                           </div>
