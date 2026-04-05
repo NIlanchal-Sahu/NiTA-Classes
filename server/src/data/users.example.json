@@ -1,0 +1,9 @@
+[
+  {
+    "id": "admin-1",
+    "email": "admin@nitaclasses.com",
+    "passwordHash": "$2b$10$La99KzUeKCsG4Al8NAqfjevN.kcAQ4n9lYEOhvCygK4V.iXcty01W",
+    "role": "admin",
+    "name": "Admin"
+  }
+]

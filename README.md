@@ -19,7 +19,7 @@ npm run dev:all
 
 This runs the Vite dev server and the auth API (port 3001). The frontend proxies `/api` to the backend. Without the server, the Login button will work but sign-in will fail until the API is running.
 
-- **Password login:** Admin demo: `admin@nitaclasses.com` / `admin123`. Add more users (with hashed passwords) in `server/src/data/users.json` or via an admin API.
+- **Password login:** On first clone, copy `server/src/data/users.example.json` to `server/src/data/users.json` (the real file is gitignored). Default demo: `admin@nitaclasses.com` / `admin123`. Add more users (with hashed passwords) in `users.json` or via an admin API.
 - **OTP login:** Choose “OTP”, enter email, click “Send OTP”. In development the OTP is shown on screen; in production configure SMTP in `server/.env` to send OTP by email.
 
 ## Before Deployment

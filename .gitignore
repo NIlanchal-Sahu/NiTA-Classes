@@ -13,6 +13,9 @@ dist/
 server/uploads/
 server/google-service-account.json
 
+# Local user database (copy from users.example.json after clone)
+server/src/data/users.json
+
 # Editor
 .vscode/
 .idea/
