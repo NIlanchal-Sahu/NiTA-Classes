@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { dirname, join, basename } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -89,6 +89,46 @@ function parseJsonSafe(raw, fallback = []) {
   }
 }
 
+const USERS_FILE = 'users.json'
+const USERS_EXAMPLE = 'users.example.json'
+
+/** Ensures users.json exists so bootstrap can sync it from Google Sheets (gitignored file may be missing after clone). */
+function ensureUsersJsonPlaceholder() {
+  const usersPath = join(DATA_DIR, USERS_FILE)
+  if (existsSync(usersPath)) return
+  const examplePath = join(DATA_DIR, USERS_EXAMPLE)
+  if (existsSync(examplePath)) {
+    copyFileSync(examplePath, usersPath)
+  } else {
+    writeFileSync(usersPath, '[]', 'utf8')
+  }
+}
+
+/**
+ * Read JSON blob for a data file from the mirrored Sheet tab (cell B2).
+ * Returns null if Sheets is off, tab empty, or parse fails.
+ */
+export async function readJsonFromSheetTab(fileName) {
+  const sheets = await getSheetsClient()
+  if (!sheets) return null
+  const filePath = join(DATA_DIR, fileName)
+  const tab = tabNameForPath(filePath)
+  try {
+    await ensureSheetTab(sheets, tab)
+    const read = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${tab}!B2`,
+    })
+    const jsonString = read?.data?.values?.[0]?.[0]
+    if (!jsonString || !String(jsonString).trim()) return null
+    const parsed = parseJsonSafe(String(jsonString), null)
+    return parsed
+  } catch (e) {
+    console.warn('[sheetsJsonStore] readJsonFromSheetTab failed:', fileName, e.message)
+    return null
+  }
+}
+
 export function readJsonSync(path, fallback = []) {
   if (!existsSync(path)) return fallback
   const raw = readFileSync(path, 'utf8') || JSON.stringify(fallback)
@@ -136,6 +176,9 @@ export async function bootstrapDataFromSheets() {
   _bootstrapped = true
   _status.bootstrap.attempted = true
   _status.bootstrap.at = new Date().toISOString()
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
+  ensureUsersJsonPlaceholder()
+
   const sheets = await getSheetsClient()
   if (!sheets) {
     console.log('[sheetsJsonStore] Google Sheets DB disabled or not configured; using local JSON files')
@@ -143,7 +186,6 @@ export async function bootstrapDataFromSheets() {
     _status.bootstrap.error = 'not_configured_or_disabled'
     return
   }
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
   const files = readdirSync(DATA_DIR).filter((f) => f.endsWith('.json'))
   for (const fileName of files) {
     const filePath = join(DATA_DIR, fileName)
@@ -182,4 +224,9 @@ export function getSheetsStoreStatus() {
     configured: Boolean(_status.enabled && _status.spreadsheetIdPresent && creds),
     bootstrapped: _bootstrapped,
   }
+}
+
+/** Wait for pending Sheet mirror writes (e.g. after writeJsonSync in a script). */
+export function flushSheetMirrorQueue() {
+  return _writeQueue
 }

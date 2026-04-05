@@ -19,7 +19,9 @@ npm run dev:all
 
 This runs the Vite dev server and the auth API (port 3001). The frontend proxies `/api` to the backend. Without the server, the Login button will work but sign-in will fail until the API is running.
 
-- **Password login:** On first clone, copy `server/src/data/users.example.json` to `server/src/data/users.json` (the real file is gitignored). Default demo: `admin@nitaclasses.com` / `admin123`. Add more users (with hashed passwords) in `users.json` or via an admin API.
+- **Password login:** `server/src/data/users.json` is **gitignored** (so credentials are not lost on `git pull`). On first clone, either copy `server/src/data/users.example.json` → `users.json`, or rely on **Google Sheets** (recommended): configure `GOOGLE_SHEETS_SPREADSHEET_ID` and the service account in `server/.env`. On server start, the app pulls `users` from the Sheet tab `db_users` into `users.json` when present. If `users.json` is missing, a placeholder is created from `users.example.json` so bootstrap can run.
+- **Merge local + Sheet users:** From `server/`, run `npm run sync:users:merge` — merges Sheet + local `users.json` (same `id`: local fields win), saves, and mirrors back to the Sheet. Use this after pulling code or when consolidating machines.
+- Default demo (in `users.example.json`): `admin@nitaclasses.com` / `admin123`. Add more users (hashed passwords) via admin or by editing `users.json` / Sheet.
 - **OTP login:** Choose “OTP”, enter email, click “Send OTP”. In development the OTP is shown on screen; in production configure SMTP in `server/.env` to send OTP by email.
 
 ## Before Deployment
