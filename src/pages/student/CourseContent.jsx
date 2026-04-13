@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { studentPortalApi } from '../../api/student'
 
@@ -117,6 +117,69 @@ function getPlayerMode(rawUrl, resourceType) {
   }
 }
 
+function applyYoutubeEmbedRestrictions(src) {
+  const s = String(src || '')
+  if (!s.includes('youtube.com/embed') && !s.includes('youtube-nocookie.com/embed')) return s
+  try {
+    const u = new URL(s.startsWith('//') ? `https:${s}` : s)
+    u.searchParams.set('controls', '0')
+    u.searchParams.set('modestbranding', '1')
+    u.searchParams.set('rel', '0')
+    return u.toString()
+  } catch {
+    return s
+  }
+}
+
+function normalizeContentType(ch) {
+  let ct = String(ch?.contentType || '').toLowerCase()
+  if (!ct) {
+    if (String(ch?.contentHtml || '').trim()) ct = 'text'
+    else if (ch?.documentFileId || ch?.documentUrl) ct = ch?.videoUrl ? 'mixed' : 'document'
+    else ct = 'video'
+  }
+  if (!['video', 'document', 'mixed', 'text'].includes(ct)) ct = 'video'
+  return ct
+}
+
+function documentPreviewSrc(ch) {
+  if (ch?.documentFileId) return `https://drive.google.com/file/d/${ch.documentFileId}/preview`
+  const u = String(ch?.documentUrl || '').trim()
+  if (!u) return ''
+  if (u.includes('/preview')) return u
+  const m = u.match(/\/file\/d\/([^/]+)/)
+  return m ? `https://drive.google.com/file/d/${m[1]}/preview` : u
+}
+
+/** Deterrent-only: blocks right-click/copy on wrapper; does not secure cross-origin iframe content. */
+function ProtectedBlock({ children, className = '' }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const block = (e) => {
+      e.preventDefault()
+      return false
+    }
+    el.addEventListener('contextmenu', block)
+    el.addEventListener('copy', block)
+    const keys = (e) => {
+      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key))) e.preventDefault()
+    }
+    window.addEventListener('keydown', keys)
+    return () => {
+      el.removeEventListener('contextmenu', block)
+      el.removeEventListener('copy', block)
+      window.removeEventListener('keydown', keys)
+    }
+  }, [])
+  return (
+    <div ref={ref} className={`select-none ${className}`} style={{ userSelect: 'none' }} tabIndex={-1}>
+      {children}
+    </div>
+  )
+}
+
 export default function CourseContent() {
   const { courseId } = useParams()
   const [data, setData] = useState(null)
@@ -154,10 +217,29 @@ export default function CourseContent() {
   )
   const selected = allChapters.find((c) => String(c.id) === String(selectedChapterId)) || allChapters[0] || null
 
+  const contentType = useMemo(() => (selected ? normalizeContentType(selected) : 'video'), [selected])
+
   const player = useMemo(() => {
-    if (!selected) return { mode: 'empty', href: '', reason: '' }
-    return getPlayerMode(selected.videoUrl || selected.url, selected.resourceType)
+    if (!selected) return { mode: 'empty', href: '', reason: '', src: '' }
+    const ct = normalizeContentType(selected)
+    if (ct === 'document' || ct === 'text') {
+      return { mode: 'empty', href: '', reason: 'content-type', src: '' }
+    }
+    const v = String(selected.videoUrl || selected.url || '').trim()
+    if (!v) return { mode: 'empty', href: '', reason: 'no-url', src: '' }
+    return getPlayerMode(v, selected.resourceType)
   }, [selected])
+
+  const iframeSrc = useMemo(() => {
+    if (player.mode !== 'iframe' || !player.src) return ''
+    return applyYoutubeEmbedRestrictions(player.src)
+  }, [player])
+
+  const docSrc = useMemo(() => (selected ? documentPreviewSrc(selected) : ''), [selected])
+  const showVideoBlock = (contentType === 'video' || contentType === 'mixed') && selected
+  const showDocBlock =
+    selected && (contentType === 'document' || contentType === 'mixed') && Boolean(docSrc)
+  const showTextBlock = contentType === 'text' && String(selected?.contentHtml || '').trim()
 
   const displayHeading = selected?.heading || selected?.title
 
@@ -222,39 +304,65 @@ export default function CourseContent() {
           {selected && selected.unlocked ? (
             <>
               <h3 className="text-lg font-semibold text-white">{displayHeading}</h3>
-              <p className="mt-1 text-xs text-gray-400">Type: {selected.resourceType || 'video'}</p>
+              <p className="mt-1 text-xs text-gray-400">
+                Content: {contentType}
+                {selected.resourceType ? ` · Player: ${selected.resourceType}` : ''}
+              </p>
 
-              {player.mode === 'iframe' && player.src ? (
-                <div className="mt-3 aspect-video overflow-hidden rounded-lg border border-gray-700 bg-black">
-                  <iframe
-                    src={player.src}
-                    title={displayHeading || 'Video'}
-                    className="h-full w-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    referrerPolicy="strict-origin-when-cross-origin"
-                  />
-                </div>
-              ) : (
-                <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  <p className="font-medium text-amber-50">Video plays in a new tab</p>
-                  <p className="mt-1 text-xs text-amber-200/90">
-                    This link can’t be embedded here safely (e.g. OneDrive, or same-site URL). Use a YouTube or Google
-                    Drive “preview/embed” link for in-page playback.
-                  </p>
-                  {player.href ? (
-                    <a
-                      href={player.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
-                    >
-                      Open video / resource
-                    </a>
+              {showVideoBlock && (
+                <>
+                  {player.mode === 'iframe' && iframeSrc ? (
+                    <ProtectedBlock className="mt-3">
+                      <div className="aspect-video overflow-hidden rounded-lg border border-gray-700 bg-black">
+                        <iframe
+                          src={iframeSrc}
+                          title={displayHeading || 'Video'}
+                          className="h-full w-full"
+                          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                          allowFullScreen
+                          referrerPolicy="strict-origin-when-cross-origin"
+                        />
+                      </div>
+                    </ProtectedBlock>
                   ) : (
-                    <p className="mt-2 text-xs text-gray-400">No video URL set for this chapter.</p>
+                    <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                      <p className="font-medium text-amber-50">Video opens in a new tab or is not set</p>
+                      <p className="mt-1 text-xs text-amber-200/90">
+                        Use an embeddable YouTube, Vimeo, or Google Drive preview link for in-page playback where supported.
+                      </p>
+                      {player.href ? (
+                        <a
+                          href={player.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                        >
+                          Open video / resource
+                        </a>
+                      ) : (
+                        <p className="mt-2 text-xs text-gray-400">No video URL for this chapter.</p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
+              )}
+
+              {showDocBlock && (
+                <ProtectedBlock className="mt-4">
+                  <div className="text-sm font-medium text-gray-200">Notes (preview)</div>
+                  <div className="relative mt-2 min-h-[480px] overflow-hidden rounded-lg border border-gray-700 bg-gray-900">
+                    <iframe title="Document preview" src={docSrc} className="h-[min(70vh,720px)] w-full" />
+                  </div>
+                </ProtectedBlock>
+              )}
+
+              {showTextBlock && (
+                <ProtectedBlock className="mt-4">
+                  <div
+                    className="chapter-html max-w-none rounded-lg border border-gray-700 bg-gray-900/80 p-4 text-sm leading-relaxed text-gray-200 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-2 [&_h3]:text-base [&_h3]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-violet-300"
+                    dangerouslySetInnerHTML={{ __html: selected.contentHtml }}
+                  />
+                </ProtectedBlock>
               )}
 
               <p className="mt-3 text-sm text-gray-300">{selected.description || 'No description provided.'}</p>

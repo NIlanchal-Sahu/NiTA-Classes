@@ -41,6 +41,7 @@ const COURSE_UNLOCK_FEES = {
   "spoken-english-mastery": 499,
   "ai-associate": 1499,
   "ai-video-creation": 499,
+  "ai-vibe-coding": 999,
 };
 const COURSE_DURATION_DAYS = {
   dca: 90,
@@ -48,6 +49,7 @@ const COURSE_DURATION_DAYS = {
   "spoken-english-mastery": 90,
   "ai-associate": 180,
   "ai-video-creation": 60,
+  "ai-vibe-coding": 60,
 };
 
 function loadJson(path) {
@@ -135,10 +137,13 @@ function getCourseCatalog() {
   const academy = loadJson(ACADEMY_COURSES_PATH);
   const fromAcademy = academy.map((c) => {
     const id = normalizeCourseId(c.id);
+    const image = typeof c.image === "string" ? c.image.trim() : "";
     return {
       id,
       name: c.name || id,
       description: c.description || "",
+      duration: c.duration || "",
+      image,
       unlockFee: Number(COURSE_UNLOCK_FEES[id] ?? c.price ?? 499),
     };
   });
@@ -149,6 +154,7 @@ function getCourseCatalog() {
     { id: "spoken-english-mastery", name: "Spoken English Mastery", unlockFee: 499 },
     { id: "ai-associate", name: "AI Associate (Python)", unlockFee: 1499 },
     { id: "ai-video-creation", name: "AI Video Creation Course", unlockFee: 499 },
+    { id: "ai-vibe-coding", name: "AI Vibe Coding", unlockFee: 999 },
   ];
 }
 
@@ -269,6 +275,19 @@ function getFlatChapterOrder(courseNode) {
     for (const c of chapters) ids.push(String(c.id));
   }
   return ids;
+}
+
+/** Default contentType for legacy chapters (migration in-memory). */
+function normalizeChapterForStudent(ch) {
+  if (!ch || typeof ch !== "object") return ch;
+  let contentType = String(ch.contentType || "").toLowerCase();
+  if (!contentType) {
+    if (String(ch.contentHtml || "").trim()) contentType = "text";
+    else if (ch.documentFileId || ch.documentUrl) contentType = ch.videoUrl ? "mixed" : "document";
+    else contentType = "video";
+  }
+  if (!["video", "document", "mixed", "text"].includes(contentType)) contentType = "video";
+  return { ...ch, contentType };
 }
 
 function sumWalletClassesByUser(rows) {
@@ -969,7 +988,7 @@ router.get("/portal/course-content/:courseId", studentAuth, (req, res) => {
         .slice()
         .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
         .map((c) => ({
-          ...c,
+          ...normalizeChapterForStudent(c),
           unlocked: unlockedSet.has(String(c.id)),
           completed: completedSet.has(String(c.id)),
         })),

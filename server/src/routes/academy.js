@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import multer from 'multer'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { verifyToken, adminResetStudentPassword, adminResetAdminPassword, hashPassword } from '../auth.js'
@@ -8,9 +9,22 @@ import {
   ensurePaymentReceiptsFolder,
   uploadDataUrlToDrive,
 } from '../services/googleProfileSync.js'
+import { uploadChapterNotesBuffer } from '../services/courseContentDrive.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+const chapterNotesUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 32 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok =
+      /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i.test(
+        file.mimetype,
+      ) || /\.(pdf|doc|docx)$/i.test(file.originalname || '')
+    cb(null, ok)
+  },
+})
 
 const PATHS = {
   students: join(__dirname, '..', 'data', 'students.json'),
@@ -189,6 +203,7 @@ const COURSE_DURATION_DAYS = {
   'spoken-english-mastery': 90,
   'ai-associate': 180,
   'ai-video-creation': 60,
+  'ai-vibe-coding': 60,
 }
 
 function minAccessDaysForCourse(courseId) {
@@ -429,6 +444,36 @@ function loadCourseContentTree() {
 
 function saveCourseContentTree(tree) {
   saveJson(PATHS.courseContent, tree)
+}
+
+function sanitizeContentHtml(html) {
+  let s = String(html || '')
+  s = s.replace(/<script[\s\S]*?<\/script>/gi, '')
+  s = s.replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+  s = s.replace(/\son\w+\s*=\s*(['"])[\s\S]*?\1/gi, '')
+  s = s.replace(/\son\w+\s*=\s*[^\s>]*/gi, '')
+  return s.slice(0, 600000)
+}
+
+function validateChapterContent(body) {
+  const title = String(body?.title || '').trim()
+  if (!title) return { error: 'title is required' }
+  const ct = String(body?.contentType || 'video').toLowerCase()
+  const videoUrl = String(body?.videoUrl || '').trim()
+  const documentFileId = String(body?.documentFileId || '').trim()
+  const documentUrl = String(body?.documentUrl || '').trim()
+  const contentHtml = String(body?.contentHtml || '').trim()
+  const textPlain = contentHtml.replace(/<[^>]+>/g, ' ').replace(/\s/g, '')
+  if (ct === 'document' && !documentFileId && !documentUrl) {
+    return { error: 'Document chapter: upload a file or provide a document link' }
+  }
+  if (ct === 'text' && !textPlain) {
+    return { error: 'Text chapter: add content in the editor' }
+  }
+  if (ct === 'mixed' && !documentFileId && !documentUrl && !videoUrl) {
+    return { error: 'Mixed chapter: add a video URL and/or a document' }
+  }
+  return null
 }
 
 function loadCoursesWithLegacyFallback() {
@@ -1277,12 +1322,57 @@ router.post('/content/courses/:courseId/modules/reorder', auth, allowRoles(['adm
   res.json({ success: true, modules: tree[idx].modules })
 })
 
+router.post(
+  '/content/courses/:courseId/modules/:moduleId/upload-notes',
+  auth,
+  allowRoles(['admin', 'teacher']),
+  chapterNotesUpload.single('file'),
+  async (req, res) => {
+    const courseId = String(req.params.courseId)
+    if (!requireTeacherCourseAccess(req, res, courseId)) return
+    const moduleId = String(req.params.moduleId)
+    const chapterId = String(req.body?.chapterId || '').trim()
+    if (!chapterId) return res.status(400).json({ error: 'chapterId is required (use chapter id for folder path)' })
+    if (!req.file?.buffer?.length) return res.status(400).json({ error: 'file is required (.pdf, .doc, .docx)' })
+    if (!isGoogleDriveReady()) return res.status(503).json({ error: 'Google Drive is not configured on the server' })
+    try {
+      const out = await uploadChapterNotesBuffer(req.file.buffer, {
+        fileName: req.file.originalname || 'notes.pdf',
+        mimeType: req.file.mimetype,
+        courseId,
+        moduleId,
+        chapterId,
+      })
+      if (!out.ok) return res.status(500).json({ error: out.error || 'Upload failed' })
+      return res.json({ success: true, ...out })
+    } catch (e) {
+      console.error('[academy] upload-notes', e)
+      return res.status(500).json({ error: e.message || 'Upload failed' })
+    }
+  },
+)
+
 router.post('/content/courses/:courseId/modules/:moduleId/chapters', auth, allowRoles(['admin', 'teacher']), (req, res) => {
   const courseId = String(req.params.courseId)
   if (!requireTeacherCourseAccess(req, res, courseId)) return
   const moduleId = String(req.params.moduleId)
-  const { title, videoUrl, description = '', heading = '', order, noteText = '', resourceType = 'video' } = req.body || {}
-  if (!title || !videoUrl) return res.status(400).json({ error: 'title and videoUrl are required' })
+  const {
+    title,
+    videoUrl = '',
+    description = '',
+    heading = '',
+    order,
+    noteText = '',
+    resourceType = 'video',
+    contentType = 'video',
+    contentHtml = '',
+    documentFileId = '',
+    documentUrl = '',
+    documentMime = '',
+    documentName = '',
+  } = req.body || {}
+  const err = validateChapterContent({ ...req.body, title })
+  if (err) return res.status(400).json(err)
   const tree = loadCourseContentTree()
   const idx = findTreeCourseIndex(tree, courseId)
   if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
@@ -1290,14 +1380,29 @@ router.post('/content/courses/:courseId/modules/:moduleId/chapters', auth, allow
   const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
   if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
   const list = modules[mIdx].chapters || []
+  const requestedId = String(req.body?.id || '').trim()
+  let chapterId = `ch-${Date.now()}`
+  if (requestedId && /^ch-[a-zA-Z0-9_-]+$/.test(requestedId)) {
+    if (list.some((c) => String(c.id) === requestedId)) {
+      return res.status(400).json({ error: 'Chapter id already exists in this module' })
+    }
+    chapterId = requestedId
+  }
+  const ct = String(contentType || 'video').toLowerCase()
   const next = {
-    id: `ch-${Date.now()}`,
+    id: chapterId,
     title: String(title),
     heading: String(heading || title),
     videoUrl: String(videoUrl),
     description: String(description),
     resourceType: String(resourceType || 'video'),
     noteText: String(noteText || ''),
+    contentType: ['video', 'document', 'mixed', 'text'].includes(ct) ? ct : 'video',
+    contentHtml: sanitizeContentHtml(contentHtml),
+    documentFileId: String(documentFileId || ''),
+    documentUrl: String(documentUrl || ''),
+    documentMime: String(documentMime || ''),
+    documentName: String(documentName || ''),
     order: Number(order) || list.length + 1,
     createdAt: new Date().toISOString(),
   }
@@ -1323,7 +1428,9 @@ router.put('/content/courses/:courseId/modules/:moduleId/chapters/:chapterId', a
   const chapters = modules[mIdx].chapters || []
   const cIdx = chapters.findIndex((c) => String(c.id) === chapterId)
   if (cIdx < 0) return res.status(404).json({ error: 'Chapter not found' })
-  chapters[cIdx] = { ...chapters[cIdx], ...req.body, updatedAt: new Date().toISOString() }
+  const patch = { ...req.body }
+  if (patch.contentHtml != null) patch.contentHtml = sanitizeContentHtml(patch.contentHtml)
+  chapters[cIdx] = { ...chapters[cIdx], ...patch, updatedAt: new Date().toISOString() }
   chapters.sort(byOrder)
   modules[mIdx].chapters = chapters
   tree[idx].modules = modules

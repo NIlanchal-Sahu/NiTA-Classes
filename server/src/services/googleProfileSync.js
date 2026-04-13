@@ -58,6 +58,16 @@ const SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID || ''
 const SHEET_TAB = process.env.GOOGLE_SHEETS_TAB_NAME || 'Students'
 const SHARE_EMAIL = process.env.GOOGLE_DRIVE_SHARE_EMAIL || 'tech.nilanchala25@gmail.com'
 
+/** For course content uploads and other Drive helpers outside this module. */
+export async function getDriveV3() {
+  const { drive } = await getClients()
+  return drive
+}
+
+export function getGoogleDriveParentFolderId() {
+  return DRIVE_PARENT || ''
+}
+
 export function isGoogleConfigured() {
   return !!(loadCredentials() && DRIVE_PARENT && SHEET_ID)
 }

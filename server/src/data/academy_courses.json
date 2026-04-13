@@ -55,6 +55,17 @@
     "migratedFromLegacy": true
   },
   {
+    "id": "ai-vibe-coding",
+    "name": "AI Vibe Coding",
+    "description": "Build real websites using AI-assisted “vibe coding” — no traditional coding background needed. Anyone can start from about 12 years old; we focus on tools, prompts, and practical steps rather than memorizing syntax.\n\n【 Highlights 】\n• No coding skills required — learn with AI guidance step by step\n• Age-friendly: learners from ~12 years can follow along\n• AI tools for vibe coding: modern assistants and no-code/low-code builders to go from idea to working pages fast\n• End-to-end website development covered: choosing a domain, registration basics, hosting, building the site, and deployment to go live\n• Project-based path so you ship a complete site, not just theory\n\n【 Fees & pace 】\n• Enrollment ₹999 + ₹10 per class\n• Plan for about 50 days or 2 months of structured learning (flexible pacing)",
+    "duration": "50 days / 2 months",
+    "status": "active",
+    "priceType": "perClass10",
+    "price": 10,
+    "createdAt": "2026-04-05T00:00:00.000Z",
+    "migratedFromLegacy": false
+  },
+  {
     "id": "plus2-it-arts-science-oav",
     "name": "+2 IT Arts/Science/OAV",
     "description": "One-year academic support course aligned with school curriculum for +2 Arts/Science/OAV learners. Includes fundamentals of IT, office productivity tools, internet and digital safety, project-based practicals, chapter-wise revision, previous-year question practice, and exam preparation support.",

@@ -6,6 +6,7 @@ const COURSE_OPTIONS = [
   { id: 'spoken-english-mastery', label: 'Spoken English Mastery (Advance Level)' },
   { id: 'ai-associate', label: 'Artificial Intelligent Associate (AI Development Course with Python)' },
   { id: 'ai-video-creation', label: 'AI Video Creation Course' },
+  { id: 'ai-vibe-coding', label: 'AI Vibe Coding' },
 ]
 
 const emptyForm = {

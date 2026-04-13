@@ -101,7 +101,13 @@ export default function ExploreCourses() {
             className="overflow-hidden rounded-xl border border-gray-700 bg-gray-800 transition hover:border-gray-600"
           >
             <div className="relative aspect-video bg-gray-700">
-              <img src={c.image} alt="" className="h-full w-full object-cover" />
+              {c.image ? (
+                <img src={c.image} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-700/90 to-violet-900/95 text-5xl">
+                  ✨
+                </div>
+              )}
               <span
                 className={`absolute left-2 top-2 rounded px-2 py-1 text-xs font-medium text-white ${
                   c.unlocked ? 'bg-emerald-600/90' : 'bg-red-600/90'

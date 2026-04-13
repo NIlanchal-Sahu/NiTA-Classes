@@ -142,5 +142,24 @@ export const academyApi = {
       headers: headers(),
       body: JSON.stringify({ orders }),
     }),
+
+  /** Upload PDF/DOC/DOCX to Google Drive (NITA_Course_Content/.../Chapter_{id}/). Requires chapter id before create. */
+  uploadChapterNotes: (courseId, moduleId, chapterId, file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('chapterId', chapterId)
+    return fetch(
+      `/api/admin/academy/content/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/upload-notes`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd,
+      },
+    ).then(async (res) => {
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      return data
+    })
+  },
 }
 

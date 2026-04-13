@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import LazyAllOurCoursesSection from '../components/home/LazyAllOurCoursesSection'
 import {
   WHATSAPP_NUMBER,
   LOGO_SRC,
@@ -51,7 +52,7 @@ const showcase = [
   },
   {
     id: 'plus2-it',
-    title: '+2 IT Arts/Science/OAV: School Curriculum Support',
+    title: '+2 IT Arts/Science/OAV: School Curriculum',
     to: '/courses#plus2-it-arts-science-oav',
     icon: '📘',
     visual: '1 Year Academic IT Support',
@@ -64,6 +65,14 @@ const showcase = [
     icon: '🏫',
     visual: '1 Year ICT School Program',
     bgClass: 'from-lime-100 via-emerald-100 to-teal-100',
+  },
+  {
+    id: 'ai-vibe-coding',
+    title: 'AI Vibe Coding: Domain Registration to Deployment',
+    to: '/courses#ai-vibe-coding',
+    icon: '✨',
+    visual: 'No-code to Building Complete Website',
+    bgClass: 'from-slate-100 via-indigo-100 to-violet-100',
   },
   {
     id: 'vvip',
@@ -251,12 +260,12 @@ export default function Home() {
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { title: 'DCA', subtitle: 'Basic Computer + AI' },
-                  { title: 'CCA', subtitle: 'Advanced Computer Course + AI' },
+                  { title: 'CCA', subtitle: 'Advanced Computer Equivalent to PGDCA & \'O\' Level' },
                   { title: 'AI / ML', subtitle: 'AI development with Python' },
                   { title: 'AI Video Creation', subtitle: 'Write Prompt Get Video in minutes' },
-                  { title: 'DEO', subtitle: 'Data Entry Operator - 30 Days' },
+                  { title: 'AI Vibe Coding', subtitle: 'No Code to Complete Website Development' },
                   { title: 'Spoken English', subtitle: 'Speak with Confidence' },
-                  { title: 'OAV - IT', subtitle: 'OAV & Govt. School IT Classes' },
+                  { title: 'OAV - ICT', subtitle: 'OAV & Govt. School ICT Classes' },
                   { title: '+2 IT', subtitle: '+2 Arts & Science IT Class' },
                 ].map((x) => (
                   <div key={x.title} className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -273,10 +282,10 @@ export default function Home() {
 
               <div className="mt-5 space-y-3">
                 {[
-                  { n: '1', t: 'Register', d: 'Fill enrollment form in minutes' },
-                  { n: '2', t: 'Payment', d: 'Pay ₹10/class or course pricing' },
-                  { n: '3', t: 'Group Access', d: 'WhatsApp + learning resources' },
-                  { n: '4', t: 'Learn', d: 'Start learning on your schedule' },
+                  { n: '1', t: 'Register', d: 'Fill enrollment form in minutes (No Fees)' },
+                  { n: '2', t: 'Group Access', d: 'WhatsApp + Class & Batch Updates' },
+                  { n: '3', t: 'Payment', d: 'Understand the Skills + Course Enrollment' },
+                  { n: '4', t: 'Learn', d: 'Pay ₹10/class & Start learning on your schedule' },
                 ].map((s) => (
                   <div key={s.n} className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
                     <div className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-sm font-bold">
@@ -352,6 +361,8 @@ export default function Home() {
         </div>
       </section>
 
+      <LazyAllOurCoursesSection />
+
       {/* Video Showcase (portfolio-style) */}
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -388,7 +399,7 @@ export default function Home() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { k: '₹10', t: 'Per class fee' },
-              { k: '7', t: 'Comprehensive courses' },
+              { k: '8', t: 'Comprehensive courses' },
               { k: '45 Days', t: 'Urgent certification (DCA/CCA/AI Associate)' },
               { k: '₹699', t: 'VVIP Unlimited Classes (1 month)' },
             ].map((x) => (
