@@ -7,6 +7,7 @@ import {
   LOGO_SRC,
   PROGRAM_START_DATE,
   WHATSAPP_CTA,
+  INTERNSHIP_APPLICATION_FORM_URL,
 } from '../config'
 
 const showcase = [
@@ -356,6 +357,38 @@ export default function Home() {
               <div className="col-span-2 rounded-lg bg-emerald-100 px-3 py-2 text-center text-xs font-semibold text-emerald-900">
                 Selected Courses are NSQF Level 4 aligned and can be verified on DigiLocker App.
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Internship */}
+      <section className="border-y border-violet-200 bg-gradient-to-br from-violet-50 via-indigo-50 to-primary-50">
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-xl">
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">Internship & traineeship</p>
+              <h2 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">Learn how a skill institute runs — apply as an intern</h2>
+              <p className="mt-3 text-gray-700">
+                Support batches, content, or digital tasks while building real experience. Submit our short application form
+                and we will get back to you.
+              </p>
+            </div>
+            <div className="flex flex-shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
+              <Link
+                to="/internship"
+                className="btn-touch inline-flex items-center justify-center rounded-xl bg-primary-600 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition"
+              >
+                Internship details
+              </Link>
+              <a
+                href={INTERNSHIP_APPLICATION_FORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-touch inline-flex items-center justify-center rounded-xl border-2 border-primary-600 bg-white px-6 py-3 text-center text-sm font-semibold text-primary-700 hover:bg-primary-50 transition"
+              >
+                Apply (Google Form) →
+              </a>
             </div>
           </div>
         </div>

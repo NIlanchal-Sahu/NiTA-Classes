@@ -17,7 +17,7 @@ export default function Footer() {
           <div>
             <h4 className="text-sm font-semibold uppercase tracking-wider text-white">Quick Links</h4>
             <ul className="mt-3 space-y-2">
-              {['/', '/courses', '/admission', '/about', '/contact'].map((path) => (
+              {['/', '/courses', '/admission', '/internship', '/about', '/contact'].map((path) => (
                 <li key={path}>
                   <Link to={path} className="text-sm hover:text-white transition">
                     {path === '/' ? 'Home' : path.slice(1).charAt(0).toUpperCase() + path.slice(2)}

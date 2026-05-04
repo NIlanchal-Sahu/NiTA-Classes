@@ -7,6 +7,7 @@ const navLinks = [
   { to: '/', label: 'Home' },
   { to: '/courses', label: 'Courses' },
   { to: '/admission', label: 'Admission' },
+  { to: '/internship', label: 'Internship' },
   { to: '/referral', label: 'Referral' },
   { to: '/about', label: 'About' },
   { to: '/contact', label: 'Contact' },

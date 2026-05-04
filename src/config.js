@@ -15,6 +15,10 @@ export const INSTAGRAM_URL = 'https://instagram.com/nitaclasses'
 export const FACEBOOK_URL = 'https://facebook.com/nitaclasses'
 export const YOUTUBE_URL = 'https://youtube.com/@nitaclasses'
 
+/** Public Google Form: internship / trainee applications */
+export const INTERNSHIP_APPLICATION_FORM_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLSd10oBwtfPhFeZJc-8j-GZsrS_s7KEXBg3K9dcRdadj6jNHhw/viewform?usp=sharing'
+
 /** Form submission: Google Apps Script web app URL or Formspree form endpoint */
 export const FORM_ENDPOINT = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'
 
