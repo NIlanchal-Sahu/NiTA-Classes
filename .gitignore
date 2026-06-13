@@ -16,6 +16,10 @@ server/google-service-account.json
 # Local user database (copy from users.example.json after clone)
 server/src/data/users.json
 
+# Runtime payment logs — created on server; never commit (avoids overwriting production)
+server/src/data/course_payment_orders.json
+server/src/data/online_enrollments.json
+
 # Editor
 .vscode/
 .idea/

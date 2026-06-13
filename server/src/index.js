@@ -8,12 +8,15 @@ import enrollmentsRoutes from './routes/enrollments.js'
 import batchesRoutes from './routes/batches.js'
 import notificationsRoutes from './routes/notifications.js'
 import publicEnrollmentsRoutes from './routes/publicEnrollments.js'
+import publicCoursesRoutes from './routes/publicCourses.js'
 import referralsRoutes from './routes/referrals.js'
 import academyRoutes from './routes/academy.js'
 import studentProfileRoutes from './routes/studentProfile.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { bootstrapDataFromSheets, getSheetsStoreStatus } from './services/sheetsJsonStore.js'
+import { startEventTriggerJobs } from './services/eventTriggers.js'
+import { handleRazorpayWebhook } from './routes/razorpayWebhook.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -21,6 +24,14 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 app.use(cors({ origin: true, credentials: true }))
+
+// Razorpay webhook must receive raw body (before express.json)
+app.post(
+  '/api/public/courses/payment/webhook',
+  express.raw({ type: 'application/json' }),
+  handleRazorpayWebhook,
+)
+
 // Allow larger JSON payloads for base64 profile photo uploads from admin forms.
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
@@ -30,6 +41,7 @@ app.use('/api/student', studentRoutes)
 app.use('/api/student', studentProfileRoutes)
 app.use('/api/student/referrals', referralsRoutes)
 app.use('/api/public/enrollments', publicEnrollmentsRoutes)
+app.use('/api/public/courses', publicCoursesRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/admin/academy', academyRoutes)
 app.use('/api/admin/enrollments', enrollmentsRoutes)
@@ -49,5 +61,6 @@ bootstrapDataFromSheets()
   .finally(() => {
     app.listen(PORT, () => {
       console.log(`Auth server running at http://localhost:${PORT}`)
+      startEventTriggerJobs()
     })
   })

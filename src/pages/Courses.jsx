@@ -1,171 +1,11 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-
-const COURSE_DETAILS = [
-  {
-    id: 'dca',
-    name: 'DCA (Basic Computer Course) - Quick and Short Term Course',
-    courseHour: '140 / 300 Hours',
-    certificationDuration: '3 Month / 6 Month (as per student preference)',
-    enrollmentFees: '499',
-    classFee: '10/class',
-    urgent: 'Urgent Certification Available in 45 Days',
-    level: 'Quick & Short Term',
-    content: [
-      'Basics of Computer Technology & AI',
-      'Basics of MS Office (Word, Excel, PPT, Email) - Introductory AI Tools',
-      'Basics of Networking - Communication Technologies, Website, Mobile APP, Web Application.',
-      'Spoken English - Intermediate Level (6 Month Course Only)',
-    ],
-  },
-  {
-    id: 'cca',
-    name: "CCA - Course on Computer Application (Equivalent to PGDCA & 'O' Level)",
-    trustBadge: 'NSQF Level 4 | Skill India + NSDC',
-    nsqf: 'NSQF Level - 4',
-    nsdc: 'Recognized under Skill India and NSDC (Ministry of Skill Development and Entrepreneurship). Certificates can be verified on the Government DigiLocker app.',
-    courseHour: '600 Hours',
-    certificationDuration: '6 Month / 1 Year (as per student preference)',
-    enrollmentFees: '999',
-    classFee: '10/class',
-    urgent: 'Urgent Certification Available in 45 Days',
-    level: 'Advanced Computer Course',
-    content: [
-      'Fundamentals of Computer Technology & AI',
-      'Complete MS Office Skills (Word, Excel, PPT, Email) - With AI Tools',
-      'Concept of Networking - Communication Technologies, Website, Mobile APP, Web Application.',
-      'C and Java Programming',
-      'HTML + React JS (Website Development)',
-      'Tally ERP',
-      'Project (As per student choice)',
-    ],
-  },
-  {
-    id: 'spoken-english-mastery',
-    name: 'Spoken English Mastery - Advance Level',
-    courseHour: '140 Hours',
-    certificationDuration: '3 Months / 6 Months',
-    enrollmentFees: '499',
-    classFee: '10/class',
-    urgent: 'Urgent Complete in 30 Days',
-    level: 'Communication & Speaking Focus',
-    intro:
-      '90 din mein achhi English — bilkul basic se advanced tak. Grammar rules mein uljhe bina, easily bolna. Odia aur Hindi mein samjhaakar padhaaya jaata hai.',
-    content: [
-      'Bilkul basic se lekar advanced level tak poori training',
-      'English words bolne ka sahi tarika',
-      'Sentences banana — bina grammar rules mein uljhe',
-      'Do, Does, Has, Have, Had — easily',
-      'Introduction English mein kaise dein',
-      'English mein sawal aur jawab',
-      'Request, order, invitation, salaah dena',
-      'Kisi se kaam karwane wali baat kaise bolein',
-      'Could, Would, Should ka sahi use',
-      'Common mistakes theek karna aur confidence badhana',
-      'If wale conditional sentences',
-      'Tenses, Active–Passive, Narration, Causative verbs — roz-marra mein use',
-    ],
-  },
-  {
-    id: 'ai-associate',
-    name: 'Artificial Intelligent Associate (AI Development Course with Python)',
-    trustBadge: 'NSQF Level 4 | Skill India + NSDC',
-    qpCode: 'QP Code - NIE/SSC/Q1004',
-    nsqf: 'NSQF Level - 4',
-    nielit: 'NIELIT / NSDC recognized certification pathway under the Ministry of Skill Development and Entrepreneurship (verify on Government DigiLocker app)',
-    courseHour: '600 Hours',
-    certificationDuration: '6 Month / 1 Year (as per student preference)',
-    enrollmentFees: '1499',
-    classFee: '10/class',
-    urgent: 'Urgent Certification Available in 100 Days',
-    level: 'AI Development with Python',
-    content: [
-      'NIE/ITS/N1005: Development of Deep Learning framework for collecting, analysing and interpreting large amounts of data',
-      'NIE/ITS/N1005: PROGRAMMING with PYTHON',
-      'NIE/ITS/N1006: Create and deploy interactive Artificial Intelligence projects',
-      'NIE/ITS/N1007: Conceptualising Data Science with Python',
-      'NIE/ITS/N1008: FUNDAMENTALS of MACHINE LEARNING',
-      'NIE/ITS/N1008: Data analysis and Visualization',
-      'NIE/ITS/N1009: PERFORMANCE and ACCURACY of MACHINE LEARNING MODELS',
-      'DGT/VSQ/N0102: Employability Skills (60 Hours)',
-    ],
-  },
-  {
-    id: 'ai-video-creation',
-    name: 'AI Video Creation Course',
-    courseHour: '80 Hours',
-    certificationDuration: '2 Months',
-    enrollmentFees: '499',
-    classFee: '10/class',
-    urgent: 'Urgent Complete in 15 Days',
-    level: 'AI Video Creation',
-    content: [
-      'Product Ad Video Prompts Using JSON Framework',
-      'AI Model Creation',
-      'Retail Store Demo Ad (BIBA Case Study)',
-      'UGC Ad Creation',
-      'AI Presentation Video',
-      'Facebook Ads Video Creation',
-      'Idea To Complete AI Video – LIVE Masterclass',
-    ],
-  },
-  {
-    id: 'ai-vibe-coding',
-    name: 'AI Vibe Coding',
-    courseHour: 'Project-based - 50 Hours',
-    certificationDuration: '50 Days / 2 Months (flexible pace)',
-    enrollmentFees: '999',
-    classFee: '10/class',
-    urgent: 'No prior coding required — suitable from above 12 years Students',
-    level: 'AI-Assisted Web Development',
-    intro:
-      'No coding skills required — anyone can learn with AI-guided, step-by-step building. We cover AI tools for vibe coding and take you from domain registration through deployment so your website goes live.',
-    content: [
-      'No traditional coding prerequisite; learn with AI assistants and guided prompts',
-      'Age-friendly: learners from above 12 years can follow the same structured path',
-      'AI tools for vibe coding: assistants and builders to turn ideas into pages and components quickly',
-      'End-to-end website development: domain registration, hosting basics, building the site, and deployment',
-      'Practical project: ship a complete website, not just isolated lessons',
-    ],
-  },
-  {
-    id: 'plus2-it-arts-science-oav',
-    name: '+2 IT Arts/Science/OAV',
-    courseHour: '100 Hours',
-    certificationDuration: '1 Year (Academic Year)',
-    enrollmentFees: '999',
-    classFee: 'As per academic Curriculum/Syllabus',
-    urgent: 'Structured yearly support as per school timetable',
-    level: 'School Curriculum Practical Training',
-    content: [
-      'Computer fundamentals, digital literacy, and academic IT basics',
-      'Office tools: Word, Excel, PowerPoint, internet, and email practice',
-      'Chapter-wise support for +2 Arts/Science/OAV IT syllabus',
-      'Practical lab activities, assignments, and revision worksheets',
-      'Previous-year question practice and exam-oriented preparation',
-      'Doubt-clearing sessions and monthly progress tracking',
-    ],
-  },
-  {
-    id: 'oav-ict-6th-10th',
-    name: 'OAV - ICT 6th-10th',
-    courseHour: '100 Hours',
-    certificationDuration: '1 Year (School Curriculum Year)',
-    enrollmentFees: '599',
-    classFee: 'As per school-support Curriculum/Syllabus',
-    urgent: 'Progressive foundation program for middle to secondary classes',
-    level: 'ICT Foundation (Class 6th-10th) Exam Ready Practical Training',
-    content: [
-      'Digital literacy, computer operation, and safe internet usage',
-      'Typing, file management, and productivity tools (MS Office basics)',
-      'ICT topics aligned with OAV class-wise school curriculum',
-      'Hands-on practical sessions for school lab readiness',
-      'Activity-based learning, quizzes, and chapter tests',
-      'Exam support with concept revision and guided practice',
-    ],
-  },
-]
+import { COURSE_CATALOG } from '../data/courseCatalog'
+import CoursePreviewModal from '../components/courses/CoursePreviewModal'
 
 export default function Courses() {
+  const [previewCourse, setPreviewCourse] = useState(null)
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
       <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">Comprehensive Courses</h1>
@@ -203,7 +43,7 @@ export default function Courses() {
       </section>
 
       <div className="mt-10 space-y-8">
-        {COURSE_DETAILS.map((course) => (
+        {COURSE_CATALOG.map((course) => (
           <article key={course.id} id={course.id} className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex-1">
@@ -222,31 +62,13 @@ export default function Courses() {
                     <dt className="text-sm font-medium text-gray-500">Certification Duration</dt>
                     <dd className="text-gray-900">{course.certificationDuration}</dd>
                   </div>
-                  {course.nsqf && (
-                    <div className="sm:col-span-2">
-                      <dt className="text-sm font-medium text-gray-500">Certification Details</dt>
-                      <dd className="text-gray-900">{course.nsqf}</dd>
-                    </div>
-                  )}
-                  {course.nielit && (
-                    <div className="sm:col-span-2">
-                      <dt className="text-sm font-medium text-gray-500">Govt Certification</dt>
-                      <dd className="text-gray-900">{course.nielit}</dd>
-                    </div>
-                  )}
-                  {course.nsdc && (
-                    <div className="sm:col-span-2">
-                      <dt className="text-sm font-medium text-gray-500">NSDC Certification</dt>
-                      <dd className="text-gray-900">{course.nsdc}</dd>
-                    </div>
-                  )}
                 </dl>
 
                 <div className="mt-4">
                   <p className="text-sm font-semibold text-gray-800">
                     Enrollment fees: ₹{course.enrollmentFees} + {course.classFee}
                   </p>
-                  <p className="mt-1 text-sm text-red-600 font-medium">{course.urgent}</p>
+                  <p className="mt-1 text-sm font-medium text-red-600">{course.urgent}</p>
                 </div>
 
                 {course.intro && (
@@ -267,18 +89,36 @@ export default function Courses() {
                 <p className="text-2xl font-bold text-primary-600">
                   ₹{course.enrollmentFees} + {course.classFee}
                 </p>
-                <Link
-                  to="/admission"
-                  className="btn-touch mt-3 inline-block rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700 transition"
-                >
-                  Enroll Now
-                </Link>
+                <div className="mt-3 flex flex-col gap-2 sm:items-end">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewCourse(course)}
+                    className="btn-touch inline-block rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition"
+                  >
+                    Quick preview
+                  </button>
+                  <Link
+                    to={course.isVvip ? '/student/pay' : `/enroll/${course.id}`}
+                    className="btn-touch inline-block rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700 transition"
+                  >
+                    {course.isVvip ? 'Get VVIP' : 'Enroll Now — Pay online'}
+                  </Link>
+                  {!course.isVvip && (
+                    <Link
+                      to="/admission"
+                      className="text-xs font-medium text-gray-500 hover:text-primary-600 hover:underline"
+                    >
+                      Or use free admission form
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           </article>
         ))}
       </div>
+
+      <CoursePreviewModal course={previewCourse} onClose={() => setPreviewCourse(null)} />
     </div>
   )
 }
-

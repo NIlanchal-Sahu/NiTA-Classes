@@ -5,6 +5,7 @@ import PublicLayout from './layouts/PublicLayout'
 import StudentLayout from './layouts/StudentLayout'
 import Home from './pages/Home'
 import Courses from './pages/Courses'
+import CourseEnroll from './pages/CourseEnroll'
 import Admission from './pages/Admission'
 import About from './pages/About'
 import Contact from './pages/Contact'
@@ -47,6 +48,7 @@ export default function App() {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/courses" element={<Courses />} />
+          <Route path="/enroll/:courseId" element={<CourseEnroll />} />
           <Route path="/admission" element={<Admission />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />

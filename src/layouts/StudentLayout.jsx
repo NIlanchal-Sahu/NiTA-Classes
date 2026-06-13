@@ -203,7 +203,7 @@ export default function StudentLayout() {
       const arr = list || [];
       setNotifications(arr);
       const popups = arr
-        .filter((n) => n.popup && n.fromAdmin && !n.read)
+        .filter((n) => n.popup && !n.read)
         .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
       setPopupQueue(popups);
     } catch {

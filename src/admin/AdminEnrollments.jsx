@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { academyApi } from '../api/adminAcademy'
 
 const COURSE_OPTIONS = [
   { id: 'dca', label: 'DCA (Basic Computer Course) - Quick & Short Term' },
@@ -101,6 +102,8 @@ function CourseMultiSelect({ value, onChange, options, placeholder = 'Select cou
 export default function AdminEnrollments() {
   const [items, setItems] = useState([])
   const [recentUnenrolled, setRecentUnenrolled] = useState([])
+  const [enrollmentAlerts, setEnrollmentAlerts] = useState([])
+  const [onlineEnrollments, setOnlineEnrollments] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -127,6 +130,15 @@ export default function AdminEnrollments() {
       const recentJson = await recentRes.json().catch(() => ({}))
       if (!recentRes.ok) throw new Error(recentJson.error || 'Failed to load recent admissions')
       setRecentUnenrolled(recentJson.recentUnenrolled || [])
+
+      const alertsOut = await academyApi.getAdminAlerts()
+      const alerts = (alertsOut.alerts || [])
+        .filter((a) => a.type === 'enrollment_submitted')
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+      setEnrollmentAlerts(alerts.slice(0, 15))
+
+      const onlineOut = await academyApi.getOnlineEnrollments()
+      setOnlineEnrollments(onlineOut.enrollments || [])
     } catch (e) {
       setError(e.message || 'Failed to load')
     } finally {
@@ -273,6 +285,78 @@ export default function AdminEnrollments() {
       <p className="mt-1 text-gray-400">Unified admission pipeline: form submissions and manual entries are kept in one queue.</p>
 
       {error && <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-200">{error}</div>}
+
+      {onlineEnrollments.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6">
+          <h2 className="text-lg font-semibold text-emerald-100">Online enrollments (Razorpay)</h2>
+          <p className="mt-1 text-sm text-emerald-200/80">Paid course enrollments from the public enroll pages.</p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="text-emerald-200/90">
+                <tr>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Student</th>
+                  <th className="px-3 py-2">Phone</th>
+                  <th className="px-3 py-2">Course</th>
+                  <th className="px-3 py-2">Amount</th>
+                  <th className="px-3 py-2">Payment ID</th>
+                  <th className="px-3 py-2">Student ID</th>
+                  <th className="px-3 py-2">WhatsApp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-emerald-500/20 text-gray-200">
+                {onlineEnrollments.map((row) => {
+                  const waText = encodeURIComponent(
+                    `Hi, I see online enrollment: ${row.studentName} (${row.mobile}) paid ₹${row.amount} for ${row.courseName || row.courseId}.`,
+                  )
+                  const waHref = `https://wa.me/919986437890?text=${waText}`
+                  return (
+                  <tr key={row.id}>
+                    <td className="px-3 py-2">{String(row.createdAt || '').slice(0, 10)}</td>
+                    <td className="px-3 py-2">{row.studentName}</td>
+                    <td className="px-3 py-2">{row.mobile}</td>
+                    <td className="px-3 py-2">{row.courseName || row.courseId}</td>
+                    <td className="px-3 py-2">₹{row.amount}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{row.razorpayPaymentId || '—'}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{row.studentId || '—'}</td>
+                    <td className="px-3 py-2">
+                      <a
+                        href={waHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex rounded-lg bg-[#25D366] px-2 py-1 text-xs font-semibold text-white hover:opacity-90"
+                      >
+                        Chat
+                      </a>
+                    </td>
+                  </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {enrollmentAlerts.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6">
+          <h2 className="text-lg font-semibold text-amber-100">New enrollment alerts (auto)</h2>
+          <p className="mt-1 text-sm text-amber-200/80">Triggered when a student submits the public admission form.</p>
+          <div className="mt-4 space-y-2">
+            {enrollmentAlerts.map((a) => (
+              <div key={a.id} className="rounded-xl border border-amber-500/20 bg-gray-900/60 px-4 py-3 text-sm text-gray-200">
+                <div className="font-medium text-white">{a.message || `${a.studentName} — ${a.courses}`}</div>
+                <div className="mt-1 text-xs text-gray-400">
+                  {String(a.createdAt || '').replace('T', ' ').slice(0, 16)}
+                  {a.admissionId ? ` · ${a.admissionId}` : ''}
+                  {a.referralCode ? ` · Ref: ${a.referralCode}` : ''}
+                  {a.existingAccount ? ' · Existing account' : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
         <h2 className="text-lg font-semibold text-white">Add / Save Admission (manual)</h2>

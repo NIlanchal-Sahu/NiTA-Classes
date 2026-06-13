@@ -84,6 +84,7 @@ export const academyApi = {
   createPayment: (body) => request('/fees/payments', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
   getPaymentRequests: () => request('/fees/payment-requests', { headers: headers(false) }),
   getAdminAlerts: () => request('/admin-alerts', { headers: headers(false) }),
+  getOnlineEnrollments: () => request('/online-enrollments', { headers: headers(false) }),
   getStudentProfiles: () => request('/student-profiles', { headers: headers(false) }),
   approvePaymentRequest: (id) => request(`/fees/payment-requests/${id}/approve`, { method: 'POST', headers: headers(), body: JSON.stringify({}) }),
 

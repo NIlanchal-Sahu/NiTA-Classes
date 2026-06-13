@@ -9,6 +9,7 @@ import {
   normalizePhoneDigits,
 } from '../enrollmentCredentials.js'
 import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
+import { onEnrollmentSubmitted } from '../services/eventTriggers.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -156,6 +157,16 @@ router.post('/', (req, res) => {
   }
   const queueWrite = upsertQueueByMobile(list, next)
   saveJson(ENROLLMENTS_PATH, list)
+
+  try {
+    onEnrollmentSubmitted({
+      enrollment: queueWrite.enrollment,
+      queueAction: queueWrite.mode,
+      existingAccount: Boolean(existingUser || existingStudent),
+    })
+  } catch (e) {
+    console.warn('[enrollment] admin alert failed:', e.message)
+  }
 
   // Existing account path: keep wallet/referrals untouched; only queue request and optional referral review.
   if (existingUser || existingStudent) {

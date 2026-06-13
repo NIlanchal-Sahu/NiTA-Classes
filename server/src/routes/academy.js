@@ -10,6 +10,7 @@ import {
   uploadDataUrlToDrive,
 } from '../services/googleProfileSync.js'
 import { uploadChapterNotesBuffer } from '../services/courseContentDrive.js'
+import { onPaymentApproved } from '../services/eventTriggers.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -43,6 +44,7 @@ const PATHS = {
   legacyCourses: join(__dirname, '..', 'data', 'courses.json'),
   studentNotifications: join(__dirname, '..', 'data', 'student_notifications.json'),
   adminAlerts: join(__dirname, '..', 'data', 'admin_alerts.json'),
+  onlineEnrollments: join(__dirname, '..', 'data', 'online_enrollments.json'),
   studentProfiles: join(__dirname, '..', 'data', 'student_profiles.json'),
   admissionsQueue: join(__dirname, '..', 'data', 'enrollments.json'),
   teacherAttendance: join(__dirname, '..', 'data', 'teacher_attendance.json'),
@@ -1845,6 +1847,11 @@ router.get('/admin-alerts', auth, allowRoles(['admin', 'teacher']), (_req, res) 
   res.json({ alerts: alerts.slice().reverse() })
 })
 
+router.get('/online-enrollments', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
+  const enrollments = loadJson(PATHS.onlineEnrollments, [])
+  res.json({ enrollments: enrollments.slice().reverse() })
+})
+
 router.post('/fees/payment-requests/:id/approve', auth, allowRoles(['admin']), async (req, res) => {
   const requests = loadJson(PATHS.paymentRequests, [])
   const idx = requests.findIndex((r) => r.id === req.params.id)
@@ -1971,16 +1978,16 @@ router.post('/fees/payment-requests/:id/approve', auth, allowRoles(['admin']), a
 
   saveJson(PATHS.paymentRequests, requests)
 
-  const notifs = loadJson(PATHS.studentNotifications, [])
-  notifs.push({
-    id: `stu-notif-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    userId: row.authUserId,
-    message: `₹${credited} has been added to your wallet. Payment request approved.`,
-    read: false,
-    type: 'payment_approved',
-    createdAt: new Date().toISOString(),
-  })
-  saveJson(PATHS.studentNotifications, notifs)
+  try {
+    onPaymentApproved({
+      authUserId: row.authUserId,
+      credited,
+      paymentRequestId: row.id,
+    })
+  } catch (e) {
+    console.warn('[academy] payment-approved notification failed:', e.message)
+  }
+
   res.json({ success: true, request: requests[idx], walletBalance: Number(u?.walletBalance) || null })
 })
 

@@ -2,88 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import LazyAllOurCoursesSection from '../components/home/LazyAllOurCoursesSection'
+import InternshipHomeSection from '../components/home/InternshipHomeSection'
+import CourseShowcaseGrid from '../components/courses/CourseShowcaseGrid'
 import {
   WHATSAPP_NUMBER,
   LOGO_SRC,
   PROGRAM_START_DATE,
   WHATSAPP_CTA,
-  INTERNSHIP_APPLICATION_FORM_URL,
 } from '../config'
-
-const showcase = [
-  {
-    id: 'dca',
-    title: 'DCA: Computer + MS Office + AI Basics',
-    to: '/courses#dca',
-    icon: '💻',
-    visual: 'Computer Fundamentals',
-    bgClass: 'from-blue-100 via-indigo-100 to-sky-100',
-  },
-  {
-    id: 'cca',
-    title: 'CCA: Advanced Course + Govt Certification',
-    to: '/courses#cca',
-    icon: '🧠',
-    visual: 'Advanced Computer Skills',
-    bgClass: 'from-violet-100 via-fuchsia-100 to-indigo-100',
-  },
-  {
-    id: 'spoken',
-    title: 'Spoken English Mastery: Speaking & Confidence',
-    to: '/courses#spoken-english-mastery',
-    icon: '🎤',
-    visual: 'Communication Practice',
-    bgClass: 'from-emerald-100 via-teal-100 to-cyan-100',
-  },
-  {
-    id: 'ai',
-    title: 'AI Associate: Python + AI Development',
-    to: '/courses#ai-associate',
-    icon: '🤖',
-    visual: 'Python + AI/ML Projects',
-    bgClass: 'from-orange-100 via-amber-100 to-yellow-100',
-  },
-  {
-    id: 'video',
-    title: 'AI Video Creation: Prompts + UGC + Masterclass',
-    to: '/courses#ai-video-creation',
-    icon: '🎬',
-    visual: 'Prompt to Video Workflow',
-    bgClass: 'from-pink-100 via-rose-100 to-purple-100',
-  },
-  {
-    id: 'plus2-it',
-    title: '+2 IT Arts/Science/OAV: School Curriculum',
-    to: '/courses#plus2-it-arts-science-oav',
-    icon: '📘',
-    visual: '1 Year Academic IT Support',
-    bgClass: 'from-cyan-100 via-sky-100 to-blue-100',
-  },
-  {
-    id: 'oav-ict',
-    title: 'OAV - ICT 6th-10th: Foundation to Exam Readiness',
-    to: '/courses#oav-ict-6th-10th',
-    icon: '🏫',
-    visual: '1 Year ICT School Program',
-    bgClass: 'from-lime-100 via-emerald-100 to-teal-100',
-  },
-  {
-    id: 'ai-vibe-coding',
-    title: 'AI Vibe Coding: Domain Registration to Deployment',
-    to: '/courses#ai-vibe-coding',
-    icon: '✨',
-    visual: 'No-code to Building Complete Website',
-    bgClass: 'from-slate-100 via-indigo-100 to-violet-100',
-  },
-  {
-    id: 'vvip',
-    title: 'VVIP Offer: Unlimited classes for ₹699 / month',
-    to: '/student/pay',
-    icon: '👑',
-    visual: 'Unlimited Learning Access',
-    bgClass: 'from-yellow-100 via-amber-100 to-orange-100',
-  },
-]
 
 const testimonials = [
   {
@@ -362,69 +288,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Internship */}
-      <section className="border-y border-violet-200 bg-gradient-to-br from-violet-50 via-indigo-50 to-primary-50">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-xl">
-              <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">Internship & traineeship</p>
-              <h2 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">Learn how a skill institute runs — apply as an intern</h2>
-              <p className="mt-3 text-gray-700">
-                Support batches, content, or digital tasks while building real experience. Submit our short application form
-                and we will get back to you.
-              </p>
-            </div>
-            <div className="flex flex-shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                to="/internship"
-                className="btn-touch inline-flex items-center justify-center rounded-xl bg-primary-600 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition"
-              >
-                Internship details
-              </Link>
-              <a
-                href={INTERNSHIP_APPLICATION_FORM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-touch inline-flex items-center justify-center rounded-xl border-2 border-primary-600 bg-white px-6 py-3 text-center text-sm font-semibold text-primary-700 hover:bg-primary-50 transition"
-              >
-                Apply (Google Form) →
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <LazyAllOurCoursesSection />
 
-      {/* Video Showcase (portfolio-style) */}
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Our Courses & Student Outcomes</h2>
-            <p className="mt-1 text-gray-600">Explore what students learn in each course.</p>
-          </div>
-          <Link to="/courses" className="text-sm font-semibold text-primary-600 hover:underline">
-            View all →
-          </Link>
-        </div>
-
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {showcase.map((v) => (
-            <Link key={v.id} to={v.to} className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className={`relative flex aspect-video items-center justify-center bg-gradient-to-br ${v.bgClass}`}>
-                <div className="text-center">
-                  <div className="text-5xl transition duration-300 group-hover:-translate-y-1 group-hover:scale-110">{v.icon}</div>
-                  <div className="mt-2 text-sm font-semibold text-gray-700">{v.visual}</div>
-                </div>
-              </div>
-              <div className="p-4">
-                <div className="font-semibold text-gray-900">{v.title}</div>
-                <div className="mt-1 text-sm text-gray-500">See details →</div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <CourseShowcaseGrid />
 
       {/* Stats strip */}
       <section className="bg-primary-50">
@@ -509,6 +375,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <InternshipHomeSection />
 
       {/* Referral */}
       <section id="referral" className="bg-gray-50 border-t border-gray-200">
