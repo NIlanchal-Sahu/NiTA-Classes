@@ -65,9 +65,15 @@ export default function Courses() {
                 </dl>
 
                 <div className="mt-4">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Enrollment fees: ₹{course.enrollmentFees} + {course.classFee}
-                  </p>
+                  {course.isIncludedBenefit ? (
+                    <p className="text-sm font-semibold text-emerald-700">
+                      Included with all courses except Spoken English
+                    </p>
+                  ) : (
+                    <p className="text-sm font-semibold text-gray-800">
+                      Enrollment fees: ₹{course.enrollmentFees} + {course.classFee}
+                    </p>
+                  )}
                   <p className="mt-1 text-sm font-medium text-red-600">{course.urgent}</p>
                 </div>
 
@@ -86,9 +92,13 @@ export default function Courses() {
               </div>
 
               <div className="shrink-0 lg:text-right">
-                <p className="text-2xl font-bold text-primary-600">
-                  ₹{course.enrollmentFees} + {course.classFee}
-                </p>
+                {course.isIncludedBenefit ? (
+                  <p className="text-lg font-bold text-emerald-700">Included benefit</p>
+                ) : (
+                  <p className="text-2xl font-bold text-primary-600">
+                    ₹{course.enrollmentFees} + {course.classFee}
+                  </p>
+                )}
                 <div className="mt-3 flex flex-col gap-2 sm:items-end">
                   <button
                     type="button"
@@ -97,19 +107,30 @@ export default function Courses() {
                   >
                     Quick preview
                   </button>
-                  <Link
-                    to={course.isVvip ? '/student/pay' : `/enroll/${course.id}`}
-                    className="btn-touch inline-block rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700 transition"
-                  >
-                    {course.isVvip ? 'Get VVIP' : 'Enroll Now — Pay online'}
-                  </Link>
-                  {!course.isVvip && (
+                  {course.isIncludedBenefit ? (
                     <Link
                       to="/admission"
-                      className="text-xs font-medium text-gray-500 hover:text-primary-600 hover:underline"
+                      className="btn-touch inline-block rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700 transition"
                     >
-                      Or use free admission form
+                      Enroll in a course — LAB included
                     </Link>
+                  ) : (
+                    <>
+                      <Link
+                        to={course.isVvip ? '/student/pay' : `/enroll/${course.id}`}
+                        className="btn-touch inline-block rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700 transition"
+                      >
+                        {course.isVvip ? 'Get VVIP' : 'Enroll Now — Pay online'}
+                      </Link>
+                      {!course.isVvip && (
+                        <Link
+                          to="/admission"
+                          className="text-xs font-medium text-gray-500 hover:text-primary-600 hover:underline"
+                        >
+                          Or use free admission form
+                        </Link>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

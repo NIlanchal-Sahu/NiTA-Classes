@@ -35,7 +35,7 @@ export default function CourseEnroll() {
   const [razorpayConfigured, setRazorpayConfigured] = useState(false)
 
   useEffect(() => {
-    if (!course || course.isVvip) return
+    if (!course || course.isVvip || course.isIncludedBenefit) return
     ;(async () => {
       try {
         const cfg = await getRazorpayKey()
@@ -50,6 +50,7 @@ export default function CourseEnroll() {
 
   useEffect(() => {
     if (course?.isVvip) navigate('/student/pay', { replace: true })
+    if (course?.isIncludedBenefit) navigate('/courses#practical-computer-lab', { replace: true })
   }, [course, navigate])
 
   if (!course) {
@@ -63,7 +64,7 @@ export default function CourseEnroll() {
     )
   }
 
-  if (course.isVvip) return null
+  if (course.isVvip || course.isIncludedBenefit) return null
 
   const handlePay = async (e) => {
     e.preventDefault()

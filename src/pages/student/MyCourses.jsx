@@ -61,18 +61,33 @@ export default function MyCourses() {
             </div>
             <div className="p-4">
               <h3 className="font-semibold text-white">{c.name}</h3>
+              {c.isIncludedBenefit && (
+                <span className="mt-1 inline-block rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                  Included benefit
+                </span>
+              )}
               <p className="mt-1 text-sm text-gray-400">{c.duration || 'Duration as per plan'}</p>
               <p className="mt-1 text-sm text-gray-400 line-clamp-2">{c.description || 'Course details available in academy dashboard.'}</p>
               <div className="mt-3 h-2 rounded-full bg-gray-700">
                 <div className="h-full rounded-full bg-violet-600" style={{ width: '35%' }} />
               </div>
               <p className="mt-1 text-xs text-gray-500">Progress tracking enabled</p>
-              <Link
-                to={`/student/course/${c.id}`}
-                className="mt-3 inline-block text-sm font-medium text-violet-400 hover:text-violet-300"
-              >
-                Open Course →
-              </Link>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Link
+                  to={`/student/course/${c.id}`}
+                  className="text-sm font-medium text-violet-400 hover:text-violet-300"
+                >
+                  Open Course →
+                </Link>
+                {c.isIncludedBenefit && (
+                  <Link
+                    to={`/student/pay?course=${encodeURIComponent(c.id)}`}
+                    className="text-sm font-medium text-emerald-400 hover:text-emerald-300"
+                  >
+                    Pay for LAB class →
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         ))}

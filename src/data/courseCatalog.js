@@ -171,6 +171,30 @@ export const COURSE_CATALOG = [
     ],
   },
   {
+    id: 'practical-computer-lab',
+    name: 'Practical Classes - Computer LAB',
+    shortTitle: 'Practical Classes: Computer LAB',
+    level: 'Hands-on Lab Practice',
+    courseHour: 'Flexible — practice at your convenience',
+    certificationDuration: 'During your enrolled course period',
+    enrollmentFees: 0,
+    classFee: 'Included with enrollment',
+    urgent: 'Included with all courses except Spoken English',
+    icon: '🖥️',
+    visual: 'Computer LAB Practice',
+    bgClass: 'from-indigo-100 via-blue-100 to-cyan-100',
+    isIncludedBenefit: true,
+    intro:
+      'Practice any skills you have learned in class — or explore topics on your own — in our Computer LAB, whenever it suits you.',
+    content: [
+      'Hands-on practice for skills from your enrolled course',
+      'Work on assignments, projects, and revision at your own pace',
+      'Flexible LAB access — practice what you want, when you want',
+      'Included automatically with every course enrollment',
+      'Not included with Spoken English Mastery enrollment',
+    ],
+  },
+  {
     id: 'vvip',
     name: 'VVIP Offer: Unlimited classes for ₹699 / month',
     shortTitle: 'VVIP Offer: Unlimited classes for ₹699 / month',
@@ -199,7 +223,7 @@ export function getCourseById(courseId) {
 }
 
 export function getEnrollableCourses() {
-  return COURSE_CATALOG.filter((c) => !c.isVvip)
+  return COURSE_CATALOG.filter((c) => !c.isVvip && !c.isIncludedBenefit)
 }
 
 export function getShowcaseCourses() {

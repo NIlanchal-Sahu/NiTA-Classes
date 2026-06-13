@@ -86,5 +86,17 @@
     "price": 599,
     "createdAt": "2026-03-17T00:00:00.000Z",
     "migratedFromLegacy": false
+  },
+  {
+    "id": "practical-computer-lab",
+    "name": "Practical Classes - Computer LAB",
+    "description": "Hands-on Computer LAB access to practice skills from your enrolled courses — or explore topics on your own — whenever it suits you.\n\n【 Included with 】\n• All courses except Spoken English Mastery\n• Pay ₹10 per LAB session from wallet (or use VVIP)\n• Attendance tracked when you pay for class\n\n【 What you can do 】\n• Practice MS Office, coding, networking, and project work\n• Revise lessons and complete assignments\n• Flexible self-paced practice in the academy LAB",
+    "duration": "Flexible — during enrolled course period",
+    "status": "active",
+    "priceType": "perClass10",
+    "price": 10,
+    "createdAt": "2026-06-07T00:00:00.000Z",
+    "migratedFromLegacy": false,
+    "isIncludedBenefit": true
   }
 ]

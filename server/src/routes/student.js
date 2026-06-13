@@ -11,6 +11,11 @@ import {
   isVvipActive,
   purchaseUnlimitedMonth,
 } from "../student.js";
+import {
+  LAB_COURSE_ID,
+  studentQualifiesForLab,
+  getQualifyingCourseIdsForStudent,
+} from "../labAccess.js";
 import { readJsonSync, writeJsonSync } from "../services/sheetsJsonStore.js";
 
 const router = Router();
@@ -138,13 +143,15 @@ function getCourseCatalog() {
   const fromAcademy = academy.map((c) => {
     const id = normalizeCourseId(c.id);
     const image = typeof c.image === "string" ? c.image.trim() : "";
+    const isIncludedBenefit = !!c.isIncludedBenefit || id === LAB_COURSE_ID;
     return {
       id,
       name: c.name || id,
       description: c.description || "",
       duration: c.duration || "",
       image,
-      unlockFee: Number(COURSE_UNLOCK_FEES[id] ?? c.price ?? 499),
+      unlockFee: isIncludedBenefit ? 0 : Number(COURSE_UNLOCK_FEES[id] ?? c.price ?? 499),
+      isIncludedBenefit,
     };
   });
   if (fromAcademy.length > 0) return fromAcademy;
@@ -155,6 +162,13 @@ function getCourseCatalog() {
     { id: "ai-associate", name: "AI Associate (Python)", unlockFee: 1499 },
     { id: "ai-video-creation", name: "AI Video Creation Course", unlockFee: 499 },
     { id: "ai-vibe-coding", name: "AI Vibe Coding", unlockFee: 999 },
+    {
+      id: LAB_COURSE_ID,
+      name: "Practical Classes - Computer LAB",
+      unlockFee: 0,
+      isIncludedBenefit: true,
+      description: "Hands-on LAB practice included with all courses except Spoken English.",
+    },
   ];
 }
 
@@ -226,9 +240,16 @@ function computeCourseAccessFromEnrollments(studentId, courseId, enrollmentRows)
 }
 
 function isCourseUnlockedForStudent(studentId, courseId) {
+  const cid = normalizeCourseId(courseId);
+  if (cid === LAB_COURSE_ID) {
+    const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+    const student = loadJson(ACADEMY_STUDENTS_PATH).find((s) => String(s.id) === String(studentId));
+    const batches = loadJson(ACADEMY_BATCHES_PATH);
+    return studentQualifiesForLab(studentId, enrollments, student, batches);
+  }
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   return enrollments.some(
-    (e) => e.studentId === studentId && normalizeCourseId(e.courseId) === normalizeCourseId(courseId)
+    (e) => e.studentId === studentId && normalizeCourseId(e.courseId) === cid
   );
 }
 
@@ -241,6 +262,13 @@ function studentBatchIdsForPortal(student) {
 function isCourseAccessibleForAuthUser(authUser, student, courseId) {
   const target = normalizeCourseId(courseId);
   if (!target) return false;
+  if (target === LAB_COURSE_ID) {
+    const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+    const batches = loadJson(ACADEMY_BATCHES_PATH);
+    return student?.id
+      ? studentQualifiesForLab(student.id, enrollments, student, batches)
+      : false;
+  }
   if (student?.id && isCourseUnlockedForStudent(student.id, target)) return true;
   const batches = loadJson(ACADEMY_BATCHES_PATH);
   for (const bid of studentBatchIdsForPortal(student)) {
@@ -387,6 +415,82 @@ function computeAttendanceFromConductedClasses({
   const presentCount = presentSet.size;
   const percentage = conductedCount ? Math.round((presentCount / conductedCount) * 100) : 0;
   return { percentage, conductedCount, presentCount };
+}
+
+function buildEnrollmentListForCourse(student, courseId, enrollments, batches, enrolledIds) {
+  const cid = normalizeCourseId(courseId);
+  let list = (enrollments || []).filter(
+    (e) =>
+      e.studentId === student?.id &&
+      normalizeCourseId(e.courseId) === cid &&
+      normalizeCourseId(e.courseId) !== "trial-course",
+  );
+  if (list.length === 0 && student?.batchId) {
+    const b = (batches || []).find(
+      (b0) => String(b0.id) === String(student.batchId) && normalizeCourseId(b0.courseId) === cid,
+    );
+    if (b) {
+      list = [
+        {
+          studentId: student.id,
+          courseId: cid,
+          startDate: b.startDate || student.admissionDate,
+          expiresAt: b.endDate,
+          createdAt: b.createdAt || student.admissionDate,
+        },
+      ];
+    }
+  }
+  if (list.length === 0 && enrolledIds?.has(cid) && student) {
+    const start0 = parseIsoDate(student.admissionDate || today());
+    list = [
+      {
+        studentId: student.id,
+        courseId: cid,
+        startDate: start0,
+        expiresAt: addDays(start0, minAccessDaysForCourse(cid)),
+        createdAt: student.createdAt || today(),
+      },
+    ];
+  }
+  return list;
+}
+
+function enrichLabCourseForStudent(c, student, enrollments, batches, enrolledIds) {
+  const labUnlocked =
+    student?.id && studentQualifiesForLab(student.id, enrollments, student, batches);
+  if (!labUnlocked) {
+    return {
+      ...c,
+      unlocked: false,
+      status: "locked",
+      completed: false,
+      daysLeft: 0,
+      isIncludedBenefit: true,
+      unlockFee: 0,
+      includedNote: "Included with all courses except Spoken English",
+    };
+  }
+  const qualifying = getQualifyingCourseIdsForStudent(student.id, enrollments, student, batches);
+  let bestAccess = null;
+  for (const qid of qualifying) {
+    const qList = buildEnrollmentListForCourse(student, qid, enrollments, batches, enrolledIds);
+    const access = computeCourseAccessFromEnrollments(student.id, qid, qList);
+    if (access && (!bestAccess || access.endDate > bestAccess.endDate)) bestAccess = access;
+  }
+  return {
+    ...c,
+    unlocked: true,
+    isIncludedBenefit: true,
+    unlockFee: 0,
+    includedNote: "Included with your enrolled course(s)",
+    status: bestAccess?.completed ? "completed" : "active",
+    completed: !!bestAccess?.completed,
+    startDate: bestAccess?.startDate,
+    endDate: bestAccess?.endDate,
+    daysLeft: bestAccess?.daysLeft ?? 0,
+    renewFee: 0,
+  };
 }
 
 router.get("/profile", studentAuth, (req, res) => {
@@ -684,57 +788,39 @@ router.get("/portal/courses", studentAuth, (req, res) => {
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   const enrolledIds = new Set();
   for (const e of enrollments) if (e.studentId === student?.id) enrolledIds.add(normalizeCourseId(e.courseId));
+  if (student?.courseEnrolled) enrolledIds.add(normalizeCourseId(student.courseEnrolled));
+  for (const cid of Array.isArray(student?.selectedCourseIds) ? student.selectedCourseIds : []) {
+    enrolledIds.add(normalizeCourseId(cid));
+  }
   if (student?.batchId) {
     const assigned = batches.find((b) => b.id === student.batchId);
     if (assigned?.courseId) enrolledIds.add(normalizeCourseId(assigned.courseId));
   }
-  const allCourses = courses.map((c) => ({
-    ...c,
-    id: normalizeCourseId(c.id),
-    unlockFee: Number(COURSE_UNLOCK_FEES[normalizeCourseId(c.id)] ?? c.unlockFee ?? 499),
-    unlocked: enrolledIds.has(normalizeCourseId(c.id)),
-  }));
+  if (student?.id && studentQualifiesForLab(student.id, enrollments, student, batches)) {
+    enrolledIds.add(LAB_COURSE_ID);
+  }
+  const allCourses = courses.map((c) => {
+    const id = normalizeCourseId(c.id);
+    const isIncludedBenefit = !!c.isIncludedBenefit || id === LAB_COURSE_ID;
+    return {
+      ...c,
+      id,
+      isIncludedBenefit,
+      unlockFee: isIncludedBenefit ? 0 : Number(COURSE_UNLOCK_FEES[id] ?? c.unlockFee ?? 499),
+      unlocked: enrolledIds.has(id),
+    };
+  });
   const trial = enrollments
     .filter((e) => e.studentId === student?.id && String(e.courseId) === "trial-course")
     .slice()
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0] || null;
 
   const enrichedCourses = allCourses.map((c) => {
+    if (c.id === LAB_COURSE_ID) {
+      return enrichLabCourseForStudent(c, student, enrollments, batches, enrolledIds);
+    }
     if (!enrolledIds.has(c.id)) return { ...c, status: "locked", completed: false, daysLeft: 0 };
-    let list = enrollments.filter(
-      (e) =>
-        e.studentId === student?.id &&
-        normalizeCourseId(e.courseId) === c.id &&
-        normalizeCourseId(e.courseId) !== "trial-course",
-    );
-    if (list.length === 0 && student?.batchId) {
-      const b = batches.find(
-        (b0) => String(b0.id) === String(student.batchId) && normalizeCourseId(b0.courseId) === c.id,
-      );
-      if (b) {
-        list = [
-          {
-            studentId: student.id,
-            courseId: c.id,
-            startDate: b.startDate || student.admissionDate,
-            expiresAt: b.endDate,
-            createdAt: b.createdAt || student.admissionDate,
-          },
-        ];
-      }
-    }
-    if (list.length === 0 && enrolledIds.has(c.id) && student) {
-      const start0 = parseIsoDate(student.admissionDate || today());
-      list = [
-        {
-          studentId: student.id,
-          courseId: c.id,
-          startDate: start0,
-          expiresAt: addDays(start0, minAccessDaysForCourse(c.id)),
-          createdAt: student.createdAt || today(),
-        },
-      ];
-    }
+    const list = buildEnrollmentListForCourse(student, c.id, enrollments, batches, enrolledIds);
     const access = computeCourseAccessFromEnrollments(student?.id, c.id, list);
     if (!access) return { ...c, status: "locked", completed: false, daysLeft: 0 };
     const renewFee = Math.round((Number(c.unlockFee) || 0) * 0.6);
@@ -807,6 +893,12 @@ router.post("/portal/courses/unlock", studentAuth, (req, res) => {
 
   const course = getCourseCatalog().find((c) => normalizeCourseId(c.id) === courseId);
   if (!course) return res.status(404).json({ error: "Course not found" });
+  if (courseId === LAB_COURSE_ID || course.isIncludedBenefit) {
+    return res.status(400).json({
+      error:
+        "Computer LAB is included automatically when you enroll in any course except Spoken English. Unlock a qualifying course first.",
+    });
+  }
   const unlockFee = Number(COURSE_UNLOCK_FEES[courseId] ?? course.unlockFee ?? 499);
 
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
@@ -878,6 +970,12 @@ router.post("/portal/courses/renew", studentAuth, (req, res) => {
   if (!courseId) return res.status(400).json({ error: "courseId is required" });
   const course = getCourseCatalog().find((c) => normalizeCourseId(c.id) === courseId);
   if (!course) return res.status(404).json({ error: "Course not found" });
+  if (courseId === LAB_COURSE_ID || course.isIncludedBenefit) {
+    return res.status(400).json({
+      error:
+        "Computer LAB access follows your enrolled course period and cannot be renewed separately.",
+    });
+  }
 
   const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
   const batches = loadJson(ACADEMY_BATCHES_PATH);

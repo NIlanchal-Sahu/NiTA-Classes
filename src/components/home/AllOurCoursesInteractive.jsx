@@ -5,10 +5,7 @@ import { LOGO_SRC } from '../../config'
 const LABELS = [
   'Java',
   'Python',
-  'React',
-  'MySQL',
-  'JavaScript',
-  'AI/ML',
+  'CCC',
   'OAV-ICT 6th-10th',
   'OAV-IT 11th-12th',
   '+2-IT Arts & Science',
@@ -20,19 +17,43 @@ const LABELS = [
   'OS-CIT',
   'OS-CIT A',
   'OS-CIT A+',
-  'MS-Word',
-  'MS-Excel',
-  'MS-PowerPoint',
+  'MS-Office',
   'Tally',
-  'Networking',
-  'HTML & CSS',
-  'Web Development',
+  'AI Web Development',
   'AI Video Creation',
   'Custom GPT',
   'AI Vibe Coding',
-  'Generative AI Tools',
-  'Prompt Engineering'
 ]
+
+/** Vibrant bubble palette — cycled per label */
+const BUBBLE_PALETTE = [
+  { light: '#818cf8', dark: '#4f46e5', stroke: '#4338ca' },
+  { light: '#38bdf8', dark: '#0284c7', stroke: '#0369a1' },
+  { light: '#34d399', dark: '#059669', stroke: '#047857' },
+  { light: '#fbbf24', dark: '#d97706', stroke: '#b45309' },
+  { light: '#f472b6', dark: '#db2777', stroke: '#be185d' },
+  { light: '#a78bfa', dark: '#7c3aed', stroke: '#6d28d9' },
+  { light: '#fb7185', dark: '#e11d48', stroke: '#be123c' },
+  { light: '#2dd4bf', dark: '#0d9488', stroke: '#0f766e' },
+  { light: '#60a5fa', dark: '#2563eb', stroke: '#1d4ed8' },
+  { light: '#a3e635', dark: '#65a30d', stroke: '#4d7c0f' },
+]
+
+function bubbleTypography(label, ctx) {
+  const words = label.split(' ')
+  const fs =
+    label.length > 18 ? 10 : label.length > 14 ? 11 : words.length > 2 ? 11 : words.length > 1 ? 12 : 13
+  ctx.font = `700 ${fs}px system-ui, "Segoe UI", sans-serif`
+  let maxW = 0
+  for (const word of words) {
+    maxW = Math.max(maxW, ctx.measureText(word).width)
+  }
+  const lineH = fs + 4
+  const textH = words.length * lineH
+  const pad = 16
+  const r = Math.max(44, Math.ceil(Math.hypot(maxW, textH) / 2 + pad))
+  return { fs, words, lineH, r }
+}
 
 function prefersReducedMotion() {
   if (typeof window === 'undefined') return false
@@ -79,7 +100,7 @@ export default function AllOurCoursesInteractive() {
         const ring = 0.35 + (i % 3) * 0.06
         const hx = cx + Math.cos(angle) * w * ring * 0.55
         const hy = cy + Math.sin(angle) * h * ring * 0.45
-        const r = 38 + (i % 4) * 4
+        const { fs, words, lineH, r } = bubbleTypography(label, ctx)
         const dir = Math.random() * Math.PI * 2
         const speed = 0.85 + Math.random() * 1.75
         return {
@@ -91,6 +112,10 @@ export default function AllOurCoursesInteractive() {
           vx: Math.cos(dir) * speed,
           vy: Math.sin(dir) * speed,
           r,
+          fs,
+          words,
+          lineH,
+          colors: BUBBLE_PALETTE[i % BUBBLE_PALETTE.length],
         }
       })
     }
@@ -141,37 +166,48 @@ export default function AllOurCoursesInteractive() {
       ctx.clearRect(0, 0, w, h)
 
       for (const node of nodes) {
+        const { light, dark, stroke } = node.colors
+
         ctx.beginPath()
         ctx.arc(node.x, node.y, node.r, 0, Math.PI * 2)
         const grd = ctx.createRadialGradient(
-          node.x - node.r * 0.3,
-          node.y - node.r * 0.3,
-          2,
+          node.x - node.r * 0.35,
+          node.y - node.r * 0.35,
+          node.r * 0.05,
           node.x,
           node.y,
           node.r,
         )
-        grd.addColorStop(0, '#ffffff')
-        grd.addColorStop(1, '#e0e7ff')
+        grd.addColorStop(0, light)
+        grd.addColorStop(0.55, dark)
+        grd.addColorStop(1, stroke)
         ctx.fillStyle = grd
         ctx.fill()
-        ctx.strokeStyle = 'rgba(79, 70, 229, 0.35)'
-        ctx.lineWidth = 1.5
+        ctx.strokeStyle = stroke
+        ctx.lineWidth = 2
         ctx.stroke()
 
-        ctx.fillStyle = '#312e81'
+        ctx.save()
+        ctx.fillStyle = '#ffffff'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        const words = node.label.split(' ')
-        const fs = node.label.length > 12 ? 10 : words.length > 1 ? 11 : 13
-        ctx.font = `600 ${fs}px system-ui, Segoe UI, sans-serif`
-        if (words.length > 1) {
-          words.forEach((word, i) => {
-            ctx.fillText(word, node.x, node.y + (i - (words.length - 1) / 2) * 14)
+        ctx.font = `700 ${node.fs}px system-ui, "Segoe UI", sans-serif`
+        ctx.shadowColor = 'rgba(15, 23, 42, 0.45)'
+        ctx.shadowBlur = 4
+        ctx.shadowOffsetY = 1
+
+        if (node.words.length > 1) {
+          node.words.forEach((word, i) => {
+            ctx.fillText(
+              word,
+              node.x,
+              node.y + (i - (node.words.length - 1) / 2) * node.lineH,
+            )
           })
         } else {
           ctx.fillText(node.label, node.x, node.y)
         }
+        ctx.restore()
       }
     }
 

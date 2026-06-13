@@ -6,5 +6,6 @@
   { "id": "ai-video-creation", "name": "AI Video Creation Course" },
   { "id": "ai-vibe-coding", "name": "AI Vibe Coding" },
   { "id": "plus2-it-arts-science-oav", "name": "+2 IT Arts/Science/OAV" },
-  { "id": "oav-ict-6th-10th", "name": "OAV - ICT 6th-10th" }
+  { "id": "oav-ict-6th-10th", "name": "OAV - ICT 6th-10th" },
+  { "id": "practical-computer-lab", "name": "Practical Classes - Computer LAB" }
 ]

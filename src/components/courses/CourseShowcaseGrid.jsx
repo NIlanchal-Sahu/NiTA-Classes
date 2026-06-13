@@ -42,7 +42,11 @@ export default function CourseShowcaseGrid({ title = 'Our Courses & Student Outc
               <div className="p-4">
                 <div className="font-semibold text-gray-900">{course.shortTitle || course.name}</div>
                 <div className="mt-1 flex items-center justify-between text-sm text-gray-500">
-                  <span>₹{course.enrollmentFees} enrollment</span>
+                  <span>
+                    {course.isIncludedBenefit
+                      ? 'Included with courses (except Spoken English)'
+                      : `₹${course.enrollmentFees} enrollment`}
+                  </span>
                   <span className="font-medium text-primary-600 group-hover:underline">Tap to preview →</span>
                 </div>
               </div>

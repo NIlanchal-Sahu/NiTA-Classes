@@ -3,8 +3,16 @@ import { Link } from 'react-router-dom'
 export default function CoursePreviewModal({ course, onClose }) {
   if (!course) return null
 
-  const enrollTo = course.isVvip ? '/student/pay' : `/enroll/${course.id}`
-  const enrollLabel = course.isVvip ? 'Get VVIP — Login required' : 'Enroll Now — Pay online'
+  const enrollTo = course.isVvip
+    ? '/student/pay'
+    : course.isIncludedBenefit
+      ? '/admission'
+      : `/enroll/${course.id}`
+  const enrollLabel = course.isVvip
+    ? 'Get VVIP — Login required'
+    : course.isIncludedBenefit
+      ? 'Enroll in a course — LAB included'
+      : 'Enroll Now — Pay online'
 
   return (
     <div
@@ -51,9 +59,13 @@ export default function CoursePreviewModal({ course, onClose }) {
               <dd className="text-sm font-semibold text-gray-900">{course.certificationDuration}</dd>
             </div>
             <div className="rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 sm:col-span-2">
-              <dt className="text-xs font-medium text-primary-700">Enrollment fee</dt>
+              <dt className="text-xs font-medium text-primary-700">
+                {course.isIncludedBenefit ? 'Access' : 'Enrollment fee'}
+              </dt>
               <dd className="text-lg font-extrabold text-primary-700">
-                ₹{course.enrollmentFees} + {course.classFee}
+                {course.isIncludedBenefit
+                  ? 'Included with all courses except Spoken English'
+                  : `₹${course.enrollmentFees} + ${course.classFee}`}
               </dd>
             </div>
           </dl>

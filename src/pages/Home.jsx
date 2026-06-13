@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import LazyAllOurCoursesSection from '../components/home/LazyAllOurCoursesSection'
+import HeroLiveClassesNotice from '../components/home/HeroLiveClassesNotice'
 import InternshipHomeSection from '../components/home/InternshipHomeSection'
 import CourseShowcaseGrid from '../components/courses/CourseShowcaseGrid'
 import {
   WHATSAPP_NUMBER,
-  LOGO_SRC,
   PROGRAM_START_DATE,
   WHATSAPP_CTA,
 } from '../config'
@@ -153,10 +153,7 @@ export default function Home() {
 
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
             <div>
-              <div className="flex items-center gap-3">
-                <img src={LOGO_SRC} alt="NITA Classes logo" className="h-10 w-auto" />
-                <p className="text-sm text-primary-100/80 sm:text-base">Classes are running from : {PROGRAM_START_DATE}</p>
-              </div>
+              <HeroLiveClassesNotice />
               <h1 className="mt-4 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-6xl">
                 <span className="block">Build Skills</span>
                 <span className="mt-1 block text-accent-orange">

@@ -127,10 +127,37 @@ export default function ExploreCourses() {
             </div>
             <div className="p-4">
               <h3 className="font-semibold text-white line-clamp-2">{c.name || c.title}</h3>
-              <div className="mt-1 text-sm text-gray-300">
-                Unlock fee: <span className="font-semibold text-white">₹{Number(c.unlockFee) || 0}</span>
-              </div>
-              {!c.unlocked || c.status === 'locked' ? (
+              {c.isIncludedBenefit ? (
+                <div className="mt-1 text-sm text-emerald-300">
+                  {c.unlocked ? 'Included with your course(s)' : 'Included with eligible courses'}
+                </div>
+              ) : (
+                <div className="mt-1 text-sm text-gray-300">
+                  Unlock fee: <span className="font-semibold text-white">₹{Number(c.unlockFee) || 0}</span>
+                </div>
+              )}
+              {c.isIncludedBenefit ? (
+                c.unlocked ? (
+                  <div className="mt-3 flex flex-col gap-2">
+                    <Link
+                      to={`/student/course/${c.id}`}
+                      className="inline-block rounded-lg bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-700"
+                    >
+                      Open LAB
+                    </Link>
+                    <Link
+                      to={`/student/pay?course=${encodeURIComponent(c.id)}`}
+                      className="inline-block rounded-lg border border-violet-500/50 bg-violet-950/40 px-4 py-2 text-center text-sm font-medium text-violet-200 hover:bg-violet-900/50"
+                    >
+                      Pay for LAB class (₹10)
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs leading-relaxed text-gray-400">
+                    Enroll in any course except Spoken English to unlock Computer LAB access.
+                  </p>
+                )
+              ) : !c.unlocked || c.status === 'locked' ? (
                 <button
                   type="button"
                   onClick={() => setUnlockModal({ id: c.id, name: c.name || c.title, unlockFee: Number(c.unlockFee) || 0 })}
@@ -188,7 +215,13 @@ export default function ExploreCourses() {
               </button>
             </div>
             <p className="mt-2 text-sm text-violet-300">
-              Unlock fee: <span className="font-semibold text-white">₹{Number(infoModal.unlockFee) || 0}</span>
+              {infoModal.isIncludedBenefit ? (
+                <span className="font-semibold text-emerald-300">Included with eligible courses (except Spoken English)</span>
+              ) : (
+                <>
+                  Unlock fee: <span className="font-semibold text-white">₹{Number(infoModal.unlockFee) || 0}</span>
+                </>
+              )}
             </p>
             <div className="mt-4 text-sm leading-relaxed">
               {infoModal.description ? (
