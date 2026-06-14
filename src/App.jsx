@@ -12,7 +12,6 @@ import Contact from './pages/Contact'
 import Referral from './pages/Referral'
 import Internship from './pages/Internship'
 import Login from './pages/Login'
-import AdminPanel from './pages/AdminPanel'
 import DashboardHome from './pages/student/DashboardHome'
 import PayForClass from './pages/student/PayForClass'
 import MyCourses from './pages/student/MyCourses'
@@ -90,15 +89,58 @@ export default function App() {
           <Route path="courses" element={<AdminCourses />} />
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="teachers" element={<AdminTeachers />} />
-          <Route path="fees" element={<AdminFees />} />
-          <Route path="discounts" element={<AdminDiscounts />} />
-          <Route path="notes" element={<AdminNotes />} />
-          <Route path="certificates" element={<AdminCertificates />} />
+          <Route path="content" element={<AdminNotes />} />
+          <Route path="notes" element={<Navigate to="/admin/content" replace />} />
           <Route path="student-profiles" element={<AdminStudentProfiles />} />
-          <Route path="enrollments" element={<AdminEnrollments />} />
           <Route path="batches" element={<AdminBatches />} />
-          <Route path="notifications" element={<AdminNotifications />} />
-          <Route path="referrals" element={<AdminReferrals />} />
+          <Route
+            path="fees"
+            element={
+              <ProtectedRoute requireRole="admin">
+                <AdminFees />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="discounts"
+            element={
+              <ProtectedRoute requireRole="admin">
+                <AdminDiscounts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="certificates"
+            element={
+              <ProtectedRoute requireRole="admin">
+                <AdminCertificates />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="enrollments"
+            element={
+              <ProtectedRoute requireRole="admin">
+                <AdminEnrollments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="notifications"
+            element={
+              <ProtectedRoute requireRole="admin">
+                <AdminNotifications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="referrals"
+            element={
+              <ProtectedRoute requireRole="admin">
+                <AdminReferrals />
+              </ProtectedRoute>
+            }
+          />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

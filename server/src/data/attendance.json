@@ -28,5 +28,11 @@
     "courseId": "spoken-english-mastery",
     "date": "2026-03-22",
     "classesCount": 1
+  },
+  {
+    "studentId": "auth-1774146766572",
+    "courseId": "practical-computer-lab",
+    "date": "2026-06-14",
+    "classesCount": 1
   }
 ]

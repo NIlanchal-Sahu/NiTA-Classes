@@ -10,6 +10,16 @@ const ROLES = [
 
 const LOGIN_MODE = { password: 'password', otp: 'otp' }
 
+function formatLoginError(message, selectedRole) {
+  if (message === 'Invalid login or role' && selectedRole !== 'teacher') {
+    return 'Invalid login or role. Teacher accounts must use the Teacher tab (not Student or Admin).'
+  }
+  if (message === 'Invalid password' && selectedRole !== 'teacher') {
+    return message
+  }
+  return message || 'Login failed'
+}
+
 export default function Login() {
   const [role, setRole] = useState('student')
   const [mode, setMode] = useState(LOGIN_MODE.password)
@@ -33,7 +43,7 @@ export default function Login() {
       await loginWithPassword(role, { email: email.trim(), password })
       navigate(redirectTo, { replace: true })
     } catch (err) {
-      setError(err.message || 'Login failed')
+      setError(formatLoginError(err.message, role))
     } finally {
       setLoading(false)
     }

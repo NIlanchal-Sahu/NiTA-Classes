@@ -8,5 +8,20 @@
     ],
     "createdAt": "2026-03-22T01:02:40.221Z",
     "updatedAt": "2026-03-22T01:02:40.223Z"
+  },
+  {
+    "id": "prog-1781462978530",
+    "studentId": "NITA20260322GJUTZH",
+    "courseId": "dca",
+    "completedChapterIds": [
+      "ch-ccc-01-notes",
+      "ch-ccc-01-practice",
+      "ch-ccc-01-answers",
+      "ch-ccc-02-notes",
+      "ch-ccc-02-practice",
+      "ch-ccc-02-answers"
+    ],
+    "createdAt": "2026-06-14T18:49:38.530Z",
+    "updatedAt": "2026-06-14T20:20:15.794Z"
   }
 ]

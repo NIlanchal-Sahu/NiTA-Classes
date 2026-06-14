@@ -25,8 +25,8 @@ export default function AdminLayout() {
         { to: '/admin/courses', label: 'Courses' },
         { to: '/admin/batches', label: 'Batches' },
         { to: '/admin/attendance', label: 'Attendance' },
-        { to: '/admin/teachers', label: 'Teachers' },
-        { to: '/admin/notes', label: 'Course Content' },
+        { to: '/admin/teachers', label: 'My profile & pay' },
+        { to: '/admin/content', label: 'Content & Quizzes' },
         { to: '/admin/student-profiles', label: 'Student profiles' },
       ]
     : [
@@ -39,7 +39,7 @@ export default function AdminLayout() {
         { to: '/admin/fees', label: 'Fees & Payments' },
         { to: '/admin/discounts', label: 'Discounts' },
         { to: '/admin/referrals', label: 'Referrals' },
-        { to: '/admin/notes', label: 'Course Content' },
+        { to: '/admin/content', label: 'Content & Quizzes' },
         { to: '/admin/certificates', label: 'Certificates' },
         { to: '/admin/student-profiles', label: 'Student profiles' },
         { to: '/admin/enrollments', label: 'Admissions Queue' },

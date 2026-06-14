@@ -11,6 +11,7 @@ import {
 } from '../services/googleProfileSync.js'
 import { uploadChapterNotesBuffer } from '../services/courseContentDrive.js'
 import { onPaymentApproved } from '../services/eventTriggers.js'
+import { sanitizeQuizData, sanitizeReferences, findAnswerKeyChapter } from '../lib/chapterExtras.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -1192,8 +1193,12 @@ router.post('/teachers/payments', auth, allowRoles(['admin']), (req, res) => {
 })
 
 // ===== Courses =====
-router.get('/courses', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
-  const courses = loadCoursesWithLegacyFallback()
+router.get('/courses', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  let courses = loadCoursesWithLegacyFallback()
+  const assigned = getTeacherAssignedCourseIds(req)
+  if (assigned != null && assigned.length > 0) {
+    courses = courses.filter((c) => assigned.some((id) => normCourseId(id) === normCourseId(c.id)))
+  }
   res.json({ courses: courses.slice().reverse() })
 })
 
@@ -1432,7 +1437,25 @@ router.put('/content/courses/:courseId/modules/:moduleId/chapters/:chapterId', a
   if (cIdx < 0) return res.status(404).json({ error: 'Chapter not found' })
   const patch = { ...req.body }
   if (patch.contentHtml != null) patch.contentHtml = sanitizeContentHtml(patch.contentHtml)
+  if (patch.quizData != null) patch.quizData = sanitizeQuizData(patch.quizData)
+  if (patch.extraReferences != null) patch.extraReferences = sanitizeReferences(patch.extraReferences)
+
   chapters[cIdx] = { ...chapters[cIdx], ...patch, updatedAt: new Date().toISOString() }
+
+  if (patch.quizData && chapters[cIdx].interactiveType === 'quiz') {
+    const answerKey = findAnswerKeyChapter(modules[mIdx], chapterId)
+    if (answerKey) {
+      const akIdx = chapters.findIndex((c) => String(c.id) === String(answerKey.id))
+      if (akIdx >= 0) {
+        chapters[akIdx] = {
+          ...chapters[akIdx],
+          quizData: patch.quizData,
+          updatedAt: new Date().toISOString(),
+        }
+      }
+    }
+  }
+
   chapters.sort(byOrder)
   modules[mIdx].chapters = chapters
   tree[idx].modules = modules

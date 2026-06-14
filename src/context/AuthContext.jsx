@@ -56,6 +56,8 @@ export function AuthProvider({ children }) {
     refreshUser,
     isStudent: user?.role === 'student',
     isAdmin: user?.role === 'admin',
+    isTeacher: user?.role === 'teacher',
+    isStaff: user?.role === 'admin' || user?.role === 'teacher',
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

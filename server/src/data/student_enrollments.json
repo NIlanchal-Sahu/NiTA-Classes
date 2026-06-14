@@ -62,5 +62,16 @@
     "startDate": "2026-03-23",
     "expiresAt": "2026-06-21",
     "createdAt": "2026-03-23T14:45:56.277Z"
+  },
+  {
+    "id": "enr-1781462851367",
+    "studentId": "NITA20260322GJUTZH",
+    "courseId": "dca",
+    "batchId": "",
+    "note": "Course unlocked from wallet. Fee deducted ₹499",
+    "status": "active",
+    "startDate": "2026-06-14",
+    "expiresAt": "2026-09-12",
+    "createdAt": "2026-06-14T18:47:31.367Z"
   }
 ]

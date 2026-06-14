@@ -13,7 +13,7 @@ const navItems = [
   { to: "/student/learning-paths", label: "Attendance Tracker", icon: PathIcon },
   { to: "/student/help", label: "Help & Support", icon: HelpIcon },
   { to: "/student/achievements", label: "Achievements", icon: TrophyIcon },
-  { to: "/student/settings", label: "Settings", icon: SettingsIcon },
+  { to: "/student/settings", label: "My Account", icon: SettingsIcon },
 ];
 
 function DashboardIcon({ className }) {

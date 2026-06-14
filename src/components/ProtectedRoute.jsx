@@ -22,7 +22,8 @@ export default function ProtectedRoute({ children, requireRole }) {
 
   const allowedRoles = Array.isArray(requireRole) ? requireRole : requireRole ? [requireRole] : []
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    const redirectTo = user.role === 'admin' || user.role === 'teacher' ? '/admin' : '/student'
+    const redirectTo =
+      user.role === 'admin' || user.role === 'teacher' ? '/admin' : '/student'
     return <Navigate to={redirectTo} replace />
   }
 

@@ -15,7 +15,7 @@ const navLinks = [
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { user, logout, isStudent, isAdmin } = useAuth()
+  const { user, logout, isStudent, isAdmin, isStaff } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -47,9 +47,9 @@ export default function Navbar() {
           {user ? (
             <>
               <li>
-                {isAdmin ? (
+                {isStaff ? (
                   <Link to="/admin" className="btn-touch rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
-                    Admin
+                    {isAdmin ? 'Admin' : 'Teacher portal'}
                   </Link>
                 ) : (
                   <Link to="/student" className="btn-touch rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
@@ -115,11 +115,11 @@ export default function Navbar() {
               <>
                 <li>
                   <Link
-                    to={isAdmin ? '/admin' : '/student'}
+                    to={isStaff ? '/admin' : '/student'}
                     className="btn-touch block rounded-lg px-4 py-3 text-base font-medium text-gray-700 hover:bg-primary-50"
                     onClick={() => setMobileOpen(false)}
                   >
-                    {isAdmin ? 'Admin' : 'Dashboard'}
+                    {isAdmin ? 'Admin' : isStaff ? 'Teacher portal' : 'Dashboard'}
                   </Link>
                 </li>
                 <li>

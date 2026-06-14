@@ -17,6 +17,15 @@ import {
   getQualifyingCourseIdsForStudent,
 } from "../labAccess.js";
 import { readJsonSync, writeJsonSync } from "../services/sheetsJsonStore.js";
+import {
+  computeSchoolDayStreak,
+  computeSchoolDayStreakInMonth,
+  countSchoolDaysInMonth,
+  getHolidaysForMonth,
+  getHolidayInfo,
+  isNonClassDay,
+  walletDatesForUser,
+} from "../lib/odishaCalendar.js";
 
 const router = Router();
 const PRICE_PER_CLASS = 10;
@@ -140,7 +149,9 @@ function removeAdmissionQueueByPhone(phone) {
 
 function getCourseCatalog() {
   const academy = loadJson(ACADEMY_COURSES_PATH);
-  const fromAcademy = academy.map((c) => {
+  const fromAcademy = academy
+    .filter((c) => String(c.status || "active").toLowerCase() !== "draft")
+    .map((c) => {
     const id = normalizeCourseId(c.id);
     const image = typeof c.image === "string" ? c.image.trim() : "";
     const isIncludedBenefit = !!c.isIncludedBenefit || id === LAB_COURSE_ID;
@@ -310,12 +321,22 @@ function normalizeChapterForStudent(ch) {
   if (!ch || typeof ch !== "object") return ch;
   let contentType = String(ch.contentType || "").toLowerCase();
   if (!contentType) {
-    if (String(ch.contentHtml || "").trim()) contentType = "text";
-    else if (ch.documentFileId || ch.documentUrl) contentType = ch.videoUrl ? "mixed" : "document";
-    else contentType = "video";
+    if (ch.quizData?.questions?.length || ch.interactiveType === "quiz" || ch.interactiveType === "answer-key") {
+      contentType = "text";
+    } else if (String(ch.contentHtml || "").trim() || ch.interactiveType === "notes") {
+      contentType = "text";
+    } else if (ch.documentFileId || ch.documentUrl) {
+      contentType = ch.videoUrl ? "mixed" : "document";
+    } else {
+      contentType = "video";
+    }
   }
   if (!["video", "document", "mixed", "text"].includes(contentType)) contentType = "video";
-  return { ...ch, contentType };
+  const out = { ...ch, contentType };
+  if (ch.quizData && typeof ch.quizData === "object") out.quizData = ch.quizData;
+  if (ch.interactiveType) out.interactiveType = ch.interactiveType;
+  if (Array.isArray(ch.extraReferences)) out.extraReferences = ch.extraReferences;
+  return out;
 }
 
 function sumWalletClassesByUser(rows) {
@@ -343,34 +364,423 @@ function monthlyAttendancePctForUser(rows, userId, month) {
 }
 
 function computeCurrentStreak(walletRows, userId) {
-  const dates = Array.from(
-    new Set(
-      walletRows
-        .filter((x) => x.studentId === userId && (Number(x.classesCount) || 0) > 0)
-        .map((x) => String(x.date || "").slice(0, 10))
-        .filter(Boolean),
-    ),
-  ).sort();
-  if (dates.length === 0) return 0;
-  let streak = 1;
-  for (let i = dates.length - 1; i > 0; i -= 1) {
-    const d1 = new Date(`${dates[i]}T00:00:00.000Z`).getTime();
-    const d0 = new Date(`${dates[i - 1]}T00:00:00.000Z`).getTime();
-    if ((d1 - d0) / 86400000 === 1) streak += 1;
-    else break;
-  }
-  return streak;
+  const dates = walletDatesForUser(walletRows, userId);
+  return computeSchoolDayStreak(dates, today());
 }
 
-function computeCompetitionScore({ totalClasses, attendancePct, enrolledCount, completedCount, referralRewards, streak }) {
-  return (
-    (Number(totalClasses) || 0) * 10 +
-    (Number(attendancePct) || 0) * 2 +
-    (Number(enrolledCount) || 0) * 120 +
-    (Number(completedCount) || 0) * 180 +
-    Math.floor((Number(referralRewards) || 0) / 10) +
-    (Number(streak) || 0) * 15
+function computeStreakInMonth(walletRows, userId, month) {
+  const dates = walletDatesForUser(walletRows, userId);
+  return computeSchoolDayStreakInMonth(dates, month, today());
+}
+
+function computeMonthlyConductedAttendance({ attendanceRows, enrollments, studentId, month }) {
+  const unlockStartByCourse = getUnlockStartByCourse(enrollments, studentId);
+  if (unlockStartByCourse.size === 0) {
+    return { percentage: 0, conductedCount: 0, presentCount: 0 };
+  }
+  const conductedSet = new Set();
+  const presentSet = new Set();
+  for (const row of attendanceRows) {
+    const courseId = normalizeCourseId(row.courseId);
+    const unlockStart = unlockStartByCourse.get(courseId);
+    if (!unlockStart) continue;
+    const date = String(row.date || '').slice(0, 10);
+    if (!date || date < unlockStart || monthKey(date) !== month) continue;
+    const key = `${courseId}|${date}`;
+    conductedSet.add(key);
+    if (String(row.studentId || '') === String(studentId) && String(row.status || '').toLowerCase() === 'present') {
+      presentSet.add(key);
+    }
+  }
+  const conductedCount = conductedSet.size;
+  const presentCount = presentSet.size;
+  const percentage = conductedCount ? Math.round((presentCount / conductedCount) * 100) : 0;
+  return { percentage, conductedCount, presentCount };
+}
+
+function countReferralsByUser(referralLinks, month = null) {
+  const map = new Map();
+  for (const link of referralLinks) {
+    if (month && monthKey(link.createdAt) !== month) continue;
+    const uid = String(link.referrerUserId || '');
+    if (!uid) continue;
+    map.set(uid, (map.get(uid) || 0) + 1);
+  }
+  return map;
+}
+
+/** Tiered achievement tracks — basic tier unlocks the next tier in the same segment. */
+function getAchievementTracks(period = 'all') {
+  if (period === 'month') {
+    return [
+      {
+        segment: 'attendance',
+        label: 'Attendance Star',
+        icon: '⭐',
+        unit: '%',
+        value: (m) => Number(m.attendancePct) || 0,
+        tiers: [
+          { id: 'm-att-b', tier: 'Bronze', target: 60, points: 70, description: '60%+ attendance this month' },
+          { id: 'm-att-s', tier: 'Silver', target: 75, points: 55, description: '75%+ attendance this month' },
+          { id: 'm-att-g', tier: 'Gold', target: 90, points: 75, description: '90%+ attendance this month' },
+        ],
+      },
+      {
+        segment: 'classes',
+        label: 'Class Warrior',
+        icon: '🔥',
+        unit: 'classes',
+        value: (m) => Number(m.totalClasses) || 0,
+        tiers: [
+          { id: 'm-cls-b', tier: 'Bronze', target: 2, points: 50, description: '2 classes this month' },
+          { id: 'm-cls-s', tier: 'Silver', target: 5, points: 80, description: '5 classes this month' },
+          { id: 'm-cls-g', tier: 'Gold', target: 10, points: 110, description: '10 classes this month' },
+        ],
+      },
+      {
+        segment: 'courses',
+        label: 'Course Explorer',
+        icon: '📘',
+        unit: 'courses',
+        value: (m) => Number(m.enrolledCount) || 0,
+        tiers: [
+          { id: 'm-crs-b', tier: 'Bronze', target: 1, points: 45, description: 'Unlock 1 course this month' },
+          { id: 'm-crs-s', tier: 'Silver', target: 2, points: 65, description: 'Unlock 2 courses this month' },
+        ],
+      },
+      {
+        segment: 'completion',
+        label: 'Course Finisher',
+        icon: '🏁',
+        unit: 'courses',
+        value: (m) => Number(m.completedCount) || 0,
+        tiers: [
+          { id: 'm-cmp-b', tier: 'Bronze', target: 1, points: 70, description: 'Complete 1 course this month' },
+        ],
+      },
+      {
+        segment: 'streak',
+        label: 'Streak Champion',
+        icon: '⚡',
+        unit: 'school days',
+        value: (m) => Number(m.streak) || 0,
+        tiers: [
+          { id: 'm-str-b', tier: 'Bronze', target: 3, points: 50, description: '3-day school streak this month (Sun & holidays excluded)' },
+          { id: 'm-str-s', tier: 'Silver', target: 6, points: 75, description: '6-day school streak this month' },
+          { id: 'm-str-g', tier: 'Gold', target: 12, points: 100, description: '12-day school streak this month' },
+        ],
+      },
+      {
+        segment: 'referral',
+        label: 'Growth Guide',
+        icon: '🌱',
+        unit: 'referrals',
+        value: (m) => Number(m.referralsCount) || 0,
+        tiers: [
+          { id: 'm-ref-b', tier: 'Bronze', target: 1, points: 70, description: 'Refer 1 friend this month' },
+          { id: 'm-ref-s', tier: 'Silver', target: 2, points: 90, description: 'Refer 2 friends this month' },
+        ],
+      },
+    ];
+  }
+
+  return [
+    {
+      segment: 'attendance',
+      label: 'Attendance Star',
+      icon: '⭐',
+      unit: '%',
+      value: (m) => Number(m.attendancePct) || 0,
+      tiers: [
+        { id: 'att-b', tier: 'Bronze', target: 75, points: 80, description: 'Reach 75% overall attendance' },
+        { id: 'att-s', tier: 'Silver', target: 85, points: 60, description: 'Reach 85% overall attendance' },
+        { id: 'att-g', tier: 'Gold', target: 95, points: 90, description: 'Reach 95% overall attendance' },
+      ],
+    },
+    {
+      segment: 'classes',
+      label: 'Class Warrior',
+      icon: '🔥',
+      unit: 'classes',
+      value: (m) => Number(m.totalClasses) || 0,
+      tiers: [
+        { id: 'cls-b', tier: 'Bronze', target: 10, points: 60, description: 'Attend 10 paid classes (all time)' },
+        { id: 'cls-s', tier: 'Silver', target: 25, points: 90, description: 'Attend 25 paid classes (all time)' },
+        { id: 'cls-g', tier: 'Gold', target: 50, points: 130, description: 'Attend 50 paid classes (all time)' },
+      ],
+    },
+    {
+      segment: 'courses',
+      label: 'Course Explorer',
+      icon: '📘',
+      unit: 'courses',
+      value: (m) => Number(m.enrolledCount) || 0,
+      tiers: [
+        { id: 'crs-b', tier: 'Bronze', target: 1, points: 50, description: 'Unlock 1 course' },
+        { id: 'crs-s', tier: 'Silver', target: 2, points: 70, description: 'Unlock 2 courses' },
+        { id: 'crs-g', tier: 'Gold', target: 3, points: 100, description: 'Unlock 3 courses' },
+      ],
+    },
+    {
+      segment: 'completion',
+      label: 'Course Finisher',
+      icon: '🏁',
+      unit: 'courses',
+      value: (m) => Number(m.completedCount) || 0,
+      tiers: [
+        { id: 'cmp-b', tier: 'Bronze', target: 1, points: 80, description: 'Complete 1 course' },
+        { id: 'cmp-s', tier: 'Silver', target: 2, points: 100, description: 'Complete 2 courses' },
+      ],
+    },
+    {
+      segment: 'streak',
+      label: 'Streak Champion',
+      icon: '⚡',
+      unit: 'school days',
+      value: (m) => Number(m.streak) || 0,
+      tiers: [
+        { id: 'str-b', tier: 'Bronze', target: 6, points: 70, description: '6-day school streak — 1 week of classes (Sunday is holiday)' },
+        { id: 'str-s', tier: 'Silver', target: 12, points: 100, description: '12-day school streak — 2 weeks of classes' },
+        { id: 'str-g', tier: 'Gold', target: 25, points: 140, description: '25-day school streak — ~1 month (excl. Sun, public holidays & Odisha festivals)' },
+      ],
+    },
+    {
+      segment: 'referral',
+      label: 'Growth Guide',
+      icon: '🌱',
+      unit: 'referrals',
+      value: (m) => Number(m.referralsCount) || 0,
+      tiers: [
+        { id: 'ref-b', tier: 'Bronze', target: 1, points: 80, description: 'Refer 1 friend who joins' },
+        { id: 'ref-s', tier: 'Silver', target: 3, points: 100, description: 'Refer 3 friends who join' },
+        { id: 'ref-g', tier: 'Gold', target: 5, points: 140, description: 'Refer 5 friends who join' },
+      ],
+    },
+  ];
+}
+
+function buildStudentCompetitionMetrics({
+  userId,
+  linkedStudent,
+  walletRows,
+  academyAttendanceRows,
+  allEnrollments,
+  referralsCount = 0,
+  referralRewards = 0,
+  month = null,
+}) {
+  const isMonthly = Boolean(month);
+  const enrs = allEnrollments.filter(
+    (e) => e.studentId === linkedStudent?.id && normalizeCourseId(e.courseId) !== 'trial-course',
   );
+
+  let enrolledCount;
+  let completedCount;
+  if (isMonthly) {
+    enrolledCount = enrs.filter((e) => monthKey(e.createdAt || e.startDate) === month).length;
+    completedCount = enrs.filter(
+      (e) =>
+        String(e.status || '').toLowerCase() === 'completed' &&
+        monthKey(e.completedAt || e.updatedAt || e.createdAt) === month,
+    ).length;
+  } else {
+    enrolledCount = new Set(enrs.map((e) => normalizeCourseId(e.courseId))).size;
+    completedCount = enrs.filter((e) => String(e.status || '').toLowerCase() === 'completed').length;
+  }
+
+  let attendancePct;
+  let conductedCount;
+  let presentCount;
+  if (isMonthly) {
+    const acc = computeMonthlyConductedAttendance({
+      attendanceRows: academyAttendanceRows,
+      enrollments: allEnrollments,
+      studentId: linkedStudent?.id,
+      month,
+    });
+    attendancePct = acc.percentage;
+    conductedCount = acc.conductedCount;
+    presentCount = acc.presentCount;
+  } else {
+    const acc = computeAttendanceFromConductedClasses({
+      attendanceRows: academyAttendanceRows,
+      enrollments: allEnrollments,
+      studentId: linkedStudent?.id,
+    });
+    attendancePct = acc.percentage;
+    conductedCount = acc.conductedCount;
+    presentCount = acc.presentCount;
+  }
+
+  const totalClasses = isMonthly
+    ? walletRows
+        .filter((r) => r.studentId === userId && monthKey(r.date) === month)
+        .reduce((s, r) => s + (Number(r.classesCount) || 0), 0)
+    : getTotalClassesFromWallet(userId);
+
+  const streak = isMonthly
+    ? computeStreakInMonth(walletRows, userId, month)
+    : computeCurrentStreak(walletRows, userId);
+
+  return {
+    userId,
+    period: isMonthly ? 'month' : 'all',
+    month: month || null,
+    totalClasses,
+    attendancePct,
+    enrolledCount,
+    completedCount,
+    streak,
+    referralsCount: Number(referralsCount) || 0,
+    referralRewards: Number(referralRewards) || 0,
+    conductedCount,
+    presentCount,
+  };
+}
+
+function buildAchievementCards(metrics, period = 'all') {
+  const tracks = getAchievementTracks(period);
+  const cards = [];
+  for (const track of tracks) {
+    const value = track.value(metrics);
+    let prevTierAchieved = true;
+    for (let i = 0; i < track.tiers.length; i += 1) {
+      const tier = track.tiers[i];
+      const achieved = value >= tier.target;
+      const locked = i > 0 && !prevTierAchieved;
+      cards.push({
+        id: tier.id,
+        segment: track.segment,
+        title: `${track.label} — ${tier.tier}`,
+        description: tier.description,
+        icon: track.icon,
+        tier: tier.tier,
+        tierOrder: i,
+        target: tier.target,
+        unit: track.unit,
+        points: tier.points,
+        progress: Math.min(tier.target, value),
+        achieved,
+        locked,
+        activeChase: !achieved && !locked,
+      });
+      prevTierAchieved = achieved;
+    }
+  }
+  return cards;
+}
+
+/** Show only the tier currently being chased (hide locked future tiers). */
+function filterChaseVisibleCards(cards) {
+  const bySegment = new Map();
+  for (const c of cards) {
+    if (!bySegment.has(c.segment)) bySegment.set(c.segment, []);
+    bySegment.get(c.segment).push(c);
+  }
+  const segmentOrder = ['attendance', 'classes', 'courses', 'completion', 'streak', 'referral'];
+  const visible = [];
+  for (const segment of segmentOrder) {
+    const segCards = bySegment.get(segment);
+    if (!segCards?.length) continue;
+    const sorted = [...segCards].sort((a, b) => a.tierOrder - b.tierOrder);
+    const chasing = sorted.find((c) => c.activeChase);
+    if (chasing) {
+      visible.push(chasing);
+    } else {
+      const achieved = sorted.filter((c) => c.achieved);
+      if (achieved.length) visible.push(achieved[achieved.length - 1]);
+    }
+  }
+  return visible;
+}
+
+function scoreBreakdownFromCards(cards) {
+  return cards.map((c) => ({
+    id: c.id,
+    title: c.title,
+    points: c.points,
+    achieved: c.achieved,
+    locked: c.locked,
+    earned: c.achieved
+      ? c.points
+      : c.locked
+        ? 0
+        : Math.floor(c.points * 0.25 * Math.min(1, (c.progress || 0) / (c.target || 1))),
+  }));
+}
+
+/** Score = sum of tier points (each tier adds when achieved) + partial on active chase tier only. */
+function computeCompetitionScore(metrics, period = 'all') {
+  const cards = buildAchievementCards(metrics, period);
+  let score = 0;
+  let unlockedCount = 0;
+  for (const c of cards) {
+    if (c.achieved) {
+      score += c.points;
+      unlockedCount += 1;
+    } else if (c.activeChase) {
+      const ratio = c.target > 0 ? Math.min(1, c.progress / c.target) : 0;
+      score += Math.floor(c.points * 0.25 * ratio);
+    }
+  }
+  score += Math.min(period === 'month' ? 25 : 50, (Number(metrics.totalClasses) || 0) * 2);
+  score += Math.min(period === 'month' ? 20 : 35, (Number(metrics.streak) || 0) * 5);
+  score += Math.min(period === 'month' ? 15 : 30, (Number(metrics.referralsCount) || 0) * 8);
+  return { score, unlockedCount };
+}
+
+function buildAchievementsList(cards) {
+  return cards.filter((c) => c.achieved).map((c) => c.title);
+}
+
+function buildLeaderboardRows({
+  users,
+  studentByUser,
+  walletRows,
+  academyAttendanceRows,
+  allEnrollments,
+  referralsByUser,
+  payoutByUser,
+  month,
+  period,
+}) {
+  return users
+    .filter((u) => studentByUser.has(String(u.id)))
+    .map((u) => {
+      const linkedStudent = studentByUser.get(String(u.id)) || null;
+      const referralsCount = referralsByUser.get(String(u.id)) || 0;
+      const metrics = buildStudentCompetitionMetrics({
+        userId: u.id,
+        linkedStudent,
+        walletRows,
+        academyAttendanceRows,
+        allEnrollments,
+        referralsCount,
+        referralRewards: payoutByUser.get(String(u.id)) || 0,
+        month: period === 'month' ? month : null,
+      });
+      const cards = buildAchievementCards(metrics, period);
+      const { score: points, unlockedCount: achievementCount } = computeCompetitionScore(metrics, period);
+      return {
+        userId: u.id,
+        name: u.name || String(u.email || '').split('@')[0] || 'Student',
+        points,
+        achievementCount,
+        badges: buildAchievementsList(cards),
+        totalClasses: metrics.totalClasses,
+        attendancePct: metrics.attendancePct,
+        streak: metrics.streak,
+        referralsCount: metrics.referralsCount,
+        enrolledCount: metrics.enrolledCount,
+        completedCount: metrics.completedCount,
+      };
+    });
+}
+
+function rankLeaderboard(rows) {
+  return rows
+    .sort((a, b) => b.points - a.points || b.achievementCount - a.achievementCount)
+    .map((x, i) => ({ ...x, rank: i + 1 }));
 }
 
 function getUnlockStartByCourse(enrollments, studentId) {
@@ -664,31 +1074,53 @@ router.get("/portal/attendance", studentAuth, (req, res) => {
     e.classesCount += cnt;
   }
 
-  const dim = daysInMonthString(month);
-  let presentDayCount = 0;
+  const holidays = getHolidaysForMonth(month);
+  const holidayMap = new Map(holidays.map((h) => [h.date, h]));
+  for (const h of holidays) {
+    if (!holidayMap.has(h.date)) holidayMap.set(h.date, h);
+  }
+
+  const now = today();
+  const isCurrentMonth = month === monthKey(now);
+  const schoolDaysDenominator = countSchoolDaysInMonth(month, isCurrentMonth ? now : null);
+  const schoolDaysInMonth = countSchoolDaysInMonth(month);
+
+  let presentSchoolDays = 0;
   const attendance = [];
 
   for (const [date, e] of [...dayMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const present = e.classesCount > 0;
-    if (present) presentDayCount += 1;
+    const holiday = getHolidayInfo(date);
+    if (present && !isNonClassDay(date)) presentSchoolDays += 1;
     attendance.push({
       id: `day-${date}-${courseFilter || "all"}`,
       date,
       status: present ? "present" : "none",
       classesCount: e.classesCount,
+      isNonClassDay: isNonClassDay(date),
+      holiday: holiday
+        ? { name: holiday.name, type: holiday.type }
+        : null,
     });
   }
 
-  const monthlyPercentage = dim ? Math.round((presentDayCount / dim) * 100) : 0;
+  const monthlyPercentage = schoolDaysDenominator
+    ? Math.round((presentSchoolDays / schoolDaysDenominator) * 100)
+    : 0;
 
   res.json({
     studentId: req.auth.userId,
     month,
     courseId: courseFilter || null,
     attendance,
+    holidays,
     monthlyPercentage,
-    daysInMonth: dim,
-    presentDaysCount: presentDayCount,
+    daysInMonth: daysInMonthString(month),
+    presentDaysCount: presentSchoolDays,
+    schoolDaysInMonth,
+    schoolDaysDenominator,
+    calendarNote:
+      "Attendance % counts only school days (Mon–Sat excluding Odisha public holidays & festivals). Sunday is always a weekly holiday.",
   });
 });
 
@@ -1228,7 +1660,6 @@ router.post("/portal/certificates/request", studentAuth, (req, res) => {
 router.get("/portal/dashboard", studentAuth, (req, res) => {
   const authUser = getUserById(req.auth.userId);
   const student = resolveStudentRecord(authUser);
-  const currentMonth = monthKey(today());
   const walletRows = loadJson(WALLET_ATTENDANCE_PATH);
   const academyAttendanceRows = loadJson(ACADEMY_ATTENDANCE_PATH);
   const allEnrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
@@ -1240,150 +1671,128 @@ router.get("/portal/dashboard", studentAuth, (req, res) => {
   const attendancePct = attendanceFromConducted.percentage;
   const payouts = loadJson(REFERRAL_PAYOUTS_PATH).filter((p) => p.referrerUserId === req.auth.userId);
   const rewards = payouts.reduce((a, b) => a + (Number(b.amount) || 0), 0);
-  const totalClassesAttended = getTotalClassesFromWallet(req.auth.userId);
-  const myEnrollments = allEnrollments.filter((e) => e.studentId === student?.id && normalizeCourseId(e.courseId) !== "trial-course");
-  const enrolledCount = new Set(myEnrollments.map((e) => normalizeCourseId(e.courseId))).size;
-  const completedCount = myEnrollments.filter((e) => String(e.status || "").toLowerCase() === "completed").length;
-  const streak = computeCurrentStreak(walletRows, req.auth.userId);
-  const competitionScore = computeCompetitionScore({
-    totalClasses: totalClassesAttended,
-    attendancePct,
-    enrolledCount,
-    completedCount,
+  const referralLinks = loadJson(REFERRAL_LINKS_PATH);
+  const currentMonth = monthKey(today());
+  const referralsByUserAll = countReferralsByUser(referralLinks);
+  const referralsByUserMonth = countReferralsByUser(referralLinks, currentMonth);
+  const myReferralsCount = referralsByUserAll.get(String(req.auth.userId)) || 0;
+  const myReferralsCountMonth = referralsByUserMonth.get(String(req.auth.userId)) || 0;
+
+  const myMetrics = buildStudentCompetitionMetrics({
+    userId: req.auth.userId,
+    linkedStudent: student,
+    walletRows,
+    academyAttendanceRows,
+    allEnrollments,
+    referralsCount: myReferralsCount,
     referralRewards: rewards,
-    streak,
+  });
+  const myMetricsMonth = buildStudentCompetitionMetrics({
+    userId: req.auth.userId,
+    linkedStudent: student,
+    walletRows,
+    academyAttendanceRows,
+    allEnrollments,
+    referralsCount: myReferralsCountMonth,
+    referralRewards: rewards,
+    month: currentMonth,
   });
 
-  const achievementCards = [
-    {
-      id: "att-75",
-      title: "Attendance Star",
-      description: "Reach 75% monthly attendance",
-      icon: "⭐",
-      progress: Math.min(75, attendancePct),
-      target: 75,
-      unit: "%",
-      achieved: attendancePct >= 75,
-    },
-    {
-      id: "cls-25",
-      title: "Class Warrior",
-      description: "Attend 25 paid classes",
-      icon: "🔥",
-      progress: Math.min(25, totalClassesAttended),
-      target: 25,
-      unit: "classes",
-      achieved: totalClassesAttended >= 25,
-    },
-    {
-      id: "crs-2",
-      title: "Course Explorer",
-      description: "Unlock 2 courses",
-      icon: "📘",
-      progress: Math.min(2, enrolledCount),
-      target: 2,
-      unit: "courses",
-      achieved: enrolledCount >= 2,
-    },
-    {
-      id: "cmp-1",
-      title: "Course Finisher",
-      description: "Complete 1 course",
-      icon: "🏁",
-      progress: Math.min(1, completedCount),
-      target: 1,
-      unit: "courses",
-      achieved: completedCount >= 1,
-    },
-    {
-      id: "strk-7",
-      title: "Streak Champion",
-      description: "Maintain 7-day class streak",
-      icon: "⚡",
-      progress: Math.min(7, streak),
-      target: 7,
-      unit: "days",
-      achieved: streak >= 7,
-    },
-  ];
+  const achievementCardsAll = buildAchievementCards(myMetrics, 'all');
+  const achievementCardsMonthAll = buildAchievementCards(myMetricsMonth, 'month');
+  const achievementCards = filterChaseVisibleCards(achievementCardsAll);
+  const achievementCardsMonth = filterChaseVisibleCards(achievementCardsMonthAll);
+  const achievements = buildAchievementsList(achievementCardsAll);
+  const { score: competitionScore, unlockedCount: achievementsUnlocked } = computeCompetitionScore(myMetrics, 'all');
+  const { score: competitionScoreMonth, unlockedCount: achievementsUnlockedMonth } = computeCompetitionScore(
+    myMetricsMonth,
+    'month',
+  );
 
-  const achievements = [];
-  if (attendancePct >= 75) achievements.push("Attendance Star");
-  if (totalClassesAttended >= 20) achievements.push("20 Classes Milestone");
-  if (enrolledCount >= 2) achievements.push("Course Explorer");
-  if (completedCount >= 1) achievements.push("Course Finisher");
-  if (streak >= 7) achievements.push("Streak Champion");
-  if (rewards > 0) achievements.push("Referral Earner");
+  const totalClassesAttended = myMetrics.totalClasses;
+  const enrolledCount = myMetrics.enrolledCount;
+  const completedCount = myMetrics.completedCount;
+  const streak = myMetrics.streak;
   const courseProgress = Math.min(100, Math.round((totalClassesAttended / 100) * 100));
 
   const students = loadJson(ACADEMY_STUDENTS_PATH);
-  const users = getUsers().filter((u) => u.role === "student");
+  const users = getUsers().filter((u) => u.role === 'student');
   const studentByUser = new Map(
-    students
-      .filter((s) => s.accountUserId)
-      .map((s) => [String(s.accountUserId), s]),
+    students.filter((s) => s.accountUserId).map((s) => [String(s.accountUserId), s]),
   );
-  const classesByUser = sumWalletClassesByUser(walletRows);
   const payoutByUser = new Map();
   for (const p of loadJson(REFERRAL_PAYOUTS_PATH)) {
-    const uid = String(p.referrerUserId || "");
+    const uid = String(p.referrerUserId || '');
     payoutByUser.set(uid, (payoutByUser.get(uid) || 0) + (Number(p.amount) || 0));
   }
-  const competitionRows = users
-    .filter((u) => studentByUser.has(String(u.id)))
-    .map((u) => {
-      const linkedStudent = studentByUser.get(String(u.id)) || null;
-      const enrs = allEnrollments.filter((e) => e.studentId === linkedStudent?.id && normalizeCourseId(e.courseId) !== "trial-course");
-      const unlocked = new Set(enrs.map((e) => normalizeCourseId(e.courseId))).size;
-      const completed = enrs.filter((e) => String(e.status || "").toLowerCase() === "completed").length;
-      const acc = computeAttendanceFromConductedClasses({
-        attendanceRows: academyAttendanceRows,
-        enrollments: allEnrollments,
-        studentId: linkedStudent?.id,
-      });
-      const monthly = acc.percentage;
-      const totalClasses = classesByUser.get(String(u.id)) || 0;
-      const referralRewards = payoutByUser.get(String(u.id)) || 0;
-      const userStreak = computeCurrentStreak(walletRows, u.id);
-      const points = computeCompetitionScore({
-        totalClasses,
-        attendancePct: monthly,
-        enrolledCount: unlocked,
-        completedCount: completed,
-        referralRewards,
-        streak: userStreak,
-      });
-      return {
-        userId: u.id,
-        name: u.name || String(u.email || "").split("@")[0] || "Student",
-        points,
-        totalClasses,
-        attendancePct: monthly,
-        enrolledCount: unlocked,
-        completedCount: completed,
-      };
-    });
-  const ranked = competitionRows.sort((a, b) => b.points - a.points).map((x, i) => ({ ...x, rank: i + 1 }));
-  const leaderboard = ranked.slice(0, 10);
-  const myRank = ranked.find((x) => x.userId === req.auth.userId)?.rank || null;
+
+  const allTimeRows = buildLeaderboardRows({
+    users,
+    studentByUser,
+    walletRows,
+    academyAttendanceRows,
+    allEnrollments,
+    referralsByUser: referralsByUserAll,
+    payoutByUser,
+    month: currentMonth,
+    period: 'all',
+  });
+  const monthRows = buildLeaderboardRows({
+    users,
+    studentByUser,
+    walletRows,
+    academyAttendanceRows,
+    allEnrollments,
+    referralsByUser: referralsByUserMonth,
+    payoutByUser,
+    month: currentMonth,
+    period: 'month',
+  });
+  const rankedAllTime = rankLeaderboard(allTimeRows);
+  const rankedMonth = rankLeaderboard(monthRows);
+  const leaderboard = rankedAllTime.slice(0, 10);
+  const leaderboardMonth = rankedMonth.slice(0, 10);
+  const myRank = rankedAllTime.find((x) => x.userId === req.auth.userId)?.rank || null;
+  const myRankMonth = rankedMonth.find((x) => x.userId === req.auth.userId)?.rank || null;
+
+  const monthLabel = new Date(`${currentMonth}-01T00:00:00.000Z`).toLocaleString('en-IN', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 
   res.json({
     attendancePercentage: attendancePct,
     achievements,
+    achievementsUnlocked,
+    achievementsUnlockedMonth,
     courseProgress,
     rewards,
     earnedByReferring: rewards,
+    referralsCount: myReferralsCount,
+    referralsCountMonth: myReferralsCountMonth,
     walletBalance: Number(authUser?.walletBalance) || 0,
     totalClassesAttended,
+    totalClassesAttendedMonth: myMetricsMonth.totalClasses,
     currentStreak: streak,
+    currentStreakMonth: myMetricsMonth.streak,
     enrolledCourseCount: enrolledCount,
     completedCourseCount: completedCount,
     competitionScore,
+    competitionScoreMonth,
     rank: myRank || null,
+    rankMonth: myRankMonth || null,
     achievementCards,
+    achievementCardsMonth,
     leaderboard,
+    leaderboardMonth,
+    currentMonth,
+    currentMonthLabel: monthLabel,
+    scoreBreakdown: scoreBreakdownFromCards(filterChaseVisibleCards(achievementCardsAll)),
+    scoreBreakdownMonth: scoreBreakdownFromCards(filterChaseVisibleCards(achievementCardsMonthAll)),
     classesConductedCount: attendanceFromConducted.conductedCount,
     classesPresentCount: attendanceFromConducted.presentCount,
+    attendancePercentageMonth: myMetricsMonth.attendancePct,
   });
 });
 

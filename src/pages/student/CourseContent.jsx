@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { studentPortalApi } from '../../api/student'
+import ChapterContentView from '../../components/student/ChapterContentView'
+import {
+  CHAPTER_KIND,
+  getChapterKind,
+  isNotesChapter,
+  isQuizChapter,
+  shouldRenderInteractiveContent,
+} from '../../lib/courseContentUtils'
 
 /** Convert common video URLs to embed-friendly URLs (external hosts only). */
 function toEmbedUrl(url) {
@@ -236,10 +244,19 @@ export default function CourseContent() {
   }, [player])
 
   const docSrc = useMemo(() => (selected ? documentPreviewSrc(selected) : ''), [selected])
-  const showVideoBlock = (contentType === 'video' || contentType === 'mixed') && selected
+  const showInteractiveBlock = selected && shouldRenderInteractiveContent(selected)
+  const showVideoBlock =
+    selected &&
+    !isQuizChapter(selected) &&
+    (contentType === 'video' || contentType === 'mixed') &&
+    String(selected.videoUrl || selected.url || '').trim()
   const showDocBlock =
-    selected && (contentType === 'document' || contentType === 'mixed') && Boolean(docSrc)
-  const showTextBlock = contentType === 'text' && String(selected?.contentHtml || '').trim()
+    selected &&
+    !showInteractiveBlock &&
+    (contentType === 'document' || contentType === 'mixed') &&
+    Boolean(docSrc)
+  const isInteractiveQuiz = selected && isQuizChapter(selected)
+  const isStudyNotes = selected && isNotesChapter(selected)
 
   const displayHeading = selected?.heading || selected?.title
 
@@ -279,13 +296,23 @@ export default function CourseContent() {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate">{c.title}</span>
-                        <span
-                          className={`text-[10px] ${
-                            c.completed ? 'text-emerald-400' : c.unlocked ? 'text-violet-300' : 'text-gray-500'
-                          }`}
-                        >
-                          {c.completed ? 'Completed' : c.unlocked ? 'Unlocked' : 'Locked'}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {c.unlocked && (() => {
+                            const meta = CHAPTER_KIND[getChapterKind(c)] || CHAPTER_KIND.other
+                            return (
+                              <span className={`rounded px-1 text-[9px] ${meta.bg} ${meta.text}`} title={meta.label}>
+                                {meta.icon}
+                              </span>
+                            )
+                          })()}
+                          <span
+                            className={`text-[10px] ${
+                              c.completed ? 'text-emerald-400' : c.unlocked ? 'text-violet-300' : 'text-gray-500'
+                            }`}
+                          >
+                            {c.completed ? 'Done' : c.unlocked ? 'Open' : 'Locked'}
+                          </span>
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -304,10 +331,12 @@ export default function CourseContent() {
           {selected && selected.unlocked ? (
             <>
               <h3 className="text-lg font-semibold text-white">{displayHeading}</h3>
-              <p className="mt-1 text-xs text-gray-400">
-                Content: {contentType}
-                {selected.resourceType ? ` · Player: ${selected.resourceType}` : ''}
-              </p>
+              {isInteractiveQuiz && (
+                <p className="mt-1 text-sm text-violet-300/90">Interactive quiz · Instant feedback on every answer</p>
+              )}
+              {isStudyNotes && !isInteractiveQuiz && (
+                <p className="mt-1 text-sm text-gray-400">Study notes · Use the sidebar to jump between sections</p>
+              )}
 
               {showVideoBlock && (
                 <>
@@ -356,13 +385,14 @@ export default function CourseContent() {
                 </ProtectedBlock>
               )}
 
-              {showTextBlock && (
-                <ProtectedBlock className="mt-4">
-                  <div
-                    className="chapter-html max-w-none rounded-lg border border-gray-700 bg-gray-900/80 p-4 text-sm leading-relaxed text-gray-200 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-2 [&_h3]:text-base [&_h3]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-violet-300"
-                    dangerouslySetInnerHTML={{ __html: selected.contentHtml }}
-                  />
-                </ProtectedBlock>
+              {showInteractiveBlock && (
+                isInteractiveQuiz || isStudyNotes ? (
+                  <ChapterContentView chapter={selected} />
+                ) : (
+                  <ProtectedBlock className="mt-4">
+                    <ChapterContentView chapter={selected} />
+                  </ProtectedBlock>
+                )
               )}
 
               <p className="mt-3 text-sm text-gray-300">{selected.description || 'No description provided.'}</p>

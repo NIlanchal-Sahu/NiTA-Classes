@@ -1,9 +1,9 @@
 [
   {
     "id": "dca",
-    "name": "DCA (Basic Computer Course)",
-    "description": "",
-    "duration": "",
+    "name": "DCA (Basic Computer Course) — NIELIT CCC",
+    "description": "NIELIT Course on Computer Concepts (CCC) Revision 4 aligned program.\n\n【 90 Hours 】30 theory + 60 practical\n\n【 11 Modules 】Computer fundamentals, OS, Word, Excel, PowerPoint, Internet, communication, digital finance, e-governance, cyber security, future skills\n\n【 Exam Prep 】550+ MCQs, 3 full mock tests (100 MCQs · 90 min · 50% pass), 15-day study plan, printable PDF pack\n\n【 Software 】MS Office + LibreOffice (Writer, Calc, Impress)",
+    "duration": "90 Hours (30 Theory + 60 Practical)",
     "status": "active",
     "priceType": "perClass10",
     "price": 10,

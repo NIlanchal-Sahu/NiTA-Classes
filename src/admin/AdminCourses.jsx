@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Fragment } from 'react'
+import { Link } from 'react-router-dom'
 import { academyApi } from '../api/adminAcademy'
+import { summarizeCourse } from '../lib/courseContentUtils'
+import { useAuth } from '../context/AuthContext'
 
 export default function AdminCourses() {
+  const { user } = useAuth()
+  const isTeacher = user?.role === 'teacher'
   const [courses, setCourses] = useState([])
   const [contentCourses, setContentCourses] = useState([])
   const [loading, setLoading] = useState(false)
@@ -18,10 +23,7 @@ export default function AdminCourses() {
   const [saving, setSaving] = useState(false)
   const [editingCourseId, setEditingCourseId] = useState('')
   const [expandedCourseId, setExpandedCourseId] = useState('')
-  const [moduleForms, setModuleForms] = useState({})
-  const [chapterForms, setChapterForms] = useState({})
   const [successMsg, setSuccessMsg] = useState('')
-  const [chapterBusy, setChapterBusy] = useState({})
 
   const refresh = async () => {
     setLoading(true)
@@ -78,12 +80,25 @@ export default function AdminCourses() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-white">Course Management</h1>
-      <p className="mt-1 text-gray-400">List and edit courses, then add modules and chapter video content.</p>
+      <p className="mt-1 text-gray-400">
+        {isTeacher
+          ? 'View assigned courses and open Content & Quizzes to edit study notes and practice MCQs.'
+          : 'Manage course pricing and metadata here. Use Content & Quizzes to edit study notes, practice MCQs, and videos.'}
+        {!isTeacher && (
+          <>
+            {' '}
+            <Link to="/admin/content" className="text-violet-300 hover:underline">
+              Open Content & Quizzes →
+            </Link>
+          </>
+        )}
+      </p>
       {successMsg && (
         <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-200">{successMsg}</div>
       )}
       {error && <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-200">{error}</div>}
 
+      {!isTeacher && (
       <div className="mt-6 rounded-2xl border border-gray-700 bg-gray-800 p-6">
         <h2 className="text-lg font-semibold text-white">{editingCourseId ? 'Edit Course' : 'Create Course'}</h2>
         <form onSubmit={submit} className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -125,6 +140,7 @@ export default function AdminCourses() {
           </div>
         </form>
       </div>
+      )}
 
       <div className="mt-6 flex max-h-[min(85vh,calc(100vh-7rem))] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800">
         <div className="shrink-0 border-b border-gray-700 px-6 py-4">
@@ -157,6 +173,7 @@ export default function AdminCourses() {
                       <td className="px-3 py-3">₹{c.price}</td>
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-2">
+                          {!isTeacher && (
                           <button
                             type="button"
                             onClick={() => {
@@ -175,12 +192,19 @@ export default function AdminCourses() {
                           >
                             Edit
                           </button>
+                          )}
+                          <Link
+                            to={`/admin/content?course=${encodeURIComponent(c.id)}`}
+                            className="rounded border border-violet-500/50 px-2 py-1 text-xs text-violet-200 hover:bg-violet-500/10"
+                          >
+                            Content & Quizzes
+                          </Link>
                           <button
                             type="button"
                             onClick={() => setExpandedCourseId((prev) => (prev === c.id ? '' : c.id))}
-                            className="rounded border border-violet-500/50 px-2 py-1 text-xs text-violet-200 hover:bg-violet-500/10"
+                            className="rounded border border-gray-500/50 px-2 py-1 text-xs text-gray-300 hover:bg-gray-500/10"
                           >
-                            {expandedCourseId === c.id ? 'Hide Content' : 'Manage Modules'}
+                            {expandedCourseId === c.id ? 'Hide summary' : 'Summary'}
                           </button>
                         </div>
                       </td>
@@ -188,375 +212,51 @@ export default function AdminCourses() {
                     {expandedCourseId === c.id ? (
                       <tr key={`${c.id}-content`}>
                         <td className="px-3 py-4 bg-gray-900/60" colSpan={6}>
-                          <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
-                            <h3 className="text-sm font-semibold text-white">Add Module</h3>
-                            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                              <input
-                                className="rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white"
-                                placeholder="Module name"
-                                value={moduleForms[c.id]?.title || ''}
-                                onChange={(e) =>
-                                  setModuleForms((prev) => ({
-                                    ...prev,
-                                    [c.id]: { ...(prev[c.id] || { order: 1 }), title: e.target.value },
-                                  }))
-                                }
-                              />
-                              <input
-                                type="number"
-                                min="1"
-                                className="w-28 rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white"
-                                value={moduleForms[c.id]?.order || 1}
-                                onChange={(e) =>
-                                  setModuleForms((prev) => ({
-                                    ...prev,
-                                    [c.id]: { ...(prev[c.id] || { title: '' }), order: Number(e.target.value) || 1 },
-                                  }))
-                                }
-                              />
-                              <button
-                                type="button"
-                                className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
-                                onClick={async () => {
-                                  const payload = moduleForms[c.id] || {}
-                                  if (!payload.title?.trim()) {
-                                    setError('Enter a module name.')
-                                    return
-                                  }
-                                  setError('')
-                                  try {
-                                    await academyApi.createModule(c.id, payload)
-                                    setModuleForms((prev) => ({ ...prev, [c.id]: { title: '', order: 1 } }))
-                                    setSuccessMsg('Module added.')
-                                    await refresh()
-                                  } catch (err) {
-                                    setError(err.message || 'Could not add module')
-                                  }
-                                }}
-                              >
-                                Add Module
-                              </button>
-                            </div>
-
-                            <div className="mt-4 space-y-3">
-                              {((contentMap.get(String(c.id))?.modules || []).slice().sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))).map((m) => (
-                                <div key={m.id} className="rounded-lg border border-gray-700 bg-gray-800 p-3">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div className="text-sm font-semibold text-violet-300">
-                                      Module {m.order}: {m.title}
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                      <button
-                                        type="button"
-                                        className="rounded border border-sky-500/40 px-2 py-0.5 text-[10px] text-sky-200 hover:bg-sky-500/10"
-                                        onClick={async () => {
-                                          const t = window.prompt('Rename module', m.title)
-                                          if (t == null || !String(t).trim()) return
-                                          await academyApi.updateModule(c.id, m.id, { title: String(t).trim() })
-                                          await refresh()
-                                        }}
-                                      >
-                                        Rename module
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="rounded border border-red-500/40 px-2 py-0.5 text-[10px] text-red-300 hover:bg-red-500/10"
-                                        onClick={async () => {
-                                          if (!window.confirm('Delete this module and all its chapters?')) return
-                                          await academyApi.deleteModule(c.id, m.id)
-                                          await refresh()
-                                        }}
-                                      >
-                                        Delete module
-                                      </button>
-                                    </div>
+                          {(() => {
+                            const content = contentMap.get(String(c.id))
+                            const stats = content ? summarizeCourse(content) : null
+                            return (
+                              <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <h3 className="text-sm font-semibold text-white">Content overview</h3>
+                                    {stats ? (
+                                      <p className="mt-1 text-xs text-gray-400">
+                                        {stats.modules} modules · {stats.chapters} chapters · {stats.notes} study notes ·{' '}
+                                        {stats.quizzes} practice quizzes · {stats.mcqs} MCQs
+                                      </p>
+                                    ) : (
+                                      <p className="mt-1 text-xs text-gray-500">No LMS content synced for this course yet.</p>
+                                    )}
                                   </div>
-
-                                  <div className="mt-2 space-y-2">
-                                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                      <input
-                                        className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-xs text-white"
-                                        placeholder="Chapter title (sidebar) *"
-                                        value={chapterForms[m.id]?.title || ''}
-                                        onChange={(e) =>
-                                          setChapterForms((prev) => ({
-                                            ...prev,
-                                            [m.id]: {
-                                              ...(prev[m.id] || {
-                                                heading: '',
-                                                videoUrl: '',
-                                                description: '',
-                                                noteText: '',
-                                                order: 1,
-                                              }),
-                                              title: e.target.value,
-                                            },
-                                          }))
-                                        }
-                                      />
-                                      <input
-                                        className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-xs text-white"
-                                        placeholder="Heading (above video)"
-                                        value={chapterForms[m.id]?.heading || ''}
-                                        onChange={(e) =>
-                                          setChapterForms((prev) => ({
-                                            ...prev,
-                                            [m.id]: {
-                                              ...(prev[m.id] || {
-                                                title: '',
-                                                videoUrl: '',
-                                                description: '',
-                                                noteText: '',
-                                                order: 1,
-                                              }),
-                                              heading: e.target.value,
-                                            },
-                                          }))
-                                        }
-                                      />
-                                      <input
-                                        className="rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-xs text-white"
-                                        placeholder="Video URL * (YouTube / Drive)"
-                                        value={chapterForms[m.id]?.videoUrl || ''}
-                                        onChange={(e) =>
-                                          setChapterForms((prev) => ({
-                                            ...prev,
-                                            [m.id]: {
-                                              ...(prev[m.id] || {
-                                                title: '',
-                                                heading: '',
-                                                description: '',
-                                                noteText: '',
-                                                order: 1,
-                                              }),
-                                              videoUrl: e.target.value,
-                                            },
-                                          }))
-                                        }
-                                      />
-                                    </div>
-                                    <textarea
-                                      className="w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-xs text-white"
-                                      rows={2}
-                                      placeholder="Description (optional)"
-                                      value={chapterForms[m.id]?.description || ''}
-                                      onChange={(e) =>
-                                        setChapterForms((prev) => ({
-                                          ...prev,
-                                          [m.id]: { ...(prev[m.id] || { order: 1 }), description: e.target.value },
-                                        }))
-                                      }
-                                    />
-                                    <textarea
-                                      className="w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-xs text-white"
-                                      rows={2}
-                                      placeholder="Notes for students (optional)"
-                                      value={chapterForms[m.id]?.noteText || ''}
-                                      onChange={(e) =>
-                                        setChapterForms((prev) => ({
-                                          ...prev,
-                                          [m.id]: { ...(prev[m.id] || { order: 1 }), noteText: e.target.value },
-                                        }))
-                                      }
-                                    />
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        className="w-20 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-xs text-white"
-                                        title="Order"
-                                        value={chapterForms[m.id]?.order || 1}
-                                        onChange={(e) =>
-                                          setChapterForms((prev) => ({
-                                            ...prev,
-                                            [m.id]: {
-                                              ...(prev[m.id] || {
-                                                title: '',
-                                                heading: '',
-                                                videoUrl: '',
-                                                description: '',
-                                                noteText: '',
-                                              }),
-                                              order: Number(e.target.value) || 1,
-                                            },
-                                          }))
-                                        }
-                                      />
-                                      <button
-                                        type="button"
-                                        disabled={chapterBusy[m.id]}
-                                        className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                                        onClick={async () => {
-                                          const payload = chapterForms[m.id] || {}
-                                          if (!String(payload.title || '').trim() || !String(payload.videoUrl || '').trim()) {
-                                            setError('Chapter title and video URL are required.')
-                                            return
-                                          }
-                                          setError('')
-                                          setChapterBusy((b) => ({ ...b, [m.id]: true }))
-                                          try {
-                                            await academyApi.createChapter(c.id, m.id, {
-                                              title: String(payload.title).trim(),
-                                              heading: String(payload.heading || payload.title).trim(),
-                                              videoUrl: String(payload.videoUrl).trim(),
-                                              description: String(payload.description || ''),
-                                              noteText: String(payload.noteText || ''),
-                                              resourceType: 'video',
-                                              order: payload.order || 1,
-                                            })
-                                            setChapterForms((prev) => ({
-                                              ...prev,
-                                              [m.id]: {
-                                                title: '',
-                                                heading: '',
-                                                videoUrl: '',
-                                                description: '',
-                                                noteText: '',
-                                                order: 1,
-                                              },
-                                            }))
-                                            setSuccessMsg('Chapter added successfully.')
-                                            await refresh()
-                                          } catch (err) {
-                                            setError(err.message || 'Could not add chapter. Check login and try again.')
-                                          } finally {
-                                            setChapterBusy((b) => ({ ...b, [m.id]: false }))
-                                          }
-                                        }}
-                                      >
-                                        {chapterBusy[m.id] ? 'Saving…' : 'Add Chapter'}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="mt-2 space-y-2">
-                                    {((m.chapters || []).slice().sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))).map((ch) => (
-                                      <div key={ch.id} className="rounded border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-gray-200">
-                                        <div className="flex flex-wrap items-start justify-between gap-2">
-                                          <div>
-                                            <div className="font-semibold text-white">Chapter {ch.order}: {ch.title}</div>
-                                            {ch.heading && ch.heading !== ch.title ? (
-                                              <div className="text-violet-200/90">Heading: {ch.heading}</div>
-                                            ) : null}
-                                            <div className="mt-0.5 break-all text-gray-400">{ch.videoUrl}</div>
-                                            {ch.description ? (
-                                              <div className="mt-1 text-gray-400">Desc: {ch.description}</div>
-                                            ) : null}
-                                            {ch.noteText ? (
-                                              <div className="mt-1 text-gray-500">Notes: {ch.noteText}</div>
-                                            ) : null}
-                                          </div>
-                                          <div className="flex min-w-[140px] flex-row flex-wrap justify-end gap-1">
-                                            <button
-                                              type="button"
-                                              className="rounded border border-sky-500/40 px-2 py-0.5 text-[10px] text-sky-200 hover:bg-sky-500/10"
-                                              onClick={async () => {
-                                                const t = window.prompt('Rename chapter (title in sidebar)', ch.title)
-                                                if (t == null || !String(t).trim()) return
-                                                await academyApi.updateChapter(c.id, m.id, ch.id, { title: String(t).trim() })
-                                                await refresh()
-                                              }}
-                                            >
-                                              Rename title
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="rounded border border-violet-500/40 px-2 py-0.5 text-[10px] text-violet-200 hover:bg-violet-500/10"
-                                              onClick={async () => {
-                                                const t = window.prompt('Heading (above video)', ch.heading || ch.title || '')
-                                                if (t == null) return
-                                                await academyApi.updateChapter(c.id, m.id, ch.id, { heading: String(t).trim() })
-                                                await refresh()
-                                              }}
-                                            >
-                                              Set heading
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="rounded border border-amber-500/40 px-2 py-0.5 text-[10px] text-amber-200 hover:bg-amber-500/10"
-                                              onClick={async () => {
-                                                if (!window.confirm('Remove heading text? (video and chapter stay)')) return
-                                                await academyApi.updateChapter(c.id, m.id, ch.id, { heading: '' })
-                                                await refresh()
-                                              }}
-                                            >
-                                              Clear heading
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="rounded border border-emerald-500/40 px-2 py-0.5 text-[10px] text-emerald-200 hover:bg-emerald-500/10"
-                                              onClick={async () => {
-                                                const t = window.prompt('Video URL (YouTube or Google Drive file link)', ch.videoUrl || '')
-                                                if (t == null || !String(t).trim()) return
-                                                try {
-                                                  await academyApi.updateChapter(c.id, m.id, ch.id, { videoUrl: String(t).trim() })
-                                                  setSuccessMsg('Video URL updated.')
-                                                  await refresh()
-                                                } catch (err) {
-                                                  setError(err.message || 'Update failed')
-                                                }
-                                              }}
-                                            >
-                                              Edit video URL
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="rounded border border-gray-500/40 px-2 py-0.5 text-[10px] text-gray-200 hover:bg-gray-500/10"
-                                              onClick={async () => {
-                                                const t = window.prompt('Description (optional)', ch.description || '')
-                                                if (t == null) return
-                                                try {
-                                                  await academyApi.updateChapter(c.id, m.id, ch.id, { description: String(t) })
-                                                  setSuccessMsg('Description saved.')
-                                                  await refresh()
-                                                } catch (err) {
-                                                  setError(err.message || 'Update failed')
-                                                }
-                                              }}
-                                            >
-                                              Edit description
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="rounded border border-gray-500/40 px-2 py-0.5 text-[10px] text-gray-200 hover:bg-gray-500/10"
-                                              onClick={async () => {
-                                                const t = window.prompt('Notes for students (optional)', ch.noteText || '')
-                                                if (t == null) return
-                                                try {
-                                                  await academyApi.updateChapter(c.id, m.id, ch.id, { noteText: String(t) })
-                                                  setSuccessMsg('Notes saved.')
-                                                  await refresh()
-                                                } catch (err) {
-                                                  setError(err.message || 'Update failed')
-                                                }
-                                              }}
-                                            >
-                                              Edit notes
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="rounded border border-red-500/40 px-2 py-0.5 text-[10px] text-red-300 hover:bg-red-500/10"
-                                              onClick={async () => {
-                                                if (!window.confirm('Delete this chapter (heading + video + notes)?')) return
-                                                await academyApi.deleteChapter(c.id, m.id, ch.id)
-                                                await refresh()
-                                              }}
-                                            >
-                                              Delete chapter
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    {(m.chapters || []).length === 0 ? <div className="text-xs text-gray-500">No chapters yet.</div> : null}
-                                  </div>
+                                  <Link
+                                    to={`/admin/content?course=${encodeURIComponent(c.id)}`}
+                                    className="rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+                                  >
+                                    Open Content & Quiz Studio →
+                                  </Link>
                                 </div>
-                              ))}
-                              {(contentMap.get(String(c.id))?.modules || []).length === 0 ? (
-                                <div className="text-xs text-gray-500">No modules yet for this course.</div>
-                              ) : null}
-                            </div>
-                          </div>
+                                {content?.modules?.length ? (
+                                  <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    {[...(content.modules || [])]
+                                      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+                                      .slice(0, 6)
+                                      .map((m) => (
+                                        <li key={m.id} className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-300">
+                                          <span className="font-medium text-white">{m.order}. {m.title}</span>
+                                          <span className="mt-0.5 block text-gray-500">{(m.chapters || []).length} chapters</span>
+                                        </li>
+                                      ))}
+                                    {(content.modules || []).length > 6 && (
+                                      <li className="rounded-lg border border-dashed border-gray-600 px-3 py-2 text-xs text-gray-500">
+                                        +{(content.modules || []).length - 6} more modules — open studio to edit
+                                      </li>
+                                    )}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            )
+                          })()}
                         </td>
                       </tr>
                     ) : null}

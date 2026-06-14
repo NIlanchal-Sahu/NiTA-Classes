@@ -7,9 +7,20 @@ function monthDays(month) {
   return Array.from({ length: total }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
 }
 
+function weekdayShort(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00.000Z`)
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()]
+}
+
+function holidayBadgeClass(type) {
+  if (type === 'weekly') return 'bg-slate-700/60 border-slate-500 text-slate-300'
+  if (type === 'public') return 'bg-rose-950/40 border-rose-500/50 text-rose-200'
+  if (type === 'optional') return 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+  return 'bg-orange-950/40 border-orange-500/40 text-orange-200'
+}
+
 export default function LearningPaths() {
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
-  /** Empty string = all unlocked courses (overall attendance for the month) */
   const [courseId, setCourseId] = useState('')
   const [data, setData] = useState(null)
   const [learnCourses, setLearnCourses] = useState([])
@@ -38,35 +49,55 @@ export default function LearningPaths() {
         const out = await studentPortalApi.getAttendance(month, courseId)
         setData(out)
       } catch {
-        setData({ attendance: [], monthlyPercentage: 0, month })
+        setData({ attendance: [], holidays: [], monthlyPercentage: 0, month })
       }
     })()
   }, [month, courseId])
 
   const dailyStatus = useMemo(() => {
     const map = {}
-    for (const r of data?.attendance || []) map[r.date] = r.status
+    for (const r of data?.attendance || []) map[r.date] = r
     return map
   }, [data])
 
-  const labelFor = (s) => {
-    if (s === 'present') return 'Present'
-    if (s === 'absent') return 'Absent'
+  const holidayByDate = useMemo(() => {
+    const map = {}
+    for (const h of data?.holidays || []) map[h.date] = h
+    return map
+  }, [data])
+
+  const labelFor = (entry) => {
+    if (entry?.holiday?.type === 'weekly') return 'Sunday'
+    if (entry?.holiday) return 'Holiday'
+    if (entry?.status === 'present') return 'Present'
+    if (entry?.status === 'absent') return 'Absent'
     return '—'
   }
 
-  const statusClass = (s) => {
-    if (s === 'present') return 'text-emerald-300'
-    if (s === 'absent') return 'text-red-300'
+  const statusClass = (entry) => {
+    if (entry?.holiday?.type === 'weekly') return 'text-slate-400'
+    if (entry?.holiday) return 'text-orange-300'
+    if (entry?.status === 'present') return 'text-emerald-300'
+    if (entry?.status === 'absent') return 'text-red-300'
     return 'text-gray-500'
   }
+
+  const calendarCellClass = (date, entry, holiday) => {
+    if (holiday?.type === 'weekly') return 'bg-slate-800/80 border-slate-600'
+    if (holiday) return `${holidayBadgeClass(holiday.type)} border`
+    if (entry?.status === 'present') return 'bg-emerald-600/30 border-emerald-500'
+    if (entry?.status === 'absent') return 'bg-red-600/30 border-red-500'
+    return 'bg-gray-900 border-gray-700'
+  }
+
+  const monthHolidays = (data?.holidays || []).filter((h) => h.type !== 'weekly')
 
   return (
     <>
       <h1 className="text-2xl font-bold text-white">Attendance Tracker</h1>
       <p className="mt-1 text-gray-400">
-        Pay-for-class days count as present. Pick a course to see that course only; leave &quot;All courses&quot; for
-        overall attendance.
+        Pay-for-class days count as present. Attendance % uses school days only — Sunday, Odisha public holidays, and
+        festivals are excluded.
       </p>
 
       <div className="mt-6 flex flex-wrap items-end gap-3">
@@ -98,30 +129,74 @@ export default function LearningPaths() {
         <div className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-300">
           Monthly Attendance:{' '}
           <span className="font-semibold text-white">{data?.monthlyPercentage ?? 0}%</span>
-          {data?.presentDaysCount != null && data?.daysInMonth != null && (
+          {data?.presentDaysCount != null && data?.schoolDaysDenominator != null && (
             <span className="ml-2 text-xs text-gray-500">
-              ({data.presentDaysCount} / {data.daysInMonth} days)
+              ({data.presentDaysCount} / {data.schoolDaysDenominator} school days
+              {data.schoolDaysInMonth != null ? ` · ${data.schoolDaysInMonth} total in month` : ''})
             </span>
           )}
         </div>
       </div>
 
+      {monthHolidays.length > 0 && (
+        <div className="mt-4 rounded-xl border border-orange-500/30 bg-orange-950/20 p-4">
+          <h3 className="text-sm font-semibold text-orange-200">
+            Odisha Holidays & Festivals — {month}
+          </h3>
+          <p className="mt-1 text-xs text-orange-200/70">
+            Public holidays and regional festivals for this month (per Odisha government calendar). Classes are not
+            expected on these days.
+          </p>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {monthHolidays.map((h) => (
+              <li
+                key={`${h.date}-${h.name}`}
+                className={`rounded-lg border px-3 py-2 text-xs ${holidayBadgeClass(h.type)}`}
+              >
+                <span className="font-semibold">{h.date.slice(-2)}</span>
+                <span className="mx-1 text-gray-500">·</span>
+                <span>{h.name}</span>
+                {h.type === 'public' && (
+                  <span className="ml-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] uppercase">Public</span>
+                )}
+                {h.type === 'festival' && (
+                  <span className="ml-1 rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] uppercase">Festival</span>
+                )}
+                {h.type === 'optional' && (
+                  <span className="ml-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase">Optional</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-6 rounded-xl border border-gray-700 bg-gray-800 p-4">
         <h3 className="font-semibold text-white">Calendar View</h3>
-        <p className="mt-1 text-xs text-gray-400">Green = Present, Red = Absent, Gray = Not marked</p>
+        <p className="mt-1 text-xs text-gray-400">
+          Green = Present · Red = Absent · Orange = Holiday/Festival · Slate = Sunday · Gray = No record
+        </p>
         <div className="mt-3 grid grid-cols-7 gap-2">
           {monthDays(month).map((d) => {
-            const s = dailyStatus[d]
-            const color =
-              s === 'present'
-                ? 'bg-emerald-600/30 border-emerald-500'
-                : s === 'absent'
-                  ? 'bg-red-600/30 border-red-500'
-                  : 'bg-gray-900 border-gray-700'
+            const entry = dailyStatus[d]
+            const holiday = holidayByDate[d] || entry?.holiday
             return (
-              <div key={d} className={`rounded border p-2 text-center text-xs ${color}`}>
+              <div
+                key={d}
+                className={`rounded border p-2 text-center text-xs ${calendarCellClass(d, entry, holiday)}`}
+                title={holiday?.name || undefined}
+              >
+                <div className="text-[10px] text-gray-500">{weekdayShort(d)}</div>
                 <div className="text-gray-300">{d.slice(-2)}</div>
-                <div className={`mt-1 text-[10px] ${statusClass(s)}`}>{labelFor(s)}</div>
+                <div className={`mt-1 text-[10px] leading-tight ${statusClass({ ...entry, holiday })}`}>
+                  {holiday?.type === 'weekly'
+                    ? 'Sun'
+                    : holiday
+                      ? holiday.name.length > 12
+                        ? `${holiday.name.slice(0, 10)}…`
+                        : holiday.name
+                      : labelFor(entry)}
+                </div>
               </div>
             )
           })}
@@ -137,8 +212,13 @@ export default function LearningPaths() {
               key={r.id}
               className="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm"
             >
-              <span className="text-gray-300">{r.date}</span>
-              <span className={statusClass(r.status)}>{labelFor(r.status)}</span>
+              <span className="text-gray-300">
+                {r.date}
+                {r.holiday && r.holiday.type !== 'weekly' && (
+                  <span className="ml-2 text-xs text-orange-300">({r.holiday.name})</span>
+                )}
+              </span>
+              <span className={statusClass(r)}>{labelFor(r)}</span>
             </div>
           ))}
           {(data?.attendance || []).length === 0 && (
@@ -146,6 +226,10 @@ export default function LearningPaths() {
           )}
         </div>
       </div>
+
+      {data?.calendarNote && (
+        <p className="mt-4 text-xs text-gray-500">{data.calendarNote}</p>
+      )}
     </>
   )
 }

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Referral() {
-  const { user, isStudent } = useAuth()
+  const { user, isStudent, isAdmin } = useAuth()
 
   return (
     <div className="bg-gray-50 border-t border-gray-200">
@@ -40,7 +40,7 @@ export default function Referral() {
             <div className="mt-6 flex flex-wrap gap-3">
               {user ? (
                 <Link
-                  to={isStudent ? '/student/referrals' : '/admin/referrals'}
+                  to={isStudent ? '/student/referrals' : isAdmin ? '/admin/referrals' : '/admin'}
                   className="btn-touch inline-flex items-center justify-center rounded-xl bg-primary-600 px-6 py-4 text-sm font-semibold text-white hover:bg-primary-700 transition"
                 >
                   Open Refer & Earn

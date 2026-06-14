@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { studentPortalApi } from '../../api/student'
@@ -25,18 +25,55 @@ const emptyForm = {
   parentsContact: '',
 }
 
+function StatusBadge({ ok, label }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        ok ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'
+      }`}
+    >
+      {ok ? '✓' : '!'} {label}
+    </span>
+  )
+}
+
+function ViewRow({ label, value }) {
+  return (
+    <div className="flex flex-col gap-0.5 border-b border-gray-700/60 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
+      <span className="text-sm font-medium text-white sm:text-right">{value || '—'}</span>
+    </div>
+  )
+}
+
+function calcCompletion(form, { hasPassport, hasAadhaarFile, hasAvatar }) {
+  const essential = [
+    form.fullName,
+    form.dateOfBirth,
+    form.gender,
+    form.mobile,
+    form.email,
+    form.aadhaarNumber,
+    form.fullAddress,
+    form.highestQualification,
+  ]
+  const essentialDone = essential.filter((v) => String(v || '').trim()).length
+  const docsDone = (hasPassport ? 1 : 0) + (hasAadhaarFile ? 1 : 0) + (hasAvatar ? 1 : 0)
+  const total = essential.length + 3
+  return Math.round(((essentialDone + docsDone) / total) * 100)
+}
+
 export default function StudentProfile() {
-  const { refreshUser } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [editMode, setEditMode] = useState(false)
-  /** Portal header photo (separate from passport cert photo) */
   const [avatarPreview, setAvatarPreview] = useState('')
   const [passportPreview, setPassportPreview] = useState('')
-  const [googleConfigured, setGoogleConfigured] = useState(false)
+  const [hasAadhaarFile, setHasAadhaarFile] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingDocs, setUploadingDocs] = useState(false)
 
@@ -45,7 +82,6 @@ export default function StudentProfile() {
     setError('')
     try {
       const { profile } = await studentPortalApi.getStudentProfileDetails()
-      setGoogleConfigured(!!profile.isGoogleSyncConfigured)
       setForm({
         fullName: profile.fullName || '',
         dateOfBirth: profile.dateOfBirth || '',
@@ -64,8 +100,9 @@ export default function StudentProfile() {
         emergencyContact: profile.emergencyContact || '',
         parentsContact: profile.parentsContact || '',
       })
-      setAvatarPreview(profile.avatarPublicUrl || '')
+      setAvatarPreview(user?.avatarUrl || profile.avatarUrl || '')
       setPassportPreview(profile.passportPhotoPublicUrl || profile.profilePhotoPublicUrl || '')
+      setHasAadhaarFile(!!profile.aadhaarPublicUrl || !!profile.aadhaarLocalPath || !!profile.aadhaarFileUrl)
     } catch (e) {
       setError(e.message || 'Failed to load profile')
     } finally {
@@ -75,7 +112,24 @@ export default function StudentProfile() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const completion = useMemo(
+    () =>
+      calcCompletion(form, {
+        hasPassport: !!passportPreview,
+        hasAadhaarFile,
+        hasAvatar: !!avatarPreview,
+      }),
+    [form, passportPreview, hasAadhaarFile, avatarPreview],
+  )
+
+  const maskedAadhaar = useMemo(() => {
+    const n = String(form.aadhaarNumber || '').replace(/\D/g, '')
+    if (n.length !== 12) return form.aadhaarNumber || '—'
+    return `XXXX XXXX ${n.slice(-4)}`
+  }, [form.aadhaarNumber])
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
 
@@ -101,7 +155,7 @@ export default function StudentProfile() {
     e.preventDefault()
     const file = e.target.avatar?.files?.[0]
     if (!file?.size) {
-      setError('Choose a portal profile picture (JPG, PNG or WebP, max 2MB).')
+      setError('Choose a photo (JPG, PNG or WebP, max 2MB).')
       return
     }
     setUploadingAvatar(true)
@@ -111,7 +165,7 @@ export default function StudentProfile() {
       const fd = new FormData()
       fd.append('avatar', file)
       await studentPortalApi.uploadStudentProfileFiles(fd)
-      setSuccess('Portal profile picture saved. Updating header…')
+      setSuccess('Profile picture updated.')
       await refreshUser()
       await load()
       e.target.reset()
@@ -138,7 +192,7 @@ export default function StudentProfile() {
     setSuccess('')
     try {
       const out = await studentPortalApi.uploadStudentProfileFiles(fd)
-      setSuccess(out.message || 'Files uploaded.')
+      setSuccess(out.message || 'Documents uploaded.')
       await load()
       e.target.reset()
     } catch (err) {
@@ -149,270 +203,278 @@ export default function StudentProfile() {
   }
 
   const inputCls =
-    'mt-1 block w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white placeholder-gray-500 disabled:opacity-60 disabled:cursor-not-allowed'
+    'mt-1 block w-full rounded-xl border border-gray-600 bg-gray-800 px-3 py-2.5 text-white placeholder-gray-500 disabled:opacity-60 disabled:cursor-not-allowed'
 
   if (loading) {
-    return <p className="text-gray-400">Loading profile…</p>
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-gray-400">Loading your profile…</p>
+      </div>
+    )
   }
 
+  const displayName = form.fullName || user?.name || 'Student'
+  const initial = displayName.charAt(0).toUpperCase()
+
   return (
-    <>
+    <div className="mx-auto max-w-3xl">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Student profile</h1>
-          <p className="mt-1 text-gray-400">
-            Complete these details for certificates and records. You can edit anytime after login.
-          </p>
-          {googleConfigured && (
-            <p className="mt-2 text-xs text-emerald-400/90">
-              Google Drive / Sheets sync is configured on the server — saves also sync when credentials are valid.
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {!editMode ? (
-            <button
-              type="button"
-              onClick={() => {
-                setEditMode(true)
-                setSuccess('')
-              }}
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
-            >
-              Edit profile
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setEditMode(false)
-                load()
-              }}
-              className="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
-            >
-              Cancel edit
-            </button>
-          )}
-          <Link
-            to="/student/settings"
-            className="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
-          >
-            Settings
+          <Link to="/student/settings" className="text-sm font-medium text-violet-300 hover:text-violet-200">
+            ← Back to My Account
           </Link>
+          <h1 className="mt-2 text-2xl font-bold text-white">Certificate Profile</h1>
+          <p className="mt-1 text-sm text-gray-400">
+            Details used on your course certificate. Keep them accurate and up to date.
+          </p>
         </div>
+        {!editMode ? (
+          <button
+            type="button"
+            onClick={() => {
+              setEditMode(true)
+              setSuccess('')
+            }}
+            className="shrink-0 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500"
+          >
+            Edit details
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setEditMode(false)
+              load()
+            }}
+            className="shrink-0 rounded-xl border border-gray-600 px-5 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
+          >
+            Cancel
+          </button>
+        )}
       </div>
 
-      {error && <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>
+      )}
       {success && (
-        <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{success}</div>
+        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          {success}
+        </div>
       )}
 
-      <div className="mt-8 grid max-w-3xl gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-violet-500/40 bg-violet-950/20 p-6">
-          <h2 className="text-lg font-semibold text-white">Portal profile picture</h2>
-          <p className="mt-1 text-sm text-gray-400">
-            Shown in the student portal header. Square crop works best. This is <strong className="text-white">not</strong> your certificate
-            passport photo.
-          </p>
-          <div className="mt-4 flex flex-wrap items-end gap-4">
-            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-2 border-violet-400/60 bg-gray-700">
+      {/* Completion + photos */}
+      <div className="mt-6 rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-950/60 to-gray-900 p-6">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-4">
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-violet-400/40 bg-gray-800">
               {avatarPreview ? (
                 <img src={avatarPreview} alt="" className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full items-center justify-center px-1 text-center text-[10px] text-gray-500">No portal photo</div>
+                <div className="flex h-full items-center justify-center text-2xl font-bold text-violet-300">{initial}</div>
               )}
             </div>
-            <form onSubmit={handleAvatarUpload} className="min-w-0 flex-1 space-y-2">
-              <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" className="block w-full text-sm text-gray-300" />
-              <button
-                type="submit"
-                disabled={uploadingAvatar}
-                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-              >
-                {uploadingAvatar ? 'Saving…' : 'Save portal photo'}
-              </button>
-            </form>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-amber-500/30 bg-amber-950/15 p-6">
-          <h2 className="text-lg font-semibold text-white">Passport-size photo</h2>
-          <p className="mt-1 text-sm text-gray-400">
-            For certificates and official records. <strong className="text-amber-200">Different</strong> from the small portal avatar.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4">
-            <div className="h-32 w-24 shrink-0 overflow-hidden rounded-lg border border-amber-500/40 bg-gray-800">
-              {passportPreview ? (
-                <img src={passportPreview} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full items-center justify-center p-1 text-center text-[10px] text-gray-500">No passport photo</div>
-              )}
-            </div>
-            <p className="flex-1 text-xs text-gray-500">
-              Upload below under “Certificate documents” together with Aadhaar, or only passport file there.
-            </p>
-          </div>
-        </section>
-      </div>
-
-      <form onSubmit={handleSave} className="mt-8 space-y-8 max-w-3xl">
-        <section className="rounded-xl border border-gray-700 bg-gray-800 p-6">
-          <h2 className="text-lg font-semibold text-white">Basic details</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="text-sm text-gray-400">Full name (as per Aadhaar) *</label>
-              <input className={inputCls} value={form.fullName} onChange={set('fullName')} disabled={!editMode} required />
-            </div>
             <div>
-              <label className="text-sm text-gray-400">Date of birth *</label>
-              <input type="date" className={inputCls} value={form.dateOfBirth} onChange={set('dateOfBirth')} disabled={!editMode} required />
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">Gender *</label>
-              <select className={inputCls} value={form.gender} onChange={set('gender')} disabled={!editMode} required>
-                <option value="">Select</option>
-                {GENDERS.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">Mobile number *</label>
-              <input className={inputCls} inputMode="numeric" maxLength={10} value={form.mobile} onChange={set('mobile')} disabled={!editMode} required />
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">Email ID *</label>
-              <input type="email" className={inputCls} value={form.email} onChange={set('email')} disabled={!editMode} required />
+              <p className="text-lg font-bold text-white">{displayName}</p>
+              <p className="text-sm text-gray-400">{form.mobile || user?.email || '—'}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <StatusBadge ok={!!passportPreview} label="Passport photo" />
+                <StatusBadge ok={hasAadhaarFile} label="Aadhaar uploaded" />
+              </div>
             </div>
           </div>
-        </section>
-
-        <section className="rounded-xl border border-gray-700 bg-gray-800 p-6">
-          <h2 className="text-lg font-semibold text-white">Identity</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="text-sm text-gray-400">Aadhaar number * (12 digits)</label>
-              <input
-                className={inputCls}
-                inputMode="numeric"
-                maxLength={12}
-                value={form.aadhaarNumber}
-                onChange={set('aadhaarNumber')}
-                disabled={!editMode}
-                required
+          <div className="sm:ml-auto sm:min-w-[140px] sm:text-right">
+            <p className="text-3xl font-bold text-white">{completion}%</p>
+            <p className="text-xs text-gray-500">Profile complete</p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-700">
+              <div
+                className="h-full rounded-full bg-violet-500 transition-all"
+                style={{ width: `${completion}%` }}
               />
             </div>
           </div>
-        </section>
+        </div>
+      </div>
 
-        <section className="rounded-xl border border-gray-700 bg-gray-800 p-6">
-          <h2 className="text-lg font-semibold text-white">Address</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="text-sm text-gray-400">Full address *</label>
-              <textarea className={inputCls} rows={2} value={form.fullAddress} onChange={set('fullAddress')} disabled={!editMode} required />
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">Street / Village *</label>
-              <input className={inputCls} value={form.streetVillage} onChange={set('streetVillage')} disabled={!editMode} required />
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">District / State *</label>
-              <input className={inputCls} value={form.districtState} onChange={set('districtState')} disabled={!editMode} required />
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">PIN code *</label>
-              <input className={inputCls} inputMode="numeric" maxLength={6} value={form.pinCode} onChange={set('pinCode')} disabled={!editMode} required />
-            </div>
-          </div>
-        </section>
+      {!editMode ? (
+        <>
+          {/* Read-only summary */}
+          <section className="mt-6 rounded-2xl border border-gray-700 bg-gray-800/60 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Personal details</h2>
+            <ViewRow label="Full name" value={form.fullName} />
+            <ViewRow label="Date of birth" value={form.dateOfBirth} />
+            <ViewRow label="Gender" value={form.gender} />
+            <ViewRow label="Mobile" value={form.mobile} />
+            <ViewRow label="Email" value={form.email} />
+          </section>
 
-        <section className="rounded-xl border border-gray-700 bg-gray-800 p-6">
-          <h2 className="text-lg font-semibold text-white">Educational qualification</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-sm text-gray-400">Highest qualification *</label>
-              <select
-                className={inputCls}
-                value={form.highestQualification}
-                onChange={set('highestQualification')}
-                disabled={!editMode}
-                required
-              >
-                <option value="">Select</option>
-                {QUALIFICATIONS.map((q) => (
-                  <option key={q} value={q}>
-                    {q}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">Year of passing *</label>
-              <input className={inputCls} placeholder="e.g. 2024" value={form.yearOfPassing} onChange={set('yearOfPassing')} disabled={!editMode} required />
-            </div>
-          </div>
-        </section>
+          <section className="mt-4 rounded-2xl border border-gray-700 bg-gray-800/60 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Address & education</h2>
+            <ViewRow label="Address" value={form.fullAddress} />
+            <ViewRow label="District / State" value={form.districtState} />
+            <ViewRow label="PIN code" value={form.pinCode} />
+            <ViewRow label="Qualification" value={form.highestQualification} />
+            <ViewRow label="Year of passing" value={form.yearOfPassing} />
+            <ViewRow label="Aadhaar" value={maskedAadhaar} />
+          </section>
 
-        <section className="rounded-xl border border-gray-700 bg-gray-800 p-6">
-          <h2 className="text-lg font-semibold text-white">Additional (recommended)</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-sm text-gray-400">Father&apos;s name</label>
-              <input className={inputCls} value={form.fatherName} onChange={set('fatherName')} disabled={!editMode} />
+          {(form.fatherName || form.emergencyContact) && (
+            <section className="mt-4 rounded-2xl border border-gray-700 bg-gray-800/60 p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Emergency contacts</h2>
+              {form.fatherName && <ViewRow label="Father's name" value={form.fatherName} />}
+              {form.motherName && <ViewRow label="Mother's name" value={form.motherName} />}
+              {form.emergencyContact && <ViewRow label="Emergency contact" value={form.emergencyContact} />}
+            </section>
+          )}
+        </>
+      ) : (
+        <form onSubmit={handleSave} className="mt-6 space-y-6">
+          <section className="rounded-2xl border border-gray-700 bg-gray-800/60 p-5">
+            <h2 className="font-semibold text-white">About you</h2>
+            <p className="mt-1 text-xs text-gray-500">Use the same name as on your Aadhaar card.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="text-sm text-gray-400">Full name *</label>
+                <input className={inputCls} value={form.fullName} onChange={set('fullName')} required />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Date of birth *</label>
+                <input type="date" className={inputCls} value={form.dateOfBirth} onChange={set('dateOfBirth')} required />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Gender *</label>
+                <select className={inputCls} value={form.gender} onChange={set('gender')} required>
+                  <option value="">Select</option>
+                  {GENDERS.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Mobile *</label>
+                <input className={inputCls} inputMode="numeric" maxLength={10} value={form.mobile} onChange={set('mobile')} required />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Email *</label>
+                <input type="email" className={inputCls} value={form.email} onChange={set('email')} required />
+              </div>
             </div>
-            <div>
-              <label className="text-sm text-gray-400">Mother&apos;s name</label>
-              <input className={inputCls} value={form.motherName} onChange={set('motherName')} disabled={!editMode} />
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">Emergency contact</label>
-              <input className={inputCls} inputMode="numeric" maxLength={10} value={form.emergencyContact} onChange={set('emergencyContact')} disabled={!editMode} />
-            </div>
-            <div>
-              <label className="text-sm text-gray-400">Parents contact number</label>
-              <input className={inputCls} inputMode="numeric" maxLength={10} value={form.parentsContact} onChange={set('parentsContact')} disabled={!editMode} />
-            </div>
-          </div>
-        </section>
+          </section>
 
-        {editMode && (
+          <section className="rounded-2xl border border-gray-700 bg-gray-800/60 p-5">
+            <h2 className="font-semibold text-white">Address & qualification</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="text-sm text-gray-400">Full address *</label>
+                <textarea className={inputCls} rows={2} value={form.fullAddress} onChange={set('fullAddress')} required />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Street / Village</label>
+                <input className={inputCls} value={form.streetVillage} onChange={set('streetVillage')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">District / State *</label>
+                <input className={inputCls} value={form.districtState} onChange={set('districtState')} required />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">PIN code</label>
+                <input className={inputCls} inputMode="numeric" maxLength={6} value={form.pinCode} onChange={set('pinCode')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Aadhaar number * (12 digits)</label>
+                <input className={inputCls} inputMode="numeric" maxLength={12} value={form.aadhaarNumber} onChange={set('aadhaarNumber')} required />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Highest qualification *</label>
+                <select className={inputCls} value={form.highestQualification} onChange={set('highestQualification')} required>
+                  <option value="">Select</option>
+                  {QUALIFICATIONS.map((q) => (
+                    <option key={q} value={q}>
+                      {q}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Year of passing</label>
+                <input className={inputCls} placeholder="e.g. 2024" value={form.yearOfPassing} onChange={set('yearOfPassing')} />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gray-700 bg-gray-800/60 p-5">
+            <h2 className="font-semibold text-white">Parent / emergency (optional)</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-sm text-gray-400">Father&apos;s name</label>
+                <input className={inputCls} value={form.fatherName} onChange={set('fatherName')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Mother&apos;s name</label>
+                <input className={inputCls} value={form.motherName} onChange={set('motherName')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Emergency contact</label>
+                <input className={inputCls} inputMode="numeric" maxLength={10} value={form.emergencyContact} onChange={set('emergencyContact')} />
+              </div>
+            </div>
+          </section>
+
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl bg-violet-600 px-8 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-violet-600 py-3.5 font-semibold text-white hover:bg-violet-500 disabled:opacity-50 sm:w-auto sm:px-10"
           >
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
-        )}
-      </form>
-
-      <div className="mt-10 max-w-3xl rounded-xl border border-blue-700/40 bg-blue-900/10 p-6">
-        <h2 className="text-lg font-semibold text-white">Certificate documents</h2>
-        <p className="mt-1 text-sm text-gray-400">
-          <strong className="text-white">Passport-size photo</strong> (certificates) and <strong className="text-white">Aadhaar</strong>{' '}
-          (image or PDF). Max 2MB each. These are separate from the portal profile picture above.
-        </p>
-        <form onSubmit={handlePassportAndAadhaarUpload} className="mt-4 space-y-4">
-          <div>
-            <label className="text-sm text-gray-400">Passport-size photo (for certificates)</label>
-            <input type="file" name="passportPhoto" accept="image/jpeg,image/png,image/webp" className="mt-1 block w-full text-sm text-gray-300" />
-          </div>
-          <div>
-            <label className="text-sm text-gray-400">Aadhaar card (image or PDF)</label>
-            <input type="file" name="aadhaarFile" accept="image/*,application/pdf" className="mt-1 block w-full text-sm text-gray-300" />
-          </div>
-          <button
-            type="submit"
-            disabled={uploadingDocs}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {uploadingDocs ? 'Uploading…' : 'Upload passport / Aadhaar'}
+            {saving ? 'Saving…' : 'Save profile'}
           </button>
         </form>
+      )}
+
+      {/* Photos & documents — always accessible */}
+      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-violet-500/30 bg-violet-950/20 p-5">
+          <h2 className="font-semibold text-white">Profile picture</h2>
+          <p className="mt-1 text-xs text-gray-400">Shown in the portal header — not used on certificates.</p>
+          <form onSubmit={handleAvatarUpload} className="mt-4 space-y-3">
+            <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" className="block w-full text-sm text-gray-300 file:mr-2 file:rounded-lg file:border-0 file:bg-violet-600 file:px-3 file:py-1.5 file:text-white" />
+            <button
+              type="submit"
+              disabled={uploadingAvatar}
+              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+            >
+              {uploadingAvatar ? 'Uploading…' : 'Update picture'}
+            </button>
+          </form>
+        </section>
+
+        <section className="rounded-2xl border border-amber-500/30 bg-amber-950/15 p-5">
+          <h2 className="font-semibold text-white">Certificate documents</h2>
+          <p className="mt-1 text-xs text-gray-400">Passport-size photo and Aadhaar for your official certificate.</p>
+          {passportPreview && (
+            <div className="mt-3 h-28 w-24 overflow-hidden rounded-lg border border-amber-500/30">
+              <img src={passportPreview} alt="" className="h-full w-full object-cover" />
+            </div>
+          )}
+          <form onSubmit={handlePassportAndAadhaarUpload} className="mt-4 space-y-3">
+            <div>
+              <label className="text-xs text-gray-400">Passport-size photo</label>
+              <input type="file" name="passportPhoto" accept="image/jpeg,image/png,image/webp" className="mt-1 block w-full text-sm text-gray-300" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400">Aadhaar (image or PDF)</label>
+              <input type="file" name="aadhaarFile" accept="image/*,application/pdf" className="mt-1 block w-full text-sm text-gray-300" />
+            </div>
+            <button
+              type="submit"
+              disabled={uploadingDocs}
+              className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+            >
+              {uploadingDocs ? 'Uploading…' : 'Upload documents'}
+            </button>
+          </form>
+        </section>
       </div>
-    </>
+    </div>
   )
 }
