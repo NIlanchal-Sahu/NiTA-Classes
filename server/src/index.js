@@ -15,6 +15,7 @@ import studentProfileRoutes from './routes/studentProfile.js'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { bootstrapDataFromSheets, getSheetsStoreStatus } from './services/sheetsJsonStore.js'
+import { ensureCourseContentOnStartup, getCourseContentStats } from './services/courseContentSeed.js'
 import { startEventTriggerJobs } from './services/eventTriggers.js'
 import { handleRazorpayWebhook } from './routes/razorpayWebhook.js'
 
@@ -51,12 +52,17 @@ app.use('/api/admin/notifications', notificationsRoutes)
 app.get('/api/health', (_, res) => res.json({ ok: true }))
 app.get('/api/health/storage', (_, res) => {
   const storage = getSheetsStoreStatus()
-  res.json({ ok: true, storage })
+  const courseContent = getCourseContentStats()
+  res.json({ ok: true, storage, courseContent })
 })
 
 bootstrapDataFromSheets()
   .catch((e) => {
     console.warn('[bootstrap] Google Sheets bootstrap failed:', e.message)
+  })
+  .then(() => ensureCourseContentOnStartup())
+  .catch((e) => {
+    console.warn('[bootstrap] Course content restore failed:', e.message)
   })
   .finally(() => {
     app.listen(PORT, () => {

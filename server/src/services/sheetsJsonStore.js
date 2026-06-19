@@ -6,6 +6,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = join(__dirname, '..', 'data')
 const SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID || ''
 const ENABLED = String(process.env.GOOGLE_SHEETS_DB_ENABLED || 'true').toLowerCase() !== 'false'
+/** Files too large or static for Sheets (50k cell limit). Always use repo/local JSON on deploy. */
+const SHEETS_EXCLUDED_FILES = new Set([
+  'academy_course_content.json',
+])
 const RANGE_LABEL_KEY = 'key'
 const RANGE_LABEL_VALUE = 'json'
 let _sheets = null
@@ -58,6 +62,10 @@ async function getSheetsClient() {
 function tabNameForPath(filePath) {
   const name = basename(String(filePath || ''), '.json').replace(/[^A-Za-z0-9_]/g, '_')
   return `db_${name}`.slice(0, 90)
+}
+
+function isSheetsExcluded(filePath) {
+  return SHEETS_EXCLUDED_FILES.has(basename(String(filePath || '')))
 }
 
 async function ensureSheetTab(sheets, tabName) {
@@ -137,7 +145,9 @@ export function readJsonSync(path, fallback = []) {
 
 export function writeJsonSync(path, data) {
   writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
-  enqueueSheetMirror(path, data)
+  if (!isSheetsExcluded(path)) {
+    enqueueSheetMirror(path, data)
+  }
 }
 
 function enqueueSheetMirror(path, data) {
@@ -189,6 +199,10 @@ export async function bootstrapDataFromSheets() {
   const files = readdirSync(DATA_DIR).filter((f) => f.endsWith('.json'))
   for (const fileName of files) {
     const filePath = join(DATA_DIR, fileName)
+    if (isSheetsExcluded(filePath)) {
+      console.log('[sheetsJsonStore] Skipping Sheets bootstrap for static/large file:', fileName)
+      continue
+    }
     const tab = tabNameForPath(filePath)
     try {
       await ensureSheetTab(sheets, tab)
@@ -213,16 +227,49 @@ export async function bootstrapDataFromSheets() {
   _status.bootstrap.ok = true
   _status.bootstrap.files = files.length
   _status.bootstrap.error = _status.bootstrap.error || null
+  logCourseContentBootstrapStatus()
   console.log('[sheetsJsonStore] Data bootstrap completed from Google Sheets')
+}
+
+function logCourseContentBootstrapStatus() {
+  const contentPath = join(DATA_DIR, 'academy_course_content.json')
+  if (!existsSync(contentPath)) {
+    console.warn('[sheetsJsonStore] academy_course_content.json missing after bootstrap')
+    return
+  }
+  const tree = readJsonSync(contentPath, [])
+  const dca = Array.isArray(tree)
+    ? tree.find((x) => String(x?.courseId || '').toLowerCase() === 'dca')
+    : null
+  const moduleCount = dca?.modules?.length || 0
+  const chapterCount = (dca?.modules || []).reduce((n, m) => n + (m.chapters?.length || 0), 0)
+  if (moduleCount === 0) {
+    console.warn('[sheetsJsonStore] DCA course content has 0 modules — redeploy API from latest git')
+  } else {
+    console.log(`[sheetsJsonStore] DCA course content loaded: ${moduleCount} modules, ${chapterCount} chapters`)
+  }
 }
 
 export function getSheetsStoreStatus() {
   const creds = loadCredentials()
+  const contentPath = join(DATA_DIR, 'academy_course_content.json')
+  let courseContent = { dcaModules: 0, dcaChapters: 0, courses: 0 }
+  if (existsSync(contentPath)) {
+    const tree = readJsonSync(contentPath, [])
+    if (Array.isArray(tree)) {
+      courseContent.courses = tree.length
+      const dca = tree.find((x) => String(x?.courseId || '').toLowerCase() === 'dca')
+      courseContent.dcaModules = dca?.modules?.length || 0
+      courseContent.dcaChapters = (dca?.modules || []).reduce((n, m) => n + (m.chapters?.length || 0), 0)
+    }
+  }
   return {
     ..._status,
     serviceAccountPresent: Boolean(creds),
     configured: Boolean(_status.enabled && _status.spreadsheetIdPresent && creds),
     bootstrapped: _bootstrapped,
+    courseContent,
+    sheetsExcludedFiles: [...SHEETS_EXCLUDED_FILES],
   }
 }
 

@@ -461,6 +461,10 @@ function sanitizeContentHtml(html) {
 function validateChapterContent(body) {
   const title = String(body?.title || '').trim()
   if (!title) return { error: 'title is required' }
+  const interactive = String(body?.interactiveType || '').toLowerCase()
+  if (interactive === 'quiz' || interactive === 'notes' || interactive === 'answer-key') {
+    return null
+  }
   const ct = String(body?.contentType || 'video').toLowerCase()
   const videoUrl = String(body?.videoUrl || '').trim()
   const documentFileId = String(body?.documentFileId || '').trim()
@@ -468,7 +472,7 @@ function validateChapterContent(body) {
   const contentHtml = String(body?.contentHtml || '').trim()
   const textPlain = contentHtml.replace(/<[^>]+>/g, ' ').replace(/\s/g, '')
   if (ct === 'document' && !documentFileId && !documentUrl) {
-    return { error: 'Document chapter: upload a file or provide a document link' }
+    return null
   }
   if (ct === 'text' && !textPlain) {
     return { error: 'Text chapter: add content in the editor' }
@@ -1377,12 +1381,18 @@ router.post('/content/courses/:courseId/modules/:moduleId/chapters', auth, allow
     documentUrl = '',
     documentMime = '',
     documentName = '',
+    interactiveType = '',
+    quizData = null,
+    extraReferences = [],
   } = req.body || {}
   const err = validateChapterContent({ ...req.body, title })
   if (err) return res.status(400).json(err)
   const tree = loadCourseContentTree()
-  const idx = findTreeCourseIndex(tree, courseId)
-  if (idx < 0) return res.status(404).json({ error: 'Course content not found' })
+  let idx = findTreeCourseIndex(tree, courseId)
+  if (idx < 0) {
+    tree.push({ courseId: normCourseId(courseId), modules: [] })
+    idx = tree.length - 1
+  }
   const modules = tree[idx].modules || []
   const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
   if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
@@ -1396,6 +1406,8 @@ router.post('/content/courses/:courseId/modules/:moduleId/chapters', auth, allow
     chapterId = requestedId
   }
   const ct = String(contentType || 'video').toLowerCase()
+  const interactive = String(interactiveType || '').toLowerCase()
+  const chapterOrder = Number(order) || list.length + 1
   const next = {
     id: chapterId,
     title: String(title),
@@ -1410,10 +1422,46 @@ router.post('/content/courses/:courseId/modules/:moduleId/chapters', auth, allow
     documentUrl: String(documentUrl || ''),
     documentMime: String(documentMime || ''),
     documentName: String(documentName || ''),
-    order: Number(order) || list.length + 1,
+    order: chapterOrder,
     createdAt: new Date().toISOString(),
   }
+
+  if (interactive === 'quiz') {
+    next.interactiveType = 'quiz'
+    next.contentType = 'text'
+    next.contentHtml = next.contentHtml || '<p>Interactive practice quiz</p>'
+    next.quizData = sanitizeQuizData(quizData) || { title: String(title), questions: [] }
+  } else if (interactive === 'notes') {
+    next.interactiveType = 'notes'
+    next.contentType = 'text'
+    next.contentHtml = next.contentHtml || '<p>Study notes</p>'
+    next.extraReferences = sanitizeReferences(extraReferences)
+  } else if (interactive === 'answer-key') {
+    next.interactiveType = 'answer-key'
+    next.contentType = 'text'
+    next.quizData = sanitizeQuizData(quizData)
+  }
+
   list.push(next)
+
+  if (interactive === 'quiz') {
+    const akId = `${chapterId}-answers`
+    if (!list.some((c) => String(c.id) === akId)) {
+      list.push({
+        id: akId,
+        title: `${String(title).replace(/\s*—?\s*practice quiz/i, '').trim() || String(title)} — Answer Key`,
+        heading: 'Answer Key',
+        description: 'Auto-synced from practice quiz',
+        interactiveType: 'answer-key',
+        contentType: 'text',
+        contentHtml: '<p>Answer key synced from practice quiz.</p>',
+        quizData: next.quizData,
+        order: chapterOrder + 1,
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+
   list.sort(byOrder)
   modules[mIdx].chapters = list
   tree[idx].modules = modules
@@ -1474,7 +1522,12 @@ router.delete('/content/courses/:courseId/modules/:moduleId/chapters/:chapterId'
   const modules = tree[idx].modules || []
   const mIdx = modules.findIndex((m) => String(m.id) === moduleId)
   if (mIdx < 0) return res.status(404).json({ error: 'Module not found' })
-  modules[mIdx].chapters = (modules[mIdx].chapters || []).filter((c) => String(c.id) !== chapterId)
+  const chapters = modules[mIdx].chapters || []
+  const target = chapters.find((c) => String(c.id) === chapterId)
+  const answerKey = target ? findAnswerKeyChapter(modules[mIdx], chapterId) : null
+  modules[mIdx].chapters = chapters.filter(
+    (c) => String(c.id) !== chapterId && (!answerKey || String(c.id) !== String(answerKey.id)),
+  )
   tree[idx].modules = modules
   saveCourseContentTree(tree)
   res.json({ success: true })
