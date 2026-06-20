@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { studentPortalApi } from '../../api/student'
 import ChapterContentView from '../../components/student/ChapterContentView'
+import CourseContentNav, { buildFlatChapterList } from '../../components/student/CourseContentNav'
 import {
-  CHAPTER_KIND,
-  getChapterKind,
+  isAnswerKeyChapter,
   isNotesChapter,
   isQuizChapter,
   shouldRenderInteractiveContent,
@@ -195,6 +195,8 @@ export default function CourseContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const [readingMode, setReadingMode] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -221,9 +223,19 @@ export default function CourseContent() {
 
   const allChapters = useMemo(
     () => (data?.modules || []).flatMap((m) => m.chapters || []),
-    [data]
+    [data],
   )
+  const flatRows = useMemo(() => buildFlatChapterList(data?.modules || []), [data])
   const selected = allChapters.find((c) => String(c.id) === String(selectedChapterId)) || allChapters[0] || null
+  const selectedIndex = flatRows.findIndex((r) => String(r.chapter.id) === String(selected?.id))
+  const prevRow = selectedIndex > 0 ? flatRows[selectedIndex - 1] : null
+  const nextRow = selectedIndex >= 0 && selectedIndex < flatRows.length - 1 ? flatRows[selectedIndex + 1] : null
+  const selectedModule = selectedIndex >= 0 ? flatRows[selectedIndex]?.module : null
+
+  const selectChapter = (chapterId) => {
+    setSelectedChapterId(chapterId)
+    setNavOpen(false)
+  }
 
   const contentType = useMemo(() => (selected ? normalizeContentType(selected) : 'video'), [selected])
 
@@ -257,183 +269,278 @@ export default function CourseContent() {
     Boolean(docSrc)
   const isInteractiveQuiz = selected && isQuizChapter(selected)
   const isStudyNotes = selected && isNotesChapter(selected)
+  const isAnswerKey = selected && isAnswerKeyChapter(selected)
+  const supportsFocusMode =
+    selected &&
+    (isStudyNotes || isInteractiveQuiz || isAnswerKey) &&
+    shouldRenderInteractiveContent(selected)
+
+  useEffect(() => {
+    if (!supportsFocusMode) setReadingMode(false)
+  }, [supportsFocusMode, selectedChapterId])
+
+  useEffect(() => {
+    if (!readingMode) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setNavOpen(false)
+        setReadingMode(false)
+      }
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [readingMode])
+
+  const markChapterComplete = async () => {
+    if (!selected || selected.completed) return
+    setActionLoading(true)
+    setError('')
+    try {
+      await studentPortalApi.completeChapter(courseId, selected.id)
+      await load()
+    } catch (e) {
+      setError(e.message || 'Failed to mark chapter complete')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   const displayHeading = selected?.heading || selected?.title
 
   return (
-    <>
-      <h1 className="text-2xl font-bold text-white">Course Content</h1>
-      <p className="mt-1 text-gray-400">
-        {data?.course?.name || courseId} · Progress: {data?.progressPercent ?? 0}% ({data?.completedCount ?? 0}/
-        {data?.totalChapters ?? 0})
-      </p>
+    <div className="mx-auto w-full max-w-7xl overflow-x-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold text-white sm:text-2xl">Course Content</h1>
+          <p className="mt-1 break-words text-sm text-gray-400">
+            {data?.course?.name || courseId}
+          </p>
+        </div>
+        <Link
+          to="/student/my-courses"
+          className="shrink-0 text-sm font-semibold text-violet-300 hover:text-violet-200"
+        >
+          ← My Courses
+        </Link>
+      </div>
+
+      {data && (
+        <div className="mt-4 rounded-xl border border-gray-700 bg-gray-800/80 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-gray-300">
+              Progress: <span className="font-semibold text-white">{data.progressPercent ?? 0}%</span>
+            </span>
+            <span className="text-gray-500">
+              {data.completedCount ?? 0} / {data.totalChapters ?? 0} chapters
+            </span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-900">
+            <div
+              className="h-full rounded-full bg-violet-600 transition-all"
+              style={{ width: `${Math.min(100, data.progressPercent ?? 0)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>
       )}
-      {loading && <div className="mt-4 text-gray-400">Loading content...</div>}
+      {loading && <div className="mt-4 text-gray-400">Loading content…</div>}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[320px,1fr]">
-        <aside className="rounded-xl border border-gray-700 bg-gray-800 p-4">
-          <h3 className="font-semibold text-white">Modules & Chapters</h3>
-          <div className="mt-4 space-y-4">
-            {(data?.modules || []).map((m) => (
-              <div key={m.id}>
-                <div className="text-sm font-semibold text-violet-300">{m.title}</div>
-                <div className="mt-2 space-y-2">
-                  {(m.chapters || []).map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      disabled={!c.unlocked}
-                      onClick={() => setSelectedChapterId(c.id)}
-                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
-                        !c.unlocked
-                          ? 'cursor-not-allowed border-gray-700 bg-gray-900 text-gray-500'
-                          : String(selectedChapterId) === String(c.id)
-                            ? 'border-violet-500 bg-violet-900/20 text-white'
-                            : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate">{c.title}</span>
-                        <div className="flex shrink-0 items-center gap-1">
-                          {c.unlocked && (() => {
-                            const meta = CHAPTER_KIND[getChapterKind(c)] || CHAPTER_KIND.other
-                            return (
-                              <span className={`rounded px-1 text-[9px] ${meta.bg} ${meta.text}`} title={meta.label}>
-                                {meta.icon}
-                              </span>
-                            )
-                          })()}
-                          <span
-                            className={`text-[10px] ${
-                              c.completed ? 'text-emerald-400' : c.unlocked ? 'text-violet-300' : 'text-gray-500'
-                            }`}
-                          >
-                            {c.completed ? 'Done' : c.unlocked ? 'Open' : 'Locked'}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {!loading && (data?.modules || []).length === 0 && (
-              <div className="rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-400">
-                No content added yet.
-              </div>
-            )}
+      {!loading && (data?.modules || []).length > 0 && (
+        <>
+          <div className="sticky top-0 z-20 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-700 bg-gray-900/95 p-2 backdrop-blur lg:hidden">
+            <button
+              type="button"
+              onClick={() => setNavOpen(true)}
+              className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white"
+            >
+              ☰ Outline
+            </button>
+            <select
+              value={selectedChapterId}
+              onChange={(e) => selectChapter(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-gray-600 bg-gray-800 px-2 py-2 text-xs text-white"
+            >
+              {flatRows.map(({ module, chapter }) => (
+                <option key={chapter.id} value={chapter.id} disabled={!chapter.unlocked}>
+                  {module.title?.slice(0, 24)} — {chapter.title}
+                </option>
+              ))}
+            </select>
           </div>
-        </aside>
 
-        <section className="rounded-xl border border-gray-700 bg-gray-800 p-5">
-          {selected && selected.unlocked ? (
-            <>
-              <h3 className="text-lg font-semibold text-white">{displayHeading}</h3>
-              {isInteractiveQuiz && (
-                <p className="mt-1 text-sm text-violet-300/90">Interactive quiz · Instant feedback on every answer</p>
-              )}
-              {isStudyNotes && !isInteractiveQuiz && (
-                <p className="mt-1 text-sm text-gray-400">Study notes · Use the sidebar to jump between sections</p>
-              )}
+          <div className="relative mt-4 flex min-w-0 gap-0 lg:mt-6 lg:gap-6">
+            {navOpen && (
+              <button
+                type="button"
+                className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+                aria-label="Close outline"
+                onClick={() => setNavOpen(false)}
+              />
+            )}
 
-              {showVideoBlock && (
-                <>
-                  {player.mode === 'iframe' && iframeSrc ? (
-                    <ProtectedBlock className="mt-3">
-                      <div className="aspect-video overflow-hidden rounded-lg border border-gray-700 bg-black">
-                        <iframe
-                          src={iframeSrc}
-                          title={displayHeading || 'Video'}
-                          className="h-full w-full"
-                          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                          allowFullScreen
-                          referrerPolicy="strict-origin-when-cross-origin"
-                        />
-                      </div>
-                    </ProtectedBlock>
-                  ) : (
-                    <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                      <p className="font-medium text-amber-50">Video opens in a new tab or is not set</p>
-                      <p className="mt-1 text-xs text-amber-200/90">
-                        Use an embeddable YouTube, Vimeo, or Google Drive preview link for in-page playback where supported.
+            <aside
+              className={`fixed inset-y-0 left-0 z-50 flex w-[min(100vw,320px)] flex-col border-r border-gray-700 bg-gray-800 shadow-xl transition-transform lg:static lg:z-0 lg:w-72 lg:shrink-0 lg:rounded-xl lg:border lg:shadow-none ${
+                navOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+              }`}
+            >
+              <CourseContentNav
+                modules={data?.modules || []}
+                selectedChapterId={selectedChapterId}
+                onSelectChapter={selectChapter}
+                onClose={() => setNavOpen(false)}
+              />
+            </aside>
+
+            <main className="min-w-0 flex-1 overflow-hidden">
+              {selected && selected.unlocked ? (
+                <div className="rounded-xl border border-gray-700 bg-gray-800 lg:p-1">
+                  <div className="border-b border-gray-700 px-3 py-3 sm:px-5">
+                    {selectedModule && (
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-violet-400">
+                        {selectedModule.title}
                       </p>
-                      {player.href ? (
-                        <a
-                          href={player.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-3 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                    )}
+                    <h2 className="mt-1 break-words text-lg font-semibold text-white sm:text-xl">{displayHeading}</h2>
+                    {isInteractiveQuiz && (
+                      <p className="mt-1 text-sm text-gray-400">Practice MCQs · Tap an option for instant feedback</p>
+                    )}
+                    {isStudyNotes && !isInteractiveQuiz && (
+                      <p className="mt-1 text-sm text-gray-400">Study notes · Use outline or jump menu for sections</p>
+                    )}
+                    {isAnswerKey && (
+                      <p className="mt-1 text-sm text-gray-400">Answer key · Review correct answers and explanations</p>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {supportsFocusMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNavOpen(false)
+                            setReadingMode(true)
+                          }}
+                          className="rounded-lg border border-violet-500/50 bg-violet-600/20 px-3 py-1.5 text-xs font-semibold text-violet-200 hover:bg-violet-600/30"
+                          title="Expand content to full screen for easier reading"
                         >
-                          Open video / resource
-                        </a>
+                          ⛶ Full width reading
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={!prevRow?.chapter?.unlocked}
+                        onClick={() => prevRow && selectChapter(prevRow.chapter.id)}
+                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-40"
+                      >
+                        ← Previous
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!nextRow?.chapter?.unlocked}
+                        onClick={() => nextRow && selectChapter(nextRow.chapter.id)}
+                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-40"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 overflow-x-hidden px-3 py-4 sm:px-5 sm:py-5">
+                    {showVideoBlock && (
+                      <>
+                        {player.mode === 'iframe' && iframeSrc ? (
+                          <ProtectedBlock className="mt-1">
+                            <div className="aspect-video w-full overflow-hidden rounded-lg border border-gray-700 bg-black">
+                              <iframe
+                                src={iframeSrc}
+                                title={displayHeading || 'Video'}
+                                className="h-full w-full"
+                                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                allowFullScreen
+                                referrerPolicy="strict-origin-when-cross-origin"
+                              />
+                            </div>
+                          </ProtectedBlock>
+                        ) : (
+                          <div className="mt-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                            <p className="font-medium text-amber-50">Video opens in a new tab or is not set</p>
+                            {player.href ? (
+                              <a
+                                href={player.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                              >
+                                Open video / resource
+                              </a>
+                            ) : null}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {showDocBlock && (
+                      <ProtectedBlock className="mt-4">
+                        <div className="text-sm font-medium text-gray-200">Notes (preview)</div>
+                        <div className="relative mt-2 w-full overflow-hidden rounded-lg border border-gray-700 bg-gray-900">
+                          <iframe title="Document preview" src={docSrc} className="h-[min(60vh,640px)] w-full" />
+                        </div>
+                      </ProtectedBlock>
+                    )}
+
+                    {showInteractiveBlock &&
+                      (isInteractiveQuiz || isStudyNotes ? (
+                        <ChapterContentView chapter={selected} />
                       ) : (
-                        <p className="mt-2 text-xs text-gray-400">No video URL for this chapter.</p>
+                        <ProtectedBlock>
+                          <ChapterContentView chapter={selected} />
+                        </ProtectedBlock>
+                      ))}
+
+                    {selected.description ? (
+                      <p className="mt-4 break-words text-sm text-gray-300">{selected.description}</p>
+                    ) : null}
+                    {selected.noteText ? (
+                      <div className="mt-3 break-words rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300">
+                        {selected.noteText}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-6 border-t border-gray-700 pt-4">
+                      {!selected.completed ? (
+                        <button
+                          type="button"
+                          disabled={actionLoading}
+                          onClick={markChapterComplete}
+                          className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
+                        >
+                          {actionLoading ? 'Saving…' : 'Mark as Completed'}
+                        </button>
+                      ) : (
+                        <div className="text-sm font-semibold text-emerald-300">Chapter completed ✓</div>
                       )}
                     </div>
-                  )}
-                </>
-              )}
-
-              {showDocBlock && (
-                <ProtectedBlock className="mt-4">
-                  <div className="text-sm font-medium text-gray-200">Notes (preview)</div>
-                  <div className="relative mt-2 min-h-[480px] overflow-hidden rounded-lg border border-gray-700 bg-gray-900">
-                    <iframe title="Document preview" src={docSrc} className="h-[min(70vh,720px)] w-full" />
                   </div>
-                </ProtectedBlock>
-              )}
-
-              {showInteractiveBlock && (
-                isInteractiveQuiz || isStudyNotes ? (
-                  <ChapterContentView chapter={selected} />
-                ) : (
-                  <ProtectedBlock className="mt-4">
-                    <ChapterContentView chapter={selected} />
-                  </ProtectedBlock>
-                )
-              )}
-
-              <p className="mt-3 text-sm text-gray-300">{selected.description || 'No description provided.'}</p>
-              {selected.noteText ? (
-                <div className="mt-3 rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300">
-                  {selected.noteText}
                 </div>
-              ) : null}
-              {!selected.completed ? (
-                <button
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={async () => {
-                    setActionLoading(true)
-                    setError('')
-                    try {
-                      await studentPortalApi.completeChapter(courseId, selected.id)
-                      await load()
-                    } catch (e) {
-                      setError(e.message || 'Failed to mark chapter complete')
-                    } finally {
-                      setActionLoading(false)
-                    }
-                  }}
-                  className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {actionLoading ? 'Saving…' : 'Mark as Completed'}
-                </button>
+              ) : selected && !selected.unlocked ? (
+                <div className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-6 text-sm text-gray-400">
+                  This chapter is locked. Complete the previous chapter first.
+                </div>
               ) : (
-                <div className="mt-4 text-sm font-semibold text-emerald-300">Chapter completed</div>
+                <div className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-6 text-sm text-gray-400">
+                  Select a chapter from the outline to start learning.
+                </div>
               )}
-            </>
-          ) : selected && !selected.unlocked ? (
-            <div className="rounded-lg border border-gray-600 bg-gray-900 px-4 py-3 text-sm text-gray-400">
-              This chapter is locked. Complete the previous chapter first.
-            </div>
-          ) : (
-            <div className="text-sm text-gray-400">Select an unlocked chapter to start learning.</div>
-          )}
-        </section>
-      </div>
+            </main>
+          </div>
+        </>
+      )}
 
       {!loading && (data?.modules || []).length === 0 && (
         <div className="mt-6 rounded-xl border border-gray-700 bg-gray-800 p-5 text-sm text-gray-400">
@@ -441,11 +548,92 @@ export default function CourseContent() {
         </div>
       )}
 
-      <div className="mt-6">
-        <Link to="/student/my-courses" className="text-sm font-semibold text-violet-300 hover:text-violet-200">
-          ← Back to My Courses
-        </Link>
-      </div>
-    </>
+      {readingMode && supportsFocusMode && selected?.unlocked && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-gray-900">
+          <header className="sticky top-0 z-10 shrink-0 border-b border-gray-700 bg-gray-900/95 px-3 py-3 backdrop-blur sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                {selectedModule && (
+                  <p className="truncate text-[11px] font-medium uppercase tracking-wide text-violet-400">
+                    {selectedModule.title}
+                  </p>
+                )}
+                <h2 className="truncate text-base font-semibold text-white sm:text-lg">{displayHeading}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setNavOpen(false)
+                  setReadingMode(false)
+                }}
+                className="shrink-0 rounded-lg border border-gray-600 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-gray-800"
+              >
+                Exit focus
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setNavOpen((v) => !v)}
+                className={`rounded-lg border px-3 py-1.5 text-xs ${
+                  navOpen
+                    ? 'border-violet-500/50 bg-violet-600/20 text-violet-200'
+                    : 'border-gray-600 text-gray-300 hover:bg-gray-800'
+                }`}
+              >
+                {navOpen ? '✕ Close outline' : '☰ Outline'}
+              </button>
+              <button
+                type="button"
+                disabled={!prevRow?.chapter?.unlocked}
+                onClick={() => prevRow && selectChapter(prevRow.chapter.id)}
+                className="rounded-lg border border-gray-600 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 disabled:opacity-40"
+              >
+                ← Previous
+              </button>
+              <button
+                type="button"
+                disabled={!nextRow?.chapter?.unlocked}
+                onClick={() => nextRow && selectChapter(nextRow.chapter.id)}
+                className="rounded-lg border border-gray-600 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 disabled:opacity-40"
+              >
+                Next →
+              </button>
+              {!selected.completed ? (
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={markChapterComplete}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {actionLoading ? 'Saving…' : 'Mark complete'}
+                </button>
+              ) : (
+                <span className="self-center px-2 text-xs font-semibold text-emerald-300">Completed ✓</span>
+              )}
+            </div>
+          </header>
+
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            {navOpen && (
+              <aside className="flex w-[min(100vw,320px)] shrink-0 flex-col overflow-hidden border-r border-gray-700 bg-gray-800">
+                <CourseContentNav
+                  modules={data?.modules || []}
+                  selectedChapterId={selectedChapterId}
+                  onSelectChapter={selectChapter}
+                  onClose={() => setNavOpen(false)}
+                />
+              </aside>
+            )}
+
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-none px-4 py-6 sm:px-8 lg:px-16 xl:px-24">
+                <ChapterContentView chapter={selected} fullFrame />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

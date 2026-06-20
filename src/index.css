@@ -16,6 +16,17 @@
   .btn-touch {
     @apply min-h-[44px] min-w-[44px] inline-flex items-center justify-center;
   }
+
+  .study-notes-table-wrap {
+    @apply w-full max-w-full overflow-x-auto;
+  }
+
+  .study-notes-table-wrap table {
+    display: table;
+    width: 100%;
+    max-width: 100%;
+    table-layout: auto;
+  }
 }
 
 @layer utilities {
