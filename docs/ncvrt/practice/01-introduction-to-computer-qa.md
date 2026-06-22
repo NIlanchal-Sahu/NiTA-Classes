@@ -1,24 +1,24 @@
 # Practice — Module 01: Introduction to Computer
 
-## Section A — MCQ (50 questions)
+## Section A — MCQ (80 questions)
 
 1. Full form of CPU?
-   a) Central Processing Unit
-   b) Computer Personal Unit
-   c) Control Processing Unit
-   d) Central Process Unit
+   a) Central Process Unit
+   b) Central Processing Unit
+   c) Computer Personal Unit
+   d) Control Processing Unit
 
 2. Brain of the computer?
-   a) CPU
-   b) Monitor
-   c) Keyboard
-   d) Printer
+   a) Keyboard
+   b) Printer
+   c) CPU
+   d) Monitor
 
 3. Which memory is temporary?
-   a) RAM
-   b) ROM
-   c) Hard disk
-   d) DVD
+   a) ROM
+   b) Hard disk
+   c) DVD
+   d) RAM
 
 4. Which memory stores boot instructions?
    a) ROM
@@ -27,16 +27,16 @@
    d) Register
 
 5. Input device?
-   a) Keyboard
-   b) Monitor
-   c) Printer
-   d) Speaker
+   a) Printer
+   b) Speaker
+   c) Keyboard
+   d) Monitor
 
 6. Output device?
-   a) Printer
-   b) Mouse
-   c) Scanner
-   d) Microphone
+   a) Mouse
+   b) Scanner
+   c) Microphone
+   d) Printer
 
 7. 1 KB equals?
    a) 1024 bytes
@@ -45,16 +45,16 @@
    d) 8 bytes
 
 8. Binary uses digits?
-   a) 0 and 1
-   b) 0 to 9
-   c) 1 to 9
-   d) A to F
+   a) A to F
+   b) 0 and 1
+   c) 0 to 9
+   d) 1 to 9
 
 9. Software example?
-   a) MS Word
-   b) CPU
-   c) Monitor
-   d) Keyboard
+   a) CPU
+   b) Monitor
+   c) Keyboard
+   d) MS Word
 
 10. Hardware example?
    a) Keyboard
@@ -63,16 +63,16 @@
    d) Antivirus
 
 11. Pen drive is?
-   a) Storage device
-   b) Input device
-   c) Output device
-   d) ALU
+   a) ALU
+   b) Storage device
+   c) Input device
+   d) Output device
 
 12. Full form of RAM?
-   a) Random Access Memory
-   b) Read Access Memory
-   c) Run All Memory
-   d) Random Active Memory
+   a) Run All Memory
+   b) Random Active Memory
+   c) Random Access Memory
+   d) Read Access Memory
 
 13. Full form of ROM?
    a) Read Only Memory
@@ -81,40 +81,40 @@
    d) Read Open Memory
 
 14. Supercomputer used for?
-   a) Weather research
-   b) Typing letters
-   c) Email only
-   d) Printing bills
+   a) Printing bills
+   b) Weather research
+   c) Typing letters
+   d) Email only
 
 15. Data processed into meaningful form is?
-   a) Information
-   b) Hardware
-   c) Input
-   d) Output
+   a) Input
+   b) Output
+   c) Information
+   d) Hardware
 
 16. Which is system software?
-   a) Operating System
-   b) MS Excel
-   c) Chrome
-   d) Tally
+   a) MS Excel
+   b) Chrome
+   c) Tally
+   d) Operating System
 
 17. ALU is part of?
-   a) CPU
-   b) Monitor
-   c) Printer
-   d) Mouse
+   a) Mouse
+   b) CPU
+   c) Monitor
+   d) Printer
 
 18. VDU stands for?
-   a) Visual Display Unit
-   b) Very Digital User
-   c) Video Disk Unit
-   d) Virtual Data Unit
+   a) Video Disk Unit
+   b) Virtual Data Unit
+   c) Visual Display Unit
+   d) Very Digital User
 
 19. Multitasking means?
-   a) Running many programs together
-   b) One program only
-   c) No OS
-   d) Shutdown
+   a) One program only
+   b) No OS
+   c) Shutdown
+   d) Running many programs together
 
 20. Virus is?
    a) Harmful software
@@ -123,16 +123,16 @@
    d) Storage
 
 21. Smartphone is a?
-   a) Mobile computer / IT gadget
-   b) Only phone
-   c) Printer
-   d) Scanner
+   a) Printer
+   b) Scanner
+   c) Mobile computer / IT gadget
+   d) Only phone
 
 22. Touchscreen is both?
-   a) Input and output
-   b) Only input
-   c) Only storage
-   d) Only CPU
+   a) Only input
+   b) Only storage
+   c) Only CPU
+   d) Input and output
 
 23. Evolution: first generation used?
    a) Vacuum tubes
@@ -141,10 +141,10 @@
    d) AI processors
 
 24. Fourth generation used?
-   a) Microprocessors / VLSI
-   b) Vacuum tubes
-   c) Punch cards only
-   d) Abacus
+   a) Abacus
+   b) Microprocessors / VLSI
+   c) Vacuum tubes
+   d) Punch cards only
 
 25. SSD compared to HDD is generally?
    a) Faster
@@ -153,40 +153,40 @@
    d) Not storage
 
 26. Bit is?
-   a) Smallest unit of data
-   b) 8 bytes
-   c) 1 KB
-   d) 1 MB
+   a) 1 MB
+   b) Smallest unit of data
+   c) 8 bytes
+   d) 1 KB
 
 27. 8 bits = ?
-   a) 1 Byte
-   b) 1 KB
-   c) 1 bit
-   d) 1 GB
+   a) 1 bit
+   b) 1 GB
+   c) 1 Byte
+   d) 1 KB
 
 28. Motherboard function?
-   a) Connects all components
-   b) Print documents
-   c) Browse internet
-   d) Send email
+   a) Print documents
+   b) Browse internet
+   c) Send email
+   d) Connects all components
 
 29. Scanner is?
-   a) Input device
-   b) Output device
-   c) CPU
-   d) OS
+   a) OS
+   b) Input device
+   c) Output device
+   d) CPU
 
 30. Webcam is?
-   a) Input device
-   b) Output only
-   c) Storage
-   d) Printer
+   a) Storage
+   b) Printer
+   c) Input device
+   d) Output only
 
 31. Bluetooth in laptop is for?
-   a) Wireless connectivity
-   b) Printing only
-   c) Storage only
-   d) Cooling
+   a) Printing only
+   b) Storage only
+   c) Cooling
+   d) Wireless connectivity
 
 32. Tablet is an IT gadget for?
    a) Portable computing
@@ -195,22 +195,22 @@
    d) Only scanning
 
 33. Application software does?
-   a) User-specific tasks
-   b) Boot computer only
-   c) Connect wires
-   d) Cool CPU
+   a) Cool CPU
+   b) User-specific tasks
+   c) Boot computer only
+   d) Connect wires
 
 34. Firmware is?
-   a) Software in hardware
-   b) Pure hardware
-   c) Virus
-   d) Browser
+   a) Virus
+   b) Browser
+   c) Software in hardware
+   d) Pure hardware
 
 35. Cold boot starts from?
-   a) Power off state
-   b) Sleep only
-   c) Lock screen
-   d) Hibernate only
+   a) Sleep only
+   b) Lock screen
+   c) Hibernate only
+   d) Power off state
 
 36. GUI means?
    a) Graphical User Interface
@@ -219,34 +219,34 @@
    d) Global User ID
 
 37. File extension .docx is for?
-   a) Word document
-   b) Excel
-   c) PowerPoint
-   d) Video
+   a) PowerPoint
+   b) Video
+   c) Word document
+   d) Excel
 
 38. Backup purpose?
-   a) Protect data from loss
-   b) Delete files
-   c) Slow PC
-   d) Print faster
+   a) Delete files
+   b) Slow PC
+   c) Print faster
+   d) Protect data from loss
 
 39. Microcomputer example?
-   a) Laptop
-   b) Mainframe
-   c) Supercomputer only
-   d) None
+   a) None
+   b) Laptop
+   c) Mainframe
+   d) Supercomputer only
 
 40. Cache memory is?
-   a) Very fast small buffer
-   b) Slowest storage
-   c) Printer buffer only
-   d) Email storage
+   a) Printer buffer only
+   b) Email storage
+   c) Very fast small buffer
+   d) Slowest storage
 
 41. Which enters data into computer?
-   a) Input device
-   b) Output device
-   c) Monitor
-   d) Speaker
+   a) Output device
+   b) Monitor
+   c) Speaker
+   d) Input device
 
 42. CPU speed measured in?
    a) GHz
@@ -255,22 +255,22 @@
    d) Litres
 
 43. Decimal 5 in binary?
-   a) 101
-   b) 110
-   c) 111
-   d) 100
+   a) 100
+   b) 101
+   c) 110
+   d) 111
 
 44. Binary 1010 in decimal?
-   a) 10
-   b) 8
-   c) 12
-   d) 5
+   a) 12
+   b) 5
+   c) 10
+   d) 8
 
 45. Mainframe used in?
-   a) Banks and railways
-   b) Home gaming only
-   c) Calculator only
-   d) Watch only
+   a) Home gaming only
+   b) Calculator only
+   c) Watch only
+   d) Banks and railways
 
 46. Headphones are?
    a) Output device
@@ -279,22 +279,22 @@
    d) CPU
 
 47. Joystick is used for?
-   a) Games / input
-   b) Printing
-   c) Storage
-   d) Booting
+   a) Booting
+   b) Games / input
+   c) Printing
+   d) Storage
 
 48. Digital camera captures?
-   a) Images as digital data
-   b) Only sound
-   c) Only text
-   d) Only programs
+   a) Only text
+   b) Only programs
+   c) Images as digital data
+   d) Only sound
 
 49. Mobile app runs on?
-   a) Smartphone/tablet
-   b) Printer only
-   c) Scanner only
-   d) Mouse only
+   a) Printer only
+   b) Scanner only
+   c) Mouse only
+   d) Smartphone/tablet
 
 50. E-governance uses computers for?
    a) Online citizen services
@@ -302,30 +302,212 @@
    c) Only music
    d) Only photos
 
+51. A computer mainly works on which cycle?
+   a) Storage only
+   b) Input, process, storage, output
+   c) Print only
+   d) Input only
+
+52. Second generation computers used?
+   a) Integrated circuits
+   b) Microprocessors
+   c) Transistors
+   d) Vacuum tubes
+
+53. Third generation computers used?
+   a) Vacuum tubes
+   b) Transistors
+   c) Abacus
+   d) Integrated Circuits (ICs)
+
+54. Fifth generation computers focus on?
+   a) Artificial Intelligence
+   b) 5G mobile network
+   c) Vacuum tubes
+   d) Punch cards
+
+55. IoT stands for?
+   a) Internal Operating Technique
+   b) Internet of Things
+   c) Internet of Tools
+   d) Input Output Technology
+
+56. Full form of ALU?
+   a) Automatic Logic Unit
+   b) Arithmetic Load Unit
+   c) Arithmetic Logic Unit
+   d) Advanced Logic Unit
+
+57. Control Unit (CU) in CPU does?
+   a) Prints documents
+   b) Stores files permanently
+   c) Displays output only
+   d) Directs and controls operations
+
+58. RAM is called volatile because?
+   a) Data is lost when power is off
+   b) It never loses data
+   c) It is an output device
+   d) It stores boot code
+
+59. Utility software is used for?
+   a) Hardware repair physically
+   b) Maintenance and protection
+   c) Typing letters only
+   d) Booting only
+
+60. Embedded computer example?
+   a) Supercomputer only
+   b) Mainframe only
+   c) ATM machine
+   d) Desktop PC only
+
+61. Server computer is used to?
+   a) Play games only
+   b) Type documents only
+   c) Scan papers only
+   d) Provide services to many users
+
+62. Workstation is mainly for?
+   a) Powerful single-user professional work
+   b) Large bank transactions only
+   c) Weather simulation only
+   d) Mobile calls only
+
+63. HDD stands for?
+   a) Hardware Disk Drive
+   b) Hard Disk Drive
+   c) High Data Device
+   d) Hard Digital Drive
+
+64. Cloud storage means?
+   a) RAM storage
+   b) Printer memory
+   c) Files saved on internet servers
+   d) Storage inside CPU only
+
+65. File extension .pdf is for?
+   a) Spreadsheet
+   b) Presentation
+   c) Android app
+   d) Portable document
+
+66. File extension .xlsx is for?
+   a) Spreadsheet
+   b) Word document
+   c) Video file
+   d) Text file only
+
+67. A folder is?
+   a) Virus program
+   b) Container for files and subfolders
+   c) Same as CPU
+   d) Output device
+
+68. Raw facts without full meaning are called?
+   a) Firmware
+   b) Output
+   c) Data
+   d) Information
+
+69. Hexadecimal number system uses base?
+   a) 2
+   b) 8
+   c) 10
+   d) 16
+
+70. Decimal number system uses base?
+   a) 10
+   b) 2
+   c) 8
+   d) 16
+
+71. 1 MB equals?
+   a) 1024 GB
+   b) 1024 KB
+   c) 1000 bytes
+   d) 8 bits
+
+72. Barcode reader is?
+   a) Storage device
+   b) System software
+   c) Input device
+   d) Output device
+
+73. Projector is?
+   a) Input device
+   b) Storage device
+   c) CPU part
+   d) Output device
+
+74. Microphone is?
+   a) Input device
+   b) Output device
+   c) Storage
+   d) Motherboard
+
+75. During startup, which firmware runs first?
+   a) Antivirus only
+   b) BIOS/UEFI
+   c) MS Word
+   d) Chrome browser
+
+76. Before shutting down, you should?
+   a) Delete all files
+   b) Remove RAM
+   c) Save all open work
+   d) Unplug power immediately
+
+77. OTP should be?
+   a) Shared with friends
+   b) Posted online
+   c) Written on wall
+   d) Never shared with anyone
+
+78. Antivirus software helps to?
+   a) Protect against malware
+   b) Increase RAM size
+   c) Print faster
+   d) Replace keyboard
+
+79. More storage always means faster PC — this is?
+   a) Same as more RAM always
+   b) False / misconception
+   c) Always true
+   d) Required for CPU
+
+80. CPU cabinet is the same as CPU chip — this is?
+   a) Same as motherboard
+   b) False / misconception
+   c) True always
+   d) Correct definition
+
+
 ## Section B — Short Answer (15)
 
-1. Define key concept in Introduction to Computer.
-2. List five important terms from Introduction to Computer.
-3. Name three practical tasks for Introduction to Computer.
-4. Why is Introduction to Computer important for CCC exam?
-5. Give two exam tips for Introduction to Computer.
-6. Define key concept in Introduction to Computer.
-7. List five important terms from Introduction to Computer.
-8. Name three practical tasks for Introduction to Computer.
-9. Why is Introduction to Computer important for CCC exam?
-10. Give two exam tips for Introduction to Computer.
-11. Define key concept in Introduction to Computer.
-12. List five important terms from Introduction to Computer.
-13. Name three practical tasks for Introduction to Computer.
-14. Why is Introduction to Computer important for CCC exam?
-15. Give two exam tips for Introduction to Computer.
+1. What is a computer?
+2. Explain the input-process-output-storage cycle with one example.
+3. Write the full forms of ALU and CU.
+4. Differentiate between RAM and ROM.
+5. Differentiate between hardware and software with two examples each.
+6. Name the five generations of computers with their main technology.
+7. What is IoT? Give two examples.
+8. Differentiate between data and information.
+9. Write four input devices and four output devices.
+10. Why is backup important?
+11. What happens during computer startup?
+12. Why do computers use binary?
+13. What is firmware?
+14. Write two digital safety rules for mobile/UPI use.
+15. Convert decimal 13 into binary.
+
 ## Section C — Practical (8)
 
-1. Complete lab task 1 from Introduction to Computer study notes.
-2. Complete lab task 2 from Introduction to Computer study notes.
-3. Demonstrate skill to trainer on PC.
-4. Screenshot or checklist signed by trainer.
-5. Revise wrong MCQs from practice test.
-6. Peer review exercise in lab.
-7. Timed 10-minute drill on key shortcuts.
-8. Document steps in notebook.
+1. Identify computer parts on a desktop/laptop (monitor, keyboard, mouse, ports, speakers).
+2. Classify 5 input and 5 output devices with real-life uses.
+3. Create folder `DCA_Module_1`, add a text file, rename, copy, and delete duplicate.
+4. List 10 file extensions and their file types.
+5. Classify smartphone apps as education, banking, communication, utility, or government.
+6. Convert decimal 10, 13, 25, and 31 into binary.
+7. Demonstrate safe shutdown steps on a PC.
+8. Revise wrong MCQs from this practice test and note corrections.

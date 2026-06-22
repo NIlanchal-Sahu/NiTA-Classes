@@ -3,28 +3,28 @@
 ## MCQ Answer Key
 
 1. Windows is a?
-   a) Operating System
-   b) Browser
-   c) Spreadsheet
-   d) Antivirus
-   **Answer: a) Operating System**
-   **Explanation:** Microsoft Windows is an operating system (OS) that manages hardware and runs applications. It is not a browser or spreadsheet.
+   a) Antivirus
+   b) Operating System
+   c) Browser
+   d) Spreadsheet
+   **Answer: b) Operating System**
+   **Explanation:** Microsoft Windows is an operating system that manages hardware and runs applications.
 
 2. Linux is?
-   a) Open source OS
-   b) Closed browser
-   c) Word processor
-   d) Printer driver
-   **Answer: a) Open source OS**
-   **Explanation:** Linux is an open-source operating system — its source code can be freely used and modified. Ubuntu and Fedora are Linux distributions.
+   a) Word processor
+   b) Printer driver
+   c) Open source OS
+   d) Closed browser
+   **Answer: c) Open source OS**
+   **Explanation:** Linux is open source — its source code can be studied and modified under license.
 
 3. OS function includes?
-   a) File management
-   b) Only gaming
-   c) Only printing
-   d) Only email
-   **Answer: a) File management**
-   **Explanation:** File management is the main purpose or function described in the question. Only gaming and Only printing are not the right choices here.
+   a) Only gaming
+   b) Only printing
+   c) Only email
+   d) File management
+   **Answer: d) File management**
+   **Explanation:** The OS organizes files and folders on storage devices.
 
 4. Shortcut Copy?
    a) Ctrl+C
@@ -32,23 +32,23 @@
    c) Ctrl+X
    d) Ctrl+Z
    **Answer: a) Ctrl+C**
-   **Explanation:** Ctrl+C copies selected text or files to the clipboard without removing the original. Ctrl+V pastes; Ctrl+X cuts.
+   **Explanation:** Ctrl+C copies selected items to the clipboard.
 
 5. Shortcut Paste?
-   a) Ctrl+V
-   b) Ctrl+C
-   c) Ctrl+S
-   d) Ctrl+P
-   **Answer: a) Ctrl+V**
-   **Explanation:** Ctrl+V pastes content from the clipboard. Ctrl+C copies; Ctrl+S saves the file.
-
-6. Shortcut Save?
    a) Ctrl+S
    b) Ctrl+P
-   c) Ctrl+N
-   d) Ctrl+O
-   **Answer: a) Ctrl+S**
-   **Explanation:** Ctrl+S saves the current file quickly. Always save your work often to avoid losing changes.
+   c) Ctrl+V
+   d) Ctrl+C
+   **Answer: c) Ctrl+V**
+   **Explanation:** Ctrl+V pastes copied or cut items.
+
+6. Shortcut Save?
+   a) Ctrl+P
+   b) Ctrl+N
+   c) Ctrl+O
+   d) Ctrl+S
+   **Answer: d) Ctrl+S**
+   **Explanation:** Ctrl+S saves the current file in most applications.
 
 7. Win+E opens?
    a) File Explorer
@@ -56,23 +56,23 @@
    c) Edge only
    d) Email
    **Answer: a) File Explorer**
-   **Explanation:** Win+E opens File Explorer so you can browse folders and files on your computer.
+   **Explanation:** Win+E opens File Explorer for browsing files and folders.
 
 8. Win+L?
-   a) Lock computer
-   b) Log off always
-   c) Open Word
-   d) Print
-   **Answer: a) Lock computer**
-   **Explanation:** Win+L locks the computer immediately — you must sign in again. Use this when stepping away from your desk.
+   a) Print
+   b) Lock computer
+   c) Log off always
+   d) Open Word
+   **Answer: b) Lock computer**
+   **Explanation:** Win+L locks the computer — use it when stepping away.
 
 9. F2 key?
-   a) Rename
-   b) Refresh
-   c) Save
-   d) Print
-   **Answer: a) Rename**
-   **Explanation:** F2 renames a selected file or folder in Windows File Explorer. F5 refreshes the view.
+   a) Refresh
+   b) Save
+   c) Print
+   d) Rename
+   **Answer: d) Rename**
+   **Explanation:** F2 renames the selected file or folder.
 
 10. Delete sends file to?
    a) Recycle Bin
@@ -80,23 +80,23 @@
    c) Desktop
    d) Network
    **Answer: a) Recycle Bin**
-   **Explanation:** Normal Delete (without Shift) moves the file to Recycle Bin — you can restore it later.
+   **Explanation:** The Delete key sends files to Recycle Bin for possible recovery.
 
 11. Shift+Delete?
-   a) Permanent delete
-   b) Recycle Bin
-   c) Copy
-   d) Rename
-   **Answer: a) Permanent delete**
-   **Explanation:** Shift+Delete permanently deletes a file without sending it to Recycle Bin — recovery is difficult.
+   a) Rename
+   b) Permanent delete
+   c) Recycle Bin
+   d) Copy
+   **Answer: b) Permanent delete**
+   **Explanation:** Shift+Delete bypasses Recycle Bin and deletes permanently.
 
 12. Task Manager opens with?
-   a) Ctrl+Shift+Esc
-   b) F5
-   c) Alt+H
-   d) Win+P
-   **Answer: a) Ctrl+Shift+Esc**
-   **Explanation:** Ctrl+Shift+Esc opens Task Manager to view running programs, CPU/RAM use, and end stuck tasks.
+   a) Alt+H
+   b) Win+P
+   c) Ctrl+Shift+Esc
+   d) F5
+   **Answer: c) Ctrl+Shift+Esc**
+   **Explanation:** Ctrl+Shift+Esc opens Task Manager directly.
 
 13. Default drive letter for Windows?
    a) C:
@@ -104,55 +104,55 @@
    c) Z:
    d) M:
    **Answer: a) C:**
-   **Explanation:** Windows is usually installed on drive C:. Drive A: was for floppy disks; other letters are for extra partitions or USB drives.
+   **Explanation:** Windows is usually installed on drive C:.
 
 14. Folder contains?
-   a) Files and subfolders
-   b) Only CPU
-   c) Only RAM
-   d) Nothing
-   **Answer: a) Files and subfolders**
-   **Explanation:** Files and subfolders is the correct answer. Only CPU and Only RAM are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Nothing
+   b) Files and subfolders
+   c) Only CPU
+   d) Only RAM
+   **Answer: b) Files and subfolders**
+   **Explanation:** Folders organize files and can contain subfolders.
 
 15. Ctrl+X is?
-   a) Cut
-   b) Copy
-   c) Paste
-   d) Undo
-   **Answer: a) Cut**
-   **Explanation:** Ctrl+X cuts — removes the selection and places it on the clipboard to paste elsewhere.
+   a) Paste
+   b) Undo
+   c) Cut
+   d) Copy
+   **Answer: c) Cut**
+   **Explanation:** Ctrl+X cuts — the item is moved when pasted.
 
 16. Ctrl+Z is?
-   a) Undo
-   b) Redo
-   c) Save
-   d) Print
-   **Answer: a) Undo**
-   **Explanation:** Ctrl+Z undoes your last action. Very useful if you make a mistake while typing or editing.
+   a) Redo
+   b) Save
+   c) Print
+   d) Undo
+   **Answer: d) Undo**
+   **Explanation:** Ctrl+Z undoes the last action in supported apps.
 
 17. Alt+Tab?
-   a) Switch windows
-   b) Close all
-   c) Shutdown
-   d) Save
-   **Answer: a) Switch windows**
-   **Explanation:** Alt+Tab switches between open application windows quickly without using the mouse.
+   a) Save
+   b) Switch windows
+   c) Close all
+   d) Shutdown
+   **Answer: b) Switch windows**
+   **Explanation:** Alt+Tab switches between open applications.
 
 18. Zip folder purpose?
-   a) Compress files
-   b) Delete files
-   c) Print files
-   d) Email only
-   **Answer: a) Compress files**
-   **Explanation:** Compress files is the main purpose or function described in the question. Delete files and Print files are not the right choices here.
+   a) Print files
+   b) Email only
+   c) Compress files
+   d) Delete files
+   **Answer: c) Compress files**
+   **Explanation:** Zip folders reduce size or bundle multiple files together.
 
 19. Desktop wallpaper changed via?
-   a) Personalize/Settings
-   b) BIOS only
-   c) Notepad
-   d) Calculator
-   **Answer: a) Personalize/Settings**
-   **Explanation:** Personalize/Settings is the correct answer. BIOS only and Notepad are not the right choices here. This is an important CCC exam point — memorise it.
+   a) BIOS only
+   b) Notepad
+   c) Calculator
+   d) Personalize/Settings
+   **Answer: d) Personalize/Settings**
+   **Explanation:** Wallpaper and themes are changed via Personalize or Settings.
 
 20. Uninstall program via?
    a) Settings → Apps
@@ -160,23 +160,23 @@
    c) Recycle Bin
    d) Paint
    **Answer: a) Settings → Apps**
-   **Explanation:** Use Settings → Apps → Uninstall to remove a program properly. Deleting only the desktop shortcut does not uninstall it.
+   **Explanation:** Uninstall programs properly from Settings → Apps → Installed apps.
 
 21. GUI OS uses?
-   a) Icons and mouse
-   b) Only commands
-   c) No monitor
-   d) Telegraph
-   **Answer: a) Icons and mouse**
-   **Explanation:** Icons and mouse is the correct answer. Only commands and No monitor are not the right choices here. This is an important CCC exam point — memorise it.
+   a) No monitor
+   b) Telegraph
+   c) Icons and mouse
+   d) Only commands
+   **Answer: c) Icons and mouse**
+   **Explanation:** GUI uses graphical elements like icons, windows, and a mouse pointer.
 
 22. File path shows?
-   a) Location of file
-   b) CPU speed
-   c) RAM size
-   d) Printer ink
-   **Answer: a) Location of file**
-   **Explanation:** Location of file is the correct answer. CPU speed and RAM size are not the right choices here. This is an important CCC exam point — memorise it.
+   a) CPU speed
+   b) RAM size
+   c) Printer ink
+   d) Location of file
+   **Answer: d) Location of file**
+   **Explanation:** A file path shows where a file is stored on a drive.
 
 23. Invalid filename character?
    a) *
@@ -184,15 +184,15 @@
    c) -
    d) 0
    **Answer: a) ***
-   **Explanation:** * is the correct answer. _ and - are not the right choices here. This is an important CCC exam point — memorise it.
+   **Explanation:** Characters like * ? \ / : " < > | cannot be used in Windows file names.
 
 24. Snipping Tool for?
-   a) Screenshot
-   b) Virus scan
-   c) Spreadsheet
-   d) Database
-   **Answer: a) Screenshot**
-   **Explanation:** Screenshot is the correct answer. Virus scan and Spreadsheet are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Database
+   b) Screenshot
+   c) Virus scan
+   d) Spreadsheet
+   **Answer: b) Screenshot**
+   **Explanation:** Snipping Tool captures screenshots for tutorials or proof.
 
 25. Administrator account has?
    a) Full system control
@@ -200,55 +200,55 @@
    c) Guest only
    d) No login
    **Answer: a) Full system control**
-   **Explanation:** Full system control is the correct answer. No install rights and Guest only are not the right choices here. This is an important CCC exam point — memorise it.
+   **Explanation:** Administrator accounts can install software and change system settings.
 
 26. Linux mascot/tradition often?
-   a) Penguin Tux
-   b) Apple only
-   c) Windows logo
-   d) None
-   **Answer: a) Penguin Tux**
-   **Explanation:** Penguin Tux is the correct answer. Apple only and Windows logo are not the right choices here. This is an important CCC exam point — memorise it.
+   a) None
+   b) Penguin Tux
+   c) Apple only
+   d) Windows logo
+   **Answer: b) Penguin Tux**
+   **Explanation:** Tux the penguin is the well-known mascot of Linux.
 
 27. Install program on Windows?
-   a) Run installer / Store / setup.exe
-   b) Delete folder only
-   c) Rename file
-   d) F5
-   **Answer: a) Run installer / Store / setup.exe**
-   **Explanation:** Run installer / Store / setup.exe is the correct answer. Delete folder only and Rename file are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Rename file
+   b) F5
+   c) Run installer / Store / setup.exe
+   d) Delete folder only
+   **Answer: c) Run installer / Store / setup.exe**
+   **Explanation:** Install software using official installers, Microsoft Store, or setup.exe.
 
 28. Remove program properly?
-   a) Uninstall from Settings
-   b) Delete shortcut only
-   c) Hide icon
-   d) Lock PC
-   **Answer: a) Uninstall from Settings**
-   **Explanation:** Uninstall from Settings is the correct answer. Delete shortcut only and Hide icon are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Delete shortcut only
+   b) Hide icon
+   c) Lock PC
+   d) Uninstall from Settings
+   **Answer: d) Uninstall from Settings**
+   **Explanation:** Proper removal uses Settings → Apps, not just deleting shortcuts.
 
 29. System tray shows?
-   a) Clock, network, volume
-   b) CPU chip
-   c) Keyboard keys
-   d) Hard disk
-   **Answer: a) Clock, network, volume**
-   **Explanation:** Clock, network, volume is the correct answer. CPU chip and Keyboard keys are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Hard disk
+   b) Clock, network, volume
+   c) CPU chip
+   d) Keyboard keys
+   **Answer: b) Clock, network, volume**
+   **Explanation:** The system tray shows time, network, volume, battery, and background icons.
 
 30. Start menu used to?
-   a) Launch programs
-   b) Format disk only
-   c) Destroy data
-   d) Remove OS
-   **Answer: a) Launch programs**
-   **Explanation:** Launch programs is the main purpose or function described in the question. Format disk only and Destroy data are not the right choices here.
+   a) Destroy data
+   b) Remove OS
+   c) Launch programs
+   d) Format disk only
+   **Answer: c) Launch programs**
+   **Explanation:** The Start menu launches apps, search, power options, and settings.
 
 31. Ctrl+A?
-   a) Select all
-   b) Save all
-   c) Print all
-   d) Delete all
-   **Answer: a) Select all**
-   **Explanation:** Use Select all for this action. Practice the shortcut on your keyboard during lab sessions so it becomes automatic.
+   a) Save all
+   b) Print all
+   c) Delete all
+   d) Select all
+   **Answer: d) Select all**
+   **Explanation:** Ctrl+A selects all items in the current window or document.
 
 32. Copy vs Move: Copy?
    a) Original remains
@@ -256,31 +256,31 @@
    c) Both deleted
    d) Neither exists
    **Answer: a) Original remains**
-   **Explanation:** Original remains is the correct answer. Original deleted and Both deleted are not the right choices here. This is an important CCC exam point — memorise it.
+   **Explanation:** Copy (Ctrl+C/V) keeps the original; move (Ctrl+X/V) removes it.
 
 33. Restore deleted file from?
-   a) Recycle Bin
-   b) CPU
-   c) Monitor
-   d) Keyboard
-   **Answer: a) Recycle Bin**
-   **Explanation:** Deleted files go to Recycle Bin first. Open it and choose Restore to get the file back to its original place.
+   a) Keyboard
+   b) Recycle Bin
+   c) CPU
+   d) Monitor
+   **Answer: b) Recycle Bin**
+   **Explanation:** The Delete key sends files to Recycle Bin for possible recovery.
 
 34. Hibernate saves session to?
-   a) Disk then low power
-   b) RAM only always
-   c) Cloud only
-   d) Printer
-   **Answer: a) Disk then low power**
-   **Explanation:** Disk then low power is the correct answer. RAM only always and Cloud only are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Cloud only
+   b) Printer
+   c) Disk then low power
+   d) RAM only always
+   **Answer: c) Disk then low power**
+   **Explanation:** Hibernate saves the session to disk and uses very low power.
 
 35. Windows Update purpose?
-   a) Security patches
-   b) Delete files
-   c) Remove OS
-   d) Slow internet
-   **Answer: a) Security patches**
-   **Explanation:** Security patches is the main purpose or function described in the question. Delete files and Remove OS are not the right choices here.
+   a) Delete files
+   b) Remove OS
+   c) Slow internet
+   d) Security patches
+   **Answer: d) Security patches**
+   **Explanation:** Windows Update delivers security fixes, stability improvements, and features.
 
 36. Pen drive appears as drive letter when?
    a) Plugged in USB
@@ -288,47 +288,47 @@
    c) Never
    d) Only on Linux
    **Answer: a) Plugged in USB**
-   **Explanation:** Plugged in USB is the correct answer. Always C: and Never are not the right choices here. This is an important CCC exam point — memorise it.
+   **Explanation:** USB drives appear as removable drive letters when connected.
 
 37. Search in File Explorer finds?
-   a) Files in folder/search scope
-   b) Only internet
-   c) Only emails
-   d) BIOS
-   **Answer: a) Files in folder/search scope**
-   **Explanation:** Files in folder/search scope is the correct answer. Only internet and Only emails are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Only emails
+   b) BIOS
+   c) Files in folder/search scope
+   d) Only internet
+   **Answer: c) Files in folder/search scope**
+   **Explanation:** File Explorer search finds files within the selected folder or scope.
 
 38. Notepad creates?
-   a) Plain text files
-   b) Excel sheets
-   c) Database
-   d) Video
-   **Answer: a) Plain text files**
-   **Explanation:** Plain text files is the correct answer. Excel sheets and Database are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Excel sheets
+   b) Database
+   c) Video
+   d) Plain text files
+   **Answer: d) Plain text files**
+   **Explanation:** Notepad creates simple .txt plain text files without formatting.
 
 39. Control Panel / Settings for?
-   a) System configuration
-   b) Games only
-   c) Hardware repair physical
-   d) Cable only
-   **Answer: a) System configuration**
-   **Explanation:** System configuration is the correct answer. Games only and Hardware repair physical are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Cable only
+   b) System configuration
+   c) Games only
+   d) Hardware repair physical
+   **Answer: b) System configuration**
+   **Explanation:** Settings and Control Panel configure display, network, apps, and accounts.
 
 40. Shortcut to desktop?
-   a) Send to Desktop shortcut
-   b) Delete file
-   c) Format C:
-   d) Uninstall OS
-   **Answer: a) Send to Desktop shortcut**
-   **Explanation:** Use Send to Desktop shortcut for this action. Practice the shortcut on your keyboard during lab sessions so it becomes automatic.
+   a) Format C:
+   b) Uninstall OS
+   c) Send to Desktop shortcut
+   d) Delete file
+   **Answer: c) Send to Desktop shortcut**
+   **Explanation:** Right-click → Send to → Desktop (create shortcut) makes a shortcut icon.
 
 41. Safe eject USB why?
-   a) Prevent data corruption
-   b) Speed up CPU
-   c) Add RAM
-   d) Install OS
-   **Answer: a) Prevent data corruption**
-   **Explanation:** Safely ejecting USB (Eject option) finishes writing data before you unplug — prevents file corruption.
+   a) Speed up CPU
+   b) Add RAM
+   c) Install OS
+   d) Prevent data corruption
+   **Answer: d) Prevent data corruption**
+   **Explanation:** Safely eject USB so files finish writing before removal.
 
 42. Linux distributions include?
    a) Ubuntu, Fedora
@@ -336,31 +336,31 @@
    c) Chrome only
    d) None
    **Answer: a) Ubuntu, Fedora**
-   **Explanation:** Ubuntu, Fedora is the correct answer. Word, Excel only and Chrome only are not the right choices here. This is an important CCC exam point — memorise it.
+   **Explanation:** Ubuntu and Fedora are popular Linux distributions.
 
 43. Open source means?
-   a) Source code can be studied/modified
-   b) Always free hardware
-   c) No internet
-   d) No GUI
-   **Answer: a) Source code can be studied/modified**
-   **Explanation:** Open source means the program's source code is publicly available to study, modify, and share (e.g. Linux, LibreOffice).
+   a) No GUI
+   b) Source code can be studied/modified
+   c) Always free hardware
+   d) No internet
+   **Answer: b) Source code can be studied/modified**
+   **Explanation:** Open source allows viewing and modifying source code under license.
 
 44. Taskbar location usually?
-   a) Bottom of screen
-   b) Inside CPU
-   c) On printer
-   d) In BIOS
-   **Answer: a) Bottom of screen**
-   **Explanation:** Bottom of screen is the correct answer. Inside CPU and On printer are not the right choices here. This is an important CCC exam point — memorise it.
+   a) On printer
+   b) In BIOS
+   c) Bottom of screen
+   d) Inside CPU
+   **Answer: c) Bottom of screen**
+   **Explanation:** The taskbar is usually at the bottom of the Windows desktop.
 
 45. File extension identifies?
-   a) File type
-   b) CPU model
-   c) RAM size
-   d) User name
-   **Answer: a) File type**
-   **Explanation:** File type is the correct answer. CPU model and RAM size are not the right choices here. This is an important CCC exam point — memorise it.
+   a) CPU model
+   b) RAM size
+   c) User name
+   d) File type
+   **Answer: d) File type**
+   **Explanation:** Extensions like .txt, .pdf, and .exe identify file types.
 
 46. Win+D shows?
    a) Desktop
@@ -368,31 +368,31 @@
    c) Download
    d) Database
    **Answer: a) Desktop**
-   **Explanation:** Use Desktop for this action. Practice the shortcut on your keyboard during lab sessions so it becomes automatic.
+   **Explanation:** Win+D minimizes windows and shows the desktop.
 
 47. Increase list indent in Explorer sort?
-   a) Sort by name/date/size
-   b) Print
-   c) Scan
-   d) Email
-   **Answer: a) Sort by name/date/size**
-   **Explanation:** Sort by name/date/size is the correct answer. Print and Scan are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Email
+   b) Sort by name/date/size
+   c) Print
+   d) Scan
+   **Answer: b) Sort by name/date/size**
+   **Explanation:** File Explorer can sort files by name, date modified, type, or size.
 
 48. Lock PC when away using?
-   a) Win+L
-   b) Delete
-   c) F5
-   d) Ctrl+P
-   **Answer: a) Win+L**
-   **Explanation:** Win+L is the correct answer. Delete and F5 are not the right choices here. This is an important CCC exam point — memorise it.
+   a) F5
+   b) Ctrl+P
+   c) Win+L
+   d) Delete
+   **Answer: c) Win+L**
+   **Explanation:** Win+L — important CCC exam point from Module 2 notes.
 
 49. Guest account typically?
-   a) Limited permissions
-   b) Full admin
-   c) No login ever
-   d) Root on Linux always
-   **Answer: a) Limited permissions**
-   **Explanation:** Limited permissions is the correct answer. Full admin and No login ever are not the right choices here. This is an important CCC exam point — memorise it.
+   a) Full admin
+   b) No login ever
+   c) Root on Linux always
+   d) Limited permissions
+   **Answer: d) Limited permissions**
+   **Explanation:** Guest accounts have restricted access compared to administrators.
 
 50. Antivirus on Windows often?
    a) Windows Defender built-in
@@ -400,78 +400,317 @@
    c) Part of CPU
    d) Part of mouse
    **Answer: a) Windows Defender built-in**
-   **Explanation:** Windows Defender built-in is the correct answer. Not available and Part of CPU are not the right choices here. This is an important CCC exam point — memorise it.
+   **Explanation:** Windows includes Microsoft Defender antivirus in Windows Security.
+
+51. Main purpose of an operating system is to?
+   a) Increase monitor size
+   b) Manage hardware and provide user interface
+   c) Only play videos
+   d) Replace application software
+   **Answer: b) Manage hardware and provide user interface**
+   **Explanation:** The OS manages resources and provides GUI/CLI for users.
+
+52. Ubuntu is?
+   a) A virus
+   b) A spreadsheet
+   c) A Linux distribution
+   d) A printer driver only
+   **Answer: c) A Linux distribution**
+   **Explanation:** Ubuntu bundles the Linux kernel with apps, desktop, and package manager.
+
+53. GUI stands for?
+   a) General User Internet
+   b) Global Utility Input
+   c) Graphical Unit Instruction
+   d) Graphical User Interface
+   **Answer: d) Graphical User Interface**
+   **Explanation:** GUI = Graphical User Interface — icons, menus, and windows.
+
+54. CLI uses?
+   a) Typed commands
+   b) Only touch gestures
+   c) Only pictures
+   d) Printer output
+   **Answer: a) Typed commands**
+   **Explanation:** CLI (Command Line Interface) uses typed commands like dir and cd.
+
+55. Which OS is commonly used on Apple computers?
+   a) DOS only
+   b) macOS
+   c) Ubuntu only
+   d) Android
+   **Answer: b) macOS**
+   **Explanation:** macOS is Apple's operating system for Mac computers.
+
+56. Android is mainly used on?
+   a) Speakers only
+   b) Projectors only
+   c) Smartphones and tablets
+   d) Printers only
+   **Answer: c) Smartphones and tablets**
+   **Explanation:** Android powers most smartphones and many tablets.
+
+57. Which is a mobile operating system?
+   a) Notepad
+   b) Calculator
+   c) PowerPoint
+   d) iOS
+   **Answer: d) iOS**
+   **Explanation:** iOS is Apple's mobile operating system for iPhone and iPad.
+
+58. Device drivers help the OS communicate with?
+   a) Hardware devices
+   b) Wallpapers only
+   c) Documents only
+   d) Fonts only
+   **Answer: a) Hardware devices**
+   **Explanation:** Device drivers let the OS communicate with printers, scanners, and other hardware.
+
+59. A process is?
+   a) A printer ink level
+   b) A running program
+   c) A folder name
+   d) A keyboard key
+   **Answer: b) A running program**
+   **Explanation:** A process is a program currently executing in memory.
+
+60. Memory management allocates?
+   a) Monitor to files
+   b) Printer to BIOS
+   c) RAM to programs
+   d) CPU to folders
+   **Answer: c) RAM to programs**
+   **Explanation:** Memory management assigns RAM to running programs and frees it when they close.
+
+61. Win+I opens?
+   a) Internet Explorer only
+   b) Task Manager
+   c) Recycle Bin
+   d) Settings
+   **Answer: d) Settings**
+   **Explanation:** Win+I opens the modern Settings app for system configuration.
+
+62. Alt+F4 does?
+   a) Close active window
+   b) Open File Explorer
+   c) Lock computer
+   d) Rename file
+   **Answer: a) Close active window**
+   **Explanation:** Alt+F4 closes the currently active window or app.
+
+63. Win+Shift+S is used for?
+   a) Sort files
+   b) Screenshot selection
+   c) Save file
+   d) Shutdown
+   **Answer: b) Screenshot selection**
+   **Explanation:** Win+Shift+S opens the screenshot/snipping selection tool in Windows.
+
+64. Ctrl+Y is?
+   a) Cut
+   b) Paste
+   c) Redo
+   d) Undo
+   **Answer: c) Redo**
+   **Explanation:** Ctrl+Y redoes an action that was undone with Ctrl+Z.
+
+65. Deleting a desktop shortcut usually?
+   a) Uninstalls the program
+   b) Formats the drive
+   c) Removes Windows
+   d) Does not delete the original program
+   **Answer: d) Does not delete the original program**
+   **Explanation:** A shortcut is only a link — deleting it does not uninstall the program.
+
+66. Microsoft Windows is?
+   a) Closed source / proprietary
+   b) Open source kernel
+   c) A Linux distro
+   d) A mobile app only
+   **Answer: a) Closed source / proprietary**
+   **Explanation:** Windows source code is private; users cannot freely modify it.
+
+67. Linux kernel is?
+   a) A file extension
+   b) Core part of the operating system
+   c) A spreadsheet app
+   d) A printer driver only
+   **Answer: b) Core part of the operating system**
+   **Explanation:** The Linux kernel is the core that talks to hardware.
+
+68. Ransomware?
+   a) Creates backups
+   b) Updates Windows
+   c) Encrypts files and demands payment
+   d) Speeds up the PC
+   **Answer: c) Encrypts files and demands payment**
+   **Explanation:** Ransomware encrypts files and demands payment to restore access.
+
+69. Trojan malware?
+   a) Is built into Windows
+   b) Only affects printers
+   c) Is a keyboard shortcut
+   d) Pretends to be useful software
+   **Answer: d) Pretends to be useful software**
+   **Explanation:** Trojans disguise themselves as helpful programs but cause harm.
+
+70. A backup is?
+   a) Extra copy of data
+   b) Deleted virus only
+   c) Shortcut icon only
+   d) Temporary wallpaper
+   **Answer: a) Extra copy of data**
+   **Explanation:** Backup keeps a safe copy to recover from loss or failure.
+
+71. Standard user account is generally?
+   a) Required to delete Windows folder
+   b) Safer for daily work
+   c) More powerful than administrator
+   d) Used to replace OS
+   **Answer: b) Safer for daily work**
+   **Explanation:** Standard users have limited permissions — safer for everyday tasks.
+
+72. MS-DOS mainly used?
+   a) Mobile apps only
+   b) Cloud storage
+   c) Command line interface
+   d) Touchscreen gestures
+   **Answer: c) Command line interface**
+   **Explanation:** MS-DOS was a command-line OS — users typed text commands.
+
+73. Batch processing systems?
+   a) Use only smartphones
+   b) Have no OS
+   c) Replace file management
+   d) Process jobs in groups without direct user interaction
+   **Answer: d) Process jobs in groups without direct user interaction**
+   **Explanation:** Batch systems collected jobs and processed them together.
+
+74. Command `dir` in Command Prompt?
+   a) Lists files and folders
+   b) Deletes all files
+   c) Installs software
+   d) Opens Settings
+   **Answer: a) Lists files and folders**
+   **Explanation:** The dir command lists directory contents in Command Prompt.
+
+75. Command `ipconfig` shows?
+   a) File extensions
+   b) Network configuration
+   c) CPU temperature
+   d) Printer status
+   **Answer: b) Network configuration**
+   **Explanation:** ipconfig displays IP address and network adapter details.
+
+76. File extension `.exe` usually means?
+   a) Image file
+   b) Spreadsheet
+   c) Windows installer/program
+   d) Plain text file
+   **Answer: c) Windows installer/program**
+   **Explanation:** .exe and .msi files are common Windows program/installer formats.
+
+77. Hidden files in Windows are?
+   a) Always viruses
+   b) Deleted automatically
+   c) Only on Linux
+   d) Not shown by default to prevent accidental changes
+   **Answer: d) Not shown by default to prevent accidental changes**
+   **Explanation:** Hidden/system files are concealed to avoid accidental damage.
+
+78. Two-Factor Authentication (2FA) adds?
+   a) Extra verification step after password
+   b) A second monitor
+   c) More RAM
+   d) Automatic file delete
+   **Answer: a) Extra verification step after password**
+   **Explanation:** 2FA adds OTP, app code, or biometric verification after the password.
+
+79. Deleting a program folder manually is?
+   a) Required for updates
+   b) Not the same as proper uninstall
+   c) The recommended method
+   d) Same as Settings uninstall
+   **Answer: b) Not the same as proper uninstall**
+   **Explanation:** Manual folder delete leaves registry entries and shortcuts behind.
+
+80. Linux is popular on servers because it is?
+   a) A mobile-only OS
+   b) Stable, secure, and customizable
+   c) Only for games
+   d) Not connected to networks
+   **Answer: b) Stable, secure, and customizable**
+   **Explanation:** Linux is widely used on servers for stability, security, and flexibility.
 
 ## Short Answer Key
 
-1. Define key concept in Operating System.
-   **Ans:** See study notes summary section.
+1. What is an operating system?
+   **Ans:** System software that manages hardware and software resources and provides an interface for users and applications.
 
-2. List five important terms from Operating System.
-   **Ans:** Refer module study notes vocabulary.
+2. Write any five functions of an operating system.
+   **Ans:** Process management, memory management, file management, device management, security management, user interface management (any five).
 
-3. Name three practical tasks for Operating System.
-   **Ans:** See Section C practical checklist.
+3. Differentiate between GUI and CLI with examples.
+   **Ans:** GUI uses icons, menus, and mouse (Windows desktop). CLI uses typed commands (Command Prompt, PowerShell, Terminal).
 
-4. Why is Operating System important for CCC exam?
-   **Ans:** CCC tests digital literacy including this module.
+4. Differentiate between Windows and Linux.
+   **Ans:** Windows is proprietary, widely used on desktops. Linux is open source, used in distros like Ubuntu, popular on servers and cloud.
 
-5. Give two exam tips for Operating System.
-   **Ans:** Practice MCQs daily; do hands-on lab tasks.
+5. What is Ubuntu?
+   **Ans:** A beginner-friendly Linux distribution with GUI, file manager, apps, and Terminal — used on desktop and servers.
 
-6. Define key concept in Operating System.
-   **Ans:** See study notes summary section.
+6. What is a device driver?
+   **Ans:** Software that helps the OS communicate with hardware such as printer, scanner, or network adapter.
 
-7. List five important terms from Operating System.
-   **Ans:** Refer module study notes vocabulary.
+7. What is the difference between copy and move?
+   **Ans:** Copy (Ctrl+C/V) keeps the original; move/cut (Ctrl+X/V) removes the item from the original location.
 
-8. Name three practical tasks for Operating System.
-   **Ans:** See Section C practical checklist.
+8. What happens when you press Shift + Delete?
+   **Ans:** The file is permanently deleted without going to Recycle Bin.
 
-9. Why is Operating System important for CCC exam?
-   **Ans:** CCC tests digital literacy including this module.
+9. Why should software be installed from official websites?
+   **Ans:** Official sources reduce malware risk; cracked/pirated software may contain viruses, spyware, or ransomware.
 
-10. Give two exam tips for Operating System.
-   **Ans:** Practice MCQs daily; do hands-on lab tasks.
+10. Explain why Windows updates are important.
+   **Ans:** Updates fix security weaknesses, improve stability, remove bugs, and add features.
 
-11. Define key concept in Operating System.
-   **Ans:** See study notes summary section.
+11. What is Task Manager used for?
+   **Ans:** View running programs, check CPU/RAM/disk/network usage, end frozen apps, and manage startup programs.
 
-12. List five important terms from Operating System.
-   **Ans:** Refer module study notes vocabulary.
+12. What is the difference between administrator and standard user?
+   **Ans:** Administrator has full system control and can install software; standard user has limited permissions and is safer for daily use.
 
-13. Name three practical tasks for Operating System.
-   **Ans:** See Section C practical checklist.
+13. What is open-source software? Give two examples.
+   **Ans:** Software whose source code can be studied/modified under license. Examples: Linux, Ubuntu, LibreOffice, Firefox.
 
-14. Why is Operating System important for CCC exam?
-   **Ans:** CCC tests digital literacy including this module.
+14. Write five useful keyboard shortcuts for Windows.
+   **Ans:** Win+E (File Explorer), Win+L (lock), Ctrl+C/V/X (copy/paste/cut), Ctrl+Shift+Esc (Task Manager), Alt+Tab (switch apps) — any five from notes.
 
-15. Give two exam tips for Operating System.
-   **Ans:** Practice MCQs daily; do hands-on lab tasks.
+15. Why is backup important for files and folders?
+   **Ans:** Backup protects against accidental deletion, device failure, virus attack, and corruption.
 
 ## Practical Checklist Key
 
-1. Complete lab task 1 from Operating System study notes.
+1. Open File Explorer with Win+E; identify Navigation Pane, Address Bar, and Search Box.
    **Verify:** Trainer initials & date when demonstrated.
 
-2. Complete lab task 2 from Operating System study notes.
+2. Create folder structure `Documents\CCC\Unit2\Notes` and save a Notepad file.
    **Verify:** Trainer initials & date when demonstrated.
 
-3. Demonstrate skill to trainer on PC.
+3. Rename a file with F2; copy and move files using Ctrl+C/X and Ctrl+V.
    **Verify:** Trainer initials & date when demonstrated.
 
-4. Screenshot or checklist signed by trainer.
+4. Delete a test file and restore it from Recycle Bin.
    **Verify:** Trainer initials & date when demonstrated.
 
-5. Revise wrong MCQs from practice test.
+5. Take a screenshot with Snipping Tool and save as PNG.
    **Verify:** Trainer initials & date when demonstrated.
 
-6. Peer review exercise in lab.
+6. Open Task Manager (Ctrl+Shift+Esc) and note CPU and memory usage.
    **Verify:** Trainer initials & date when demonstrated.
 
-7. Timed 10-minute drill on key shortcuts.
+7. Create a compressed (zip) folder and compare file size.
    **Verify:** Trainer initials & date when demonstrated.
 
-8. Document steps in notebook.
+8. Open Settings (Win+I) and check Windows Update status.
    **Verify:** Trainer initials & date when demonstrated.
-

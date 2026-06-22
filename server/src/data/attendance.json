@@ -34,5 +34,11 @@
     "courseId": "practical-computer-lab",
     "date": "2026-06-14",
     "classesCount": 1
+  },
+  {
+    "studentId": "auth-1774146766572",
+    "courseId": "dca",
+    "date": "2026-06-15",
+    "classesCount": 1
   }
 ]

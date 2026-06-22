@@ -56,5 +56,13 @@
     "read": false,
     "createdAt": "2026-06-14T19:14:33.627Z",
     "type": "attendance_wallet"
+  },
+  {
+    "id": "stu-notif-1781498966594-0eca21",
+    "userId": "auth-1774146766572",
+    "message": "Attendance recorded for DCA (Basic Computer Course) on 2026-06-15. ₹10 deducted from wallet.",
+    "read": false,
+    "createdAt": "2026-06-15T04:49:26.594Z",
+    "type": "attendance_wallet"
   }
 ]
