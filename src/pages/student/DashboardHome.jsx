@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useEffect } from 'react'
 import { studentPortalApi } from '../../api/student'
+import CourseEmojiCover from '../../components/courses/CourseEmojiCover'
 
 const DEFAULT_BATCH_GROUP_URL = 'https://chat.whatsapp.com/G5HVGAshx7r7BYnz7PoeRs?mode=gi_t'
 
@@ -236,7 +237,7 @@ export default function DashboardHome() {
           {(coursesData?.allCourses || []).map((c) => (
             <div key={c.id} className="group overflow-hidden rounded-xl border border-gray-700 bg-gray-800 transition hover:border-gray-600">
               <div className="relative aspect-video bg-gray-700">
-                <img src="/qr-dummy.png" alt="" className="h-full w-full object-cover opacity-70" />
+                <CourseEmojiCover course={c} variant="dark" className="h-full w-full" />
                 <span className={`absolute left-2 top-2 rounded px-2 py-1 text-xs font-medium text-white ${c.status === 'locked' ? 'bg-red-600/90' : c.status === 'completed' ? 'bg-amber-600/90' : 'bg-emerald-600/90'}`}>
                   {c.status.toUpperCase()}
                 </span>

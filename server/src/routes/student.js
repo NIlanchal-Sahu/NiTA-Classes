@@ -26,6 +26,7 @@ import {
   isNonClassDay,
   walletDatesForUser,
 } from "../lib/odishaCalendar.js";
+import { persistPaymentReceiptScreenshot } from "../services/googleProfileSync.js";
 
 const router = Router();
 const PRICE_PER_CLASS = 10;
@@ -153,7 +154,8 @@ function getCourseCatalog() {
     .filter((c) => String(c.status || "active").toLowerCase() !== "draft")
     .map((c) => {
     const id = normalizeCourseId(c.id);
-    const image = typeof c.image === "string" ? c.image.trim() : "";
+    const imageRaw = typeof c.image === "string" ? c.image.trim() : "";
+    const image = imageRaw || `/courses/${id}.svg`;
     const isIncludedBenefit = !!c.isIncludedBenefit || id === LAB_COURSE_ID;
     return {
       id,
@@ -167,17 +169,18 @@ function getCourseCatalog() {
   });
   if (fromAcademy.length > 0) return fromAcademy;
   return [
-    { id: "dca", name: "DCA (Basic Computer Course)", unlockFee: 499 },
-    { id: "cca", name: "CCA (Computer Application)", unlockFee: 999 },
-    { id: "spoken-english-mastery", name: "Spoken English Mastery", unlockFee: 499 },
-    { id: "ai-associate", name: "AI Associate (Python)", unlockFee: 1499 },
-    { id: "ai-video-creation", name: "AI Video Creation Course", unlockFee: 499 },
-    { id: "ai-vibe-coding", name: "AI Vibe Coding", unlockFee: 999 },
+    { id: "dca", name: "DCA (Basic Computer Course)", unlockFee: 499, image: "/courses/dca.svg" },
+    { id: "cca", name: "CCA (Computer Application)", unlockFee: 999, image: "/courses/cca.svg" },
+    { id: "spoken-english-mastery", name: "Spoken English Mastery", unlockFee: 499, image: "/courses/spoken-english-mastery.svg" },
+    { id: "ai-associate", name: "AI Associate (Python)", unlockFee: 1499, image: "/courses/ai-associate.svg" },
+    { id: "ai-video-creation", name: "AI Video Creation Course", unlockFee: 499, image: "/courses/ai-video-creation.svg" },
+    { id: "ai-vibe-coding", name: "AI Vibe Coding", unlockFee: 999, image: "/courses/ai-vibe-coding.svg" },
     {
       id: LAB_COURSE_ID,
       name: "Practical Classes - Computer LAB",
       unlockFee: 0,
       isIncludedBenefit: true,
+      image: "/courses/practical-computer-lab.svg",
       description: "Hands-on LAB practice included with all courses except Spoken English.",
     },
   ];
@@ -1145,7 +1148,7 @@ router.get("/portal/fees", studentAuth, (req, res) => {
   });
 });
 
-router.post("/portal/payment-requests", studentAuth, (req, res) => {
+router.post("/portal/payment-requests", studentAuth, async (req, res) => {
   const { amount, platform, mode, screenshot, note } = req.body || {};
   const platformValue = String(platform || mode || "").trim();
   if (!amount || !platformValue) return res.status(400).json({ error: "amount and platform are required" });
@@ -1157,13 +1160,24 @@ router.post("/portal/payment-requests", studentAuth, (req, res) => {
     mode: platformValue,
     platform: platformValue,
     screenshot: screenshot || "",
+    receiptDriveUrl: "",
     note: String(note || ""),
     status: "pending",
     createdAt: new Date().toISOString(),
   };
+  const stored = await persistPaymentReceiptScreenshot({
+    requestId: next.id,
+    screenshot: next.screenshot,
+  });
+  next.receiptDriveUrl = stored.receiptDriveUrl || "";
+  next.screenshot = stored.screenshot || "";
   list.push(next);
   saveJson(PAYMENT_REQUESTS_PATH, list);
-  res.json({ success: true, request: next });
+  res.json({
+    success: true,
+    request: next,
+    receiptStoredOnDrive: !!next.receiptDriveUrl,
+  });
 });
 
 /** Student started wallet top-up: notify admin (name, contact, amounts). */

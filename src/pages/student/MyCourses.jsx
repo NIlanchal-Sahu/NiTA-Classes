@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { studentPortalApi } from '../../api/student'
+import CourseEmojiCover from '../../components/courses/CourseEmojiCover'
 
 export default function MyCourses() {
   const [courses, setCourses] = useState([])
@@ -57,7 +58,7 @@ export default function MyCourses() {
         {courses.map((c) => (
           <div key={c.id} className="overflow-hidden rounded-xl border border-gray-700 bg-gray-800">
             <div className="aspect-video bg-gray-700">
-              <img src="/qr-dummy.png" alt="" className="h-full w-full object-cover" />
+              <CourseEmojiCover course={c} variant="dark" className="h-full w-full" />
             </div>
             <div className="p-4">
               <h3 className="font-semibold text-white">{c.name}</h3>

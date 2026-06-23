@@ -246,6 +246,48 @@ export async function ensurePaymentReceiptsFolder() {
   return folderId
 }
 
+/** Convert Drive view/share links to embeddable preview URLs. */
+export function driveLinkToPreview(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  if (raw.startsWith('data:')) return raw
+  const m = raw.match(/\/file\/d\/([^/?#]+)/)
+  if (m) return `https://drive.google.com/file/d/${m[1]}/preview`
+  return raw
+}
+
+/** Best URL for admin/student receipt preview (Drive preview or inline data URL). */
+export function paymentReceiptPreviewUrl(record) {
+  if (record?.receiptDriveUrl) return driveLinkToPreview(record.receiptDriveUrl)
+  const shot = String(record?.screenshot || '')
+  if (shot.startsWith('data:')) return shot
+  if (shot.startsWith('http')) return driveLinkToPreview(shot)
+  return ''
+}
+
+/**
+ * Upload wallet payment screenshot to Drive when configured; clears base64 from stored record.
+ */
+export async function persistPaymentReceiptScreenshot({ requestId, screenshot }) {
+  const dataUrl = String(screenshot || '')
+  if (!dataUrl.startsWith('data:')) {
+    return { receiptDriveUrl: '', screenshot: dataUrl }
+  }
+  if (!isGoogleDriveReady()) {
+    return { receiptDriveUrl: '', screenshot: dataUrl }
+  }
+  try {
+    const folderId = await ensurePaymentReceiptsFolder()
+    if (!folderId) return { receiptDriveUrl: '', screenshot: dataUrl }
+    const ext = dataUrl.includes('image/png') ? 'png' : 'jpg'
+    const link = await uploadDataUrlToDrive(dataUrl, `receipt-${requestId}.${ext}`, folderId)
+    if (link) return { receiptDriveUrl: link, screenshot: '' }
+  } catch (e) {
+    console.warn('[googleProfileSync] payment receipt upload failed:', e.message)
+  }
+  return { receiptDriveUrl: '', screenshot: dataUrl }
+}
+
 const HEADERS = [
   'Updated At',
   'Full Name',

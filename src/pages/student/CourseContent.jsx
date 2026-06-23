@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import { studentPortalApi } from '../../api/student'
 import ChapterContentView from '../../components/student/ChapterContentView'
 import CourseContentNav, { buildFlatChapterList } from '../../components/student/CourseContentNav'
+import CourseUnlockModal from '../../components/student/CourseUnlockModal'
+import { useAuth } from '../../context/AuthContext'
 import {
   isAnswerKeyChapter,
   isNotesChapter,
@@ -190,6 +192,7 @@ function ProtectedBlock({ children, className = '' }) {
 
 export default function CourseContent() {
   const { courseId } = useParams()
+  const { user, refreshUser } = useAuth()
   const [data, setData] = useState(null)
   const [selectedChapterId, setSelectedChapterId] = useState('')
   const [loading, setLoading] = useState(false)
@@ -197,10 +200,29 @@ export default function CourseContent() {
   const [actionLoading, setActionLoading] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   const [readingMode, setReadingMode] = useState(false)
+  const [isCourseLocked, setIsCourseLocked] = useState(false)
+  const [courseMeta, setCourseMeta] = useState(null)
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false)
+  const [unlockLoading, setUnlockLoading] = useState(false)
+  const walletBalance = Number(user?.walletBalance) || 0
+
+  const loadCourseMeta = async () => {
+    try {
+      const out = await studentPortalApi.getCoursesLearning()
+      const match =
+        (out.allCourses || []).find((c) => String(c.id).toLowerCase() === String(courseId).toLowerCase()) ||
+        (out.enrolledCourses || []).find((c) => String(c.id).toLowerCase() === String(courseId).toLowerCase()) ||
+        null
+      setCourseMeta(match)
+    } catch {
+      setCourseMeta(null)
+    }
+  }
 
   const load = async () => {
     setLoading(true)
     setError('')
+    setIsCourseLocked(false)
     try {
       const out = await studentPortalApi.getCourseContent(courseId)
       setData(out)
@@ -208,9 +230,31 @@ export default function CourseContent() {
         (out.modules || []).flatMap((m) => m.chapters || []).find((c) => c.unlocked) || null
       setSelectedChapterId((prev) => prev || firstUnlocked?.id || '')
     } catch (e) {
-      setError(e.message || 'Failed to load course content')
+      const msg = e.message || 'Failed to load course content'
+      if (/locked/i.test(msg)) {
+        setIsCourseLocked(true)
+        setData(null)
+        await loadCourseMeta()
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const confirmUnlock = async () => {
+    setUnlockLoading(true)
+    setError('')
+    try {
+      await studentPortalApi.unlockCourse(courseId, true)
+      setUnlockModalOpen(false)
+      await refreshUser()
+      await load()
+    } catch (e) {
+      setError(e.message || 'Unlock failed')
+    } finally {
+      setUnlockLoading(false)
     }
   }
 
@@ -317,7 +361,7 @@ export default function CourseContent() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-white sm:text-2xl">Course Content</h1>
           <p className="mt-1 break-words text-sm text-gray-400">
-            {data?.course?.name || courseId}
+            {data?.course?.name || courseMeta?.name || courseId}
           </p>
         </div>
         <Link
@@ -352,7 +396,53 @@ export default function CourseContent() {
       )}
       {loading && <div className="mt-4 text-gray-400">Loading content…</div>}
 
-      {!loading && (data?.modules || []).length > 0 && (
+      {!loading && isCourseLocked && (
+        <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-6">
+          <h2 className="text-lg font-semibold text-white">Course is locked</h2>
+          <p className="mt-2 text-sm text-gray-300">
+            Unlock <span className="font-semibold text-white">{courseMeta?.name || courseId}</span> to access
+            chapters and study materials.
+          </p>
+          {courseMeta?.isIncludedBenefit ? (
+            <p className="mt-4 text-sm leading-relaxed text-gray-400">
+              Computer LAB is included when you enroll in any course except Spoken English. Unlock a qualifying course
+              from{' '}
+              <Link to="/student/explore" className="font-semibold text-violet-300 hover:text-violet-200">
+                Explore Courses
+              </Link>
+              .
+            </p>
+          ) : (
+            <>
+              <p className="mt-3 text-sm text-gray-300">
+                Unlock fee:{' '}
+                <span className="font-semibold text-white">₹{Number(courseMeta?.unlockFee) || 499}</span>
+                {' · '}
+                Wallet balance: <span className="font-semibold text-white">₹{walletBalance}</span>
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setUnlockModalOpen(true)}
+                  className="rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+                >
+                  Unlock Course
+                </button>
+                {walletBalance < (Number(courseMeta?.unlockFee) || 499) && (
+                  <Link
+                    to="/student/pay"
+                    className="rounded-lg border border-blue-500/50 bg-blue-600/20 px-5 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-600/30"
+                  >
+                    Add Balance to Wallet
+                  </Link>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {!loading && !isCourseLocked && (data?.modules || []).length > 0 && (
         <>
           <div className="sticky top-0 z-20 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-700 bg-gray-900/95 p-2 backdrop-blur lg:hidden">
             <button
@@ -542,10 +632,21 @@ export default function CourseContent() {
         </>
       )}
 
-      {!loading && (data?.modules || []).length === 0 && (
+      {!loading && !isCourseLocked && (data?.modules || []).length === 0 && (
         <div className="mt-6 rounded-xl border border-gray-700 bg-gray-800 p-5 text-sm text-gray-400">
           No chapter/content added yet for this course.
         </div>
+      )}
+
+      {unlockModalOpen && (
+        <CourseUnlockModal
+          courseName={courseMeta?.name || courseId}
+          unlockFee={Number(courseMeta?.unlockFee) || 499}
+          walletBalance={walletBalance}
+          confirming={unlockLoading}
+          onCancel={() => setUnlockModalOpen(false)}
+          onConfirm={confirmUnlock}
+        />
       )}
 
       {readingMode && supportsFocusMode && selected?.unlocked && (

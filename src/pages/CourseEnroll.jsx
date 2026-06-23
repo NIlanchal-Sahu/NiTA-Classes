@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getCourseById } from '../data/courseCatalog'
+import CourseEmojiCover from '../components/courses/CourseEmojiCover'
 import {
   createCoursePaymentOrder,
   getRazorpayKey,
@@ -195,12 +196,12 @@ export default function CourseEnroll() {
       </Link>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className={`flex items-center gap-4 bg-gradient-to-r ${course.bgClass} px-6 py-5`}>
-          <span className="text-4xl">{course.icon}</span>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{course.shortTitle || course.name}</h1>
-            <p className="text-sm text-gray-700">{course.level}</p>
-          </div>
+        <div className="relative aspect-[2.4/1] max-h-40 w-full bg-gray-100">
+          <CourseEmojiCover course={course} className="h-full w-full" />
+        </div>
+        <div className="border-b border-gray-100 px-6 py-4">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{course.shortTitle || course.name}</h1>
+          <p className="text-sm text-gray-700">{course.level}</p>
         </div>
 
         <div className="grid gap-6 p-6 lg:grid-cols-2">

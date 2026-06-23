@@ -6,8 +6,8 @@ import { verifyToken, adminResetStudentPassword, adminResetAdminPassword, hashPa
 import { readJsonSync, writeJsonSync } from '../services/sheetsJsonStore.js'
 import {
   isGoogleDriveReady,
-  ensurePaymentReceiptsFolder,
-  uploadDataUrlToDrive,
+  paymentReceiptPreviewUrl,
+  persistPaymentReceiptScreenshot,
 } from '../services/googleProfileSync.js'
 import { uploadChapterNotesBuffer } from '../services/courseContentDrive.js'
 import { onPaymentApproved } from '../services/eventTriggers.js'
@@ -1906,14 +1906,21 @@ router.post('/fees/payments', auth, allowRoles(['admin']), (req, res) => {
 
 router.get('/fees/payment-requests', auth, allowRoles(['admin', 'teacher']), (_req, res) => {
   const requests = loadJson(PATHS.paymentRequests, [])
-  const users = loadJson(PATHS.users, [])
-  const students = loadJson(PATHS.students, [])
   const enriched = requests.map((r) => {
     const { user: u, student: stu } = resolveAcademyStudentFromAuthUserId(r.authUserId)
     const name = stu?.name || u?.name || '—'
     const phone = stu?.phone || u?.mobile || u?.email || '—'
-    const viewUrl = r.receiptDriveUrl || r.screenshot || ''
-    return { ...r, studentName: name, studentPhone: phone, studentAcademyId: stu?.id || '', receiptViewUrl: viewUrl }
+    const receiptPreviewUrl = paymentReceiptPreviewUrl(r)
+    const { screenshot: _omit, ...rest } = r
+    return {
+      ...rest,
+      studentName: name,
+      studentPhone: phone,
+      studentAcademyId: stu?.id || '',
+      receiptPreviewUrl,
+      receiptViewUrl: r.receiptDriveUrl || receiptPreviewUrl || '',
+      hasReceipt: !!receiptPreviewUrl,
+    }
   })
   res.json({ requests: enriched.slice().reverse() })
 })
@@ -1970,20 +1977,13 @@ router.post('/fees/payment-requests/:id/approve', auth, allowRoles(['admin']), a
     saveJson(PATHS.fees, fees)
   }
 
-  if (String(row.screenshot || '').startsWith('data:') && isGoogleDriveReady()) {
-    try {
-      const folderId = await ensurePaymentReceiptsFolder()
-      if (folderId) {
-        const ext = String(row.screenshot).includes('image/png') ? 'png' : 'jpg'
-        const link = await uploadDataUrlToDrive(row.screenshot, `receipt-${row.id}.${ext}`, folderId)
-        if (link) {
-          row.receiptDriveUrl = link
-          row.screenshot = ''
-        }
-      }
-    } catch (e) {
-      console.warn('[academy] Drive receipt upload failed:', e.message)
-    }
+  if (!row.receiptDriveUrl && String(row.screenshot || '').startsWith('data:')) {
+    const stored = await persistPaymentReceiptScreenshot({
+      requestId: row.id,
+      screenshot: row.screenshot,
+    })
+    row.receiptDriveUrl = stored.receiptDriveUrl || row.receiptDriveUrl || ''
+    row.screenshot = stored.screenshot || ''
   }
 
   if (academyStudent && credited > 0) {

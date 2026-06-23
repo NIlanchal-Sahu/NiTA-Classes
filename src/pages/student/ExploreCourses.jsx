@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { studentPortalApi } from '../../api/student'
+import CourseUnlockModal from '../../components/student/CourseUnlockModal'
 
 /** Renders academy course description: section titles 【】, bullets •, paragraphs. */
 function CourseDescriptionBody({ text }) {
@@ -52,6 +53,7 @@ export default function ExploreCourses() {
   const [error, setError] = useState('')
   const [unlockModal, setUnlockModal] = useState(null) // { id, name, unlockFee }
   const [infoModal, setInfoModal] = useState(null) // course object for details popup
+  const [unlockLoading, setUnlockLoading] = useState(false)
   const walletBalance = Number(user?.walletBalance) || 0
 
   const load = async () => {
@@ -74,6 +76,7 @@ export default function ExploreCourses() {
 
   const confirmUnlock = async () => {
     if (!unlockModal) return
+    setUnlockLoading(true)
     setError('')
     try {
       await studentPortalApi.unlockCourse(unlockModal.id, true)
@@ -82,6 +85,8 @@ export default function ExploreCourses() {
       await load()
     } catch (e) {
       setError(e.message || 'Unlock failed')
+    } finally {
+      setUnlockLoading(false)
     }
   }
 
@@ -242,39 +247,14 @@ export default function ExploreCourses() {
       )}
 
       {unlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-800 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">Unlock course?</h3>
-            <p className="mt-2 text-sm text-gray-300">
-              <span className="font-semibold text-white">{unlockModal.name}</span>
-            </p>
-            <p className="mt-2 text-sm text-amber-300">
-              Course unlock fee ₹{unlockModal.unlockFee} will be deducted from wallet.
-            </p>
-            {walletBalance < unlockModal.unlockFee && (
-              <p className="mt-2 text-sm text-red-300">
-                Insufficient wallet balance. Please add balance first.
-              </p>
-            )}
-            <div className="mt-6 flex gap-3">
-              <button type="button" onClick={() => setUnlockModal(null)} className="flex-1 rounded-lg border border-gray-600 py-2.5 font-medium text-gray-300 hover:bg-gray-700">
-                Cancel
-              </button>
-              {walletBalance < unlockModal.unlockFee ? (
-                <Link
-                  to="/student/pay"
-                  className="flex-1 rounded-lg bg-blue-600 py-2.5 text-center font-medium text-white hover:bg-blue-700"
-                >
-                  Add Balance
-                </Link>
-              ) : (
-                <button type="button" onClick={confirmUnlock} className="flex-1 rounded-lg bg-violet-600 py-2.5 font-medium text-white hover:bg-violet-700">
-                  Confirm Unlock
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <CourseUnlockModal
+          courseName={unlockModal.name}
+          unlockFee={unlockModal.unlockFee}
+          walletBalance={walletBalance}
+          confirming={unlockLoading}
+          onCancel={() => setUnlockModal(null)}
+          onConfirm={confirmUnlock}
+        />
       )}
     </>
   )

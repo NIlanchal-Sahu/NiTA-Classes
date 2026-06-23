@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { academyApi } from '../api/adminAcademy'
+import PaymentReceiptReviewModal from './PaymentReceiptReviewModal'
 
 const ATTEMPTS_PAGE_SIZE = 10
 
@@ -12,6 +13,8 @@ export default function AdminFees() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [attemptsPage, setAttemptsPage] = useState(1)
+  const [reviewRequest, setReviewRequest] = useState(null)
+  const [approvingId, setApprovingId] = useState('')
   const [form, setForm] = useState({
     studentId: '',
     amount: '',
@@ -82,6 +85,20 @@ export default function AdminFees() {
     }
   }
 
+  const approveRequest = async (id) => {
+    setApprovingId(id)
+    setError('')
+    try {
+      await academyApi.approvePaymentRequest(id)
+      setReviewRequest(null)
+      await refresh()
+    } catch (e) {
+      setError(e.message || 'Failed to approve')
+    } finally {
+      setApprovingId('')
+    }
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-white">Fees & Payments</h1>
@@ -144,32 +161,24 @@ export default function AdminFees() {
                     {r.status === 'pending' ? (
                       <button
                         type="button"
-                        onClick={async () => {
-                          try {
-                            await academyApi.approvePaymentRequest(r.id)
-                            await refresh()
-                          } catch (e) {
-                            setError(e.message || 'Failed to approve')
-                          }
-                        }}
+                        onClick={() => setReviewRequest(r)}
                         className="rounded bg-emerald-700 px-2 py-1 text-xs text-white hover:bg-emerald-600"
                       >
-                        Approve + Add Wallet
+                        Review & Approve
                       </button>
                     ) : (
                       <span className="text-xs text-emerald-300">Approved</span>
                     )}
                   </td>
                   <td className="px-3 py-3">
-                    {r.receiptViewUrl || r.receiptDriveUrl || r.screenshot ? (
-                      <a
-                        href={r.receiptViewUrl || r.receiptDriveUrl || r.screenshot}
-                        target="_blank"
-                        rel="noreferrer"
+                    {r.hasReceipt || r.receiptPreviewUrl || r.receiptViewUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setReviewRequest(r)}
                         className="text-xs text-violet-300 hover:underline"
                       >
-                        View receipt
-                      </a>
+                        Preview receipt
+                      </button>
                     ) : (
                       <span className="text-xs text-gray-500">—</span>
                     )}
@@ -301,6 +310,17 @@ export default function AdminFees() {
           </div>
         )}
       </div>
+
+      {reviewRequest && (
+        <PaymentReceiptReviewModal
+          request={reviewRequest}
+          approving={approvingId === reviewRequest.id}
+          onClose={() => {
+            if (!approvingId) setReviewRequest(null)
+          }}
+          onApprove={() => approveRequest(reviewRequest.id)}
+        />
+      )}
     </div>
   )
 }
