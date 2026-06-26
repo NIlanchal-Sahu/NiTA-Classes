@@ -10,6 +10,7 @@
     "test:razorpay": "node scripts/test-razorpay-local.mjs",
     "sync:users:merge": "node scripts/merge-users-to-sheet.mjs",
     "sync:dca-ccc-lms": "node scripts/sync-dca-ccc-lms.mjs",
+    "sync:cca-lms": "node scripts/sync-cca-lms.mjs",
     "generate:dca-ccc-mcqs": "node scripts/generate-dca-ccc-mcqs.mjs",
     "build:dca-ccc-pdf": "node scripts/build-dca-ccc-pdf-one-by-one.mjs",
     "smoke:dca-ccc": "node scripts/smoke-test-dca-ccc.mjs",

@@ -14,8 +14,8 @@
   {
     "id": "cca",
     "name": "CCA (Computer Application - PGDCA / O Level)",
-    "description": "",
-    "duration": "",
+    "description": "Advanced computer application program (PGDCA / O Level equivalent).\n\n【 Foundation 】Modules 1–6: computer fundamentals, OS, Word, Excel, PowerPoint, Internet (shared enhanced study pack)\n\n【 Coming soon 】CCA-specific modules: programming, networking, web development, Tally, project work",
+    "duration": "600 Hours",
     "status": "active",
     "image": "/courses/cca.svg",
     "priceType": "perClass10",
