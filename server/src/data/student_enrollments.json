@@ -73,5 +73,16 @@
     "startDate": "2026-06-14",
     "expiresAt": "2026-09-12",
     "createdAt": "2026-06-14T18:47:31.367Z"
+  },
+  {
+    "id": "enr-1782447714811",
+    "studentId": "NITA20260322GJUTZH",
+    "courseId": "cca",
+    "batchId": "",
+    "note": "Course unlocked from wallet. Fee deducted ₹999",
+    "status": "active",
+    "startDate": "2026-06-26",
+    "expiresAt": "2026-12-23",
+    "createdAt": "2026-06-26T04:21:54.811Z"
   }
 ]

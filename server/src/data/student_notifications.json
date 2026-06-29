@@ -64,5 +64,35 @@
     "read": false,
     "createdAt": "2026-06-15T04:49:26.594Z",
     "type": "attendance_wallet"
+  },
+  {
+    "id": "stu-notif-1782308075732-da099f",
+    "userId": "auth-1774146766572",
+    "message": "Attendance recorded for DCA (Basic Computer Course) on 2026-06-24. ₹10 deducted from wallet.",
+    "read": false,
+    "createdAt": "2026-06-24T13:34:35.732Z",
+    "type": "attendance_wallet"
+  },
+  {
+    "id": "stu-notif-1782447662484-10b809",
+    "userId": "auth-1774146766572",
+    "title": "Payment approved",
+    "message": "₹600 has been added to your wallet. Your payment request was approved.",
+    "read": true,
+    "popup": true,
+    "type": "payment_approved",
+    "createdAt": "2026-06-26T04:21:02.484Z",
+    "meta": {
+      "paymentRequestId": "payreq-1781462825791",
+      "credited": 600
+    }
+  },
+  {
+    "id": "stu-notif-1782447714813-bf61e2",
+    "userId": "auth-1774146766572",
+    "message": "Course unlocked: CCA (Computer Application - PGDCA / O Level). ₹999 deducted from your wallet.",
+    "read": false,
+    "createdAt": "2026-06-26T04:21:54.813Z",
+    "type": "course_unlock"
   }
 ]

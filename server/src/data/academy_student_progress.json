@@ -35,5 +35,15 @@
     ],
     "createdAt": "2026-06-14T18:49:38.530Z",
     "updatedAt": "2026-06-22T03:45:28.254Z"
+  },
+  {
+    "id": "prog-1782447749868",
+    "studentId": "NITA20260322GJUTZH",
+    "courseId": "cca",
+    "completedChapterIds": [
+      "ch-cca-01-notes"
+    ],
+    "createdAt": "2026-06-26T04:22:29.868Z",
+    "updatedAt": "2026-06-26T04:22:29.868Z"
   }
 ]

@@ -19,5 +19,49 @@
     "markedBy": "admin-1",
     "createdAt": "2026-03-23T10:01:49.207Z",
     "updatedAt": "2026-03-23T10:02:00.532Z"
+  },
+  {
+    "id": "att-1782308551996-868a6",
+    "date": "2026-03-22",
+    "batchId": "batch-1774229789714",
+    "courseId": "spoken-english-mastery",
+    "studentId": "NITA20260322GJUTZH",
+    "status": "present",
+    "markedBy": "wallet:backfill",
+    "syncedFromWallet": true,
+    "createdAt": "2026-06-24T13:42:31.997Z"
+  },
+  {
+    "id": "att-1782308552001-08763",
+    "date": "2026-06-14",
+    "batchId": "batch-1774229789714",
+    "courseId": "practical-computer-lab",
+    "studentId": "NITA20260322GJUTZH",
+    "status": "present",
+    "markedBy": "wallet:backfill",
+    "syncedFromWallet": true,
+    "createdAt": "2026-06-24T13:42:32.001Z"
+  },
+  {
+    "id": "att-1782308552004-239e8",
+    "date": "2026-06-15",
+    "batchId": "batch-1774229789714",
+    "courseId": "dca",
+    "studentId": "NITA20260322GJUTZH",
+    "status": "present",
+    "markedBy": "wallet:backfill",
+    "syncedFromWallet": true,
+    "createdAt": "2026-06-24T13:42:32.004Z"
+  },
+  {
+    "id": "att-1782308552005-11ec7",
+    "date": "2026-06-24",
+    "batchId": "batch-1774229789714",
+    "courseId": "dca",
+    "studentId": "NITA20260322GJUTZH",
+    "status": "present",
+    "markedBy": "wallet:backfill",
+    "syncedFromWallet": true,
+    "createdAt": "2026-06-24T13:42:32.005Z"
   }
 ]

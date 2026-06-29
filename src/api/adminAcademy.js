@@ -79,6 +79,22 @@ export const academyApi = {
       : `month=${encodeURIComponent(raw)}${batchId ? `&batchId=${encodeURIComponent(batchId)}` : ''}`
     return request(`/attendance/report/monthly?${qs}`, { headers: headers(false) })
   },
+  getAttendanceDashboard: (query = '') =>
+    request(`/attendance/dashboard${query ? `?${query}` : ''}`, { headers: headers(false) }),
+  searchAttendanceStudents: (q) =>
+    request(`/attendance/search?q=${encodeURIComponent(q || '')}`, { headers: headers(false) }),
+  getStudentAttendanceAnalytics: (id, query = '') =>
+    request(`/attendance/students/${encodeURIComponent(id)}/analytics${query ? `?${query}` : ''}`, {
+      headers: headers(false),
+    }),
+  getAttendanceOffDays: (query = '') =>
+    request(`/attendance/off-days${query ? `?${query}` : ''}`, { headers: headers(false) }),
+  markAttendanceOffDay: (body) =>
+    request('/attendance/off-days', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),
+  deleteAttendanceOffDay: (date) =>
+    request(`/attendance/off-days/${encodeURIComponent(date)}`, { method: 'DELETE', headers: headers(false) }),
+  syncWalletAttendance: () =>
+    request('/attendance/sync-wallet', { method: 'POST', headers: headers(), body: JSON.stringify({}) }),
 
   getFees: (studentId = '') => request(`/fees${studentId ? `?studentId=${encodeURIComponent(studentId)}` : ''}`, { headers: headers(false) }),
   createPayment: (body) => request('/fees/payments', { method: 'POST', headers: headers(), body: JSON.stringify(body) }),

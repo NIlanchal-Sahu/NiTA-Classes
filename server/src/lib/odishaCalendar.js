@@ -186,9 +186,19 @@ export function countSchoolDaysInMonth(ym, untilDate = null) {
 }
 
 /**
- * School-day streak: consecutive class days attended; Sundays & Odisha holidays do not break the streak.
+ * School-day streak: consecutive class days attended.
+ * Skips Sundays, Odisha holidays, admin off days, and days before enrollStartDate.
  */
-export function computeSchoolDayStreak(attendedDates, asOfDate) {
+function isStreakSkippableDay(dateStr, { adminOffDays = [], enrollStartDate = null } = {}) {
+  const d = String(dateStr || '').slice(0, 10);
+  if (!d) return true;
+  const enrollStart = enrollStartDate ? String(enrollStartDate).slice(0, 10) : null;
+  if (enrollStart && d < enrollStart) return true;
+  if ((adminOffDays || []).some((x) => String(x.date || '').slice(0, 10) === d)) return true;
+  return isNonClassDay(d);
+}
+
+export function computeSchoolDayStreak(attendedDates, asOfDate, options = {}) {
   const attended = new Set(
     (attendedDates || []).map((d) => String(d || '').slice(0, 10)).filter(Boolean),
   );
@@ -197,7 +207,7 @@ export function computeSchoolDayStreak(attendedDates, asOfDate) {
   let cursor = String(asOfDate || '').slice(0, 10);
   if (!cursor) return 0;
 
-  if (!isNonClassDay(cursor) && !attended.has(cursor)) {
+  if (!isStreakSkippableDay(cursor, options) && !attended.has(cursor)) {
     cursor = addDays(cursor, -1);
   }
 
@@ -205,7 +215,7 @@ export function computeSchoolDayStreak(attendedDates, asOfDate) {
   let guard = 0;
   while (cursor && guard < 400) {
     guard += 1;
-    if (isNonClassDay(cursor)) {
+    if (isStreakSkippableDay(cursor, options)) {
       cursor = addDays(cursor, -1);
       continue;
     }
@@ -220,7 +230,7 @@ export function computeSchoolDayStreak(attendedDates, asOfDate) {
 }
 
 /** Longest school-day streak within a calendar month. */
-export function computeSchoolDayStreakInMonth(attendedDates, ym, asOfDate) {
+export function computeSchoolDayStreakInMonth(attendedDates, ym, asOfDate, options = {}) {
   const attended = new Set(
     (attendedDates || [])
       .map((d) => String(d || '').slice(0, 10))
@@ -235,7 +245,7 @@ export function computeSchoolDayStreakInMonth(attendedDates, ym, asOfDate) {
   if (monthKey(end) !== ym || end > monthEnd) end = monthEnd;
   if (monthKey(end) !== ym) end = monthEnd;
 
-  return computeSchoolDayStreak([...attended], end);
+  return computeSchoolDayStreak([...attended], end, options);
 }
 
 export function walletDatesForUser(walletRows, userId, month = null) {

@@ -23,8 +23,6 @@ export default function Admission() {
     highestQualification: '',
     villageCity: '',
     gender: '',
-    fatherName: '',
-    school: '',
     referralCode: '',
   })
   const [errors, setErrors] = useState({})
@@ -113,8 +111,6 @@ export default function Admission() {
         highestQualification: '',
         villageCity: '',
         gender: '',
-        fatherName: '',
-        school: '',
         referralCode: '',
       })
     } catch (err) {
@@ -237,19 +233,6 @@ export default function Admission() {
         </div>
 
         <div>
-          <label htmlFor="school" className="block text-sm font-medium text-gray-700">School / College</label>
-          <input
-            id="school"
-            name="school"
-            type="text"
-            value={form.school}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            placeholder="School or college name"
-          />
-        </div>
-
-        <div>
           <label htmlFor="highestQualification" className="block text-sm font-medium text-gray-700">Highest Qualification *</label>
           <select
             id="highestQualification"
@@ -301,20 +284,6 @@ export default function Admission() {
             <option value="Other">Other</option>
           </select>
           {errors.gender && <p className="mt-1 text-sm text-red-600">{errors.gender}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700">Father Name (optional)</label>
-          <input
-            id="fatherName"
-            name="fatherName"
-            type="text"
-            value={form.fatherName}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            placeholder="Father full name"
-          />
-          {errors.fatherName && <p className="mt-1 text-sm text-red-600">{errors.fatherName}</p>}
         </div>
 
         <div>

@@ -1,1 +1,14 @@
-﻿[]
+[
+  {
+    "id": "fee-1782447662454-618f",
+    "studentId": "NITA20260322GJUTZH",
+    "amount": 600,
+    "date": "2026-06-14",
+    "mode": "upi",
+    "feeStatus": "paid",
+    "note": "Wallet top-up (approved request payreq-1781462825791)",
+    "paymentRequestId": "payreq-1781462825791",
+    "source": "wallet_topup_request",
+    "createdAt": "2026-06-26T04:21:02.455Z"
+  }
+]

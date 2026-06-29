@@ -12,6 +12,19 @@ import {
 import { uploadChapterNotesBuffer } from '../services/courseContentDrive.js'
 import { onPaymentApproved } from '../services/eventTriggers.js'
 import { sanitizeQuizData, sanitizeReferences, findAnswerKeyChapter } from '../lib/chapterExtras.js'
+import {
+  aggregateAttendanceStats,
+  buildDailyTrendForMonth,
+  buildMonthlyTrend,
+  computeStudentAttendanceStats,
+  searchStudents as searchStudentsByQuery,
+} from '../lib/attendanceStats.js'
+import {
+  authUserIdForStudent,
+  mergeStudentAttendanceRecords,
+  syncWalletHistoryToAcademy,
+} from '../lib/attendanceSync.js'
+import { getHolidaysForMonth } from '../lib/odishaCalendar.js'
 
 const router = Router()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -56,6 +69,7 @@ const PATHS = {
   referralPartners: join(__dirname, '..', 'data', 'referrals.json'),
   referralPayouts: join(__dirname, '..', 'data', 'referral_payouts.json'),
   referralReviewRequests: join(__dirname, '..', 'data', 'referral_review_requests.json'),
+  adminOffDays: join(__dirname, '..', 'data', 'admin_off_days.json'),
 }
 
 function loadJson(path, fallback = []) {
@@ -311,6 +325,55 @@ function batchMemberCount(students, batchId) {
   return students.filter((s) => getStudentBatchIds(s).includes(bid)).length
 }
 
+function studentsMatchingScope(students, { batchId, studentId, courseId, enrollments }) {
+  let list = students
+  if (studentId) list = list.filter((s) => String(s.id) === String(studentId))
+  if (batchId) list = list.filter((s) => getStudentBatchIds(s).includes(String(batchId)))
+  if (courseId) {
+    const cid = normCourseId(courseId)
+    list = list.filter(
+      (s) =>
+        normCourseId(s.courseEnrolled) === cid ||
+        enrollments.some(
+          (e) => String(e.studentId) === String(s.id) && normCourseId(e.courseId) === cid,
+        ),
+    )
+  }
+  return list
+}
+
+function statsForStudents(
+  students,
+  records,
+  enrollments,
+  adminOffDays,
+  walletRecords,
+  users,
+  { month, courseId } = {},
+) {
+  return students.map((student) => {
+    const authUserId = authUserIdForStudent(student, users)
+    const merged = mergeStudentAttendanceRecords({
+      student,
+      authUserId,
+      academyRows: records,
+      walletRows: walletRecords,
+    })
+    let studentRecords = merged
+    if (courseId) {
+      studentRecords = studentRecords.filter((r) => normCourseId(r.courseId) === normCourseId(courseId))
+    }
+    return computeStudentAttendanceStats({
+      student,
+      attendanceRecords: studentRecords,
+      enrollments,
+      adminOffDays,
+      month: month || null,
+      inferAbsentFromUnpaid: true,
+    })
+  })
+}
+
 /** Map batch teacher slot (id or legacy username) to users.json teacher id. */
 function resolveTeacherUserIdForAutomation(candidateId, users) {
   const teachers = users.filter((u) => u.role === 'teacher' && String(u.status || 'active').toLowerCase() !== 'inactive')
@@ -553,35 +616,34 @@ router.get('/students/:id/dashboard-view', auth, allowRoles(['admin', 'teacher']
   const walletAttendance = loadJson(PATHS.walletAttendance, [])
   const academyAttendance = loadJson(PATHS.attendance, [])
   const enrollments = loadJson(PATHS.enrollments, [])
+  const adminOffDays = loadJson(PATHS.adminOffDays, [])
 
   const today = parseDate(new Date().toISOString())
   const currentMonth = monthKey(today)
-  const attendanceRows = academyAttendance.filter((a) => String(a.studentId) === String(student.id))
-  const monthRows = attendanceRows.filter((a) => monthKey(a.date) === currentMonth)
-  const monthPresent = monthRows.filter((a) => String(a.status) === 'present').length
-  const monthAttendancePct = monthRows.length ? Math.round((monthPresent / monthRows.length) * 100) : 0
-
-  const unlockByCourse = new Map()
-  for (const e of enrollments) {
-    if (String(e.studentId) !== String(student.id)) continue
-    const cid = normCourseId(e.courseId)
-    if (!cid || cid === 'trial-course') continue
-    const start = parseDate(e.startDate || e.createdAt || '')
-    if (!start) continue
-    if (!unlockByCourse.has(cid) || start < unlockByCourse.get(cid)) unlockByCourse.set(cid, start)
-  }
-  const conducted = new Set()
-  const present = new Set()
-  for (const r of attendanceRows) {
-    const cid = normCourseId(r.courseId)
-    const unlockDate = unlockByCourse.get(cid)
-    const date = parseDate(r.date)
-    if (!cid || !unlockDate || !date || date < unlockDate) continue
-    const key = `${cid}|${date}`
-    conducted.add(key)
-    if (String(r.status) === 'present') present.add(key)
-  }
-  const attendancePct = conducted.size ? Math.round((present.size / conducted.size) * 100) : 0
+  const authUserId = authUserIdForStudent(student, users)
+  const merged = mergeStudentAttendanceRecords({
+    student,
+    authUserId,
+    academyRows: academyAttendance,
+    walletRows: walletAttendance,
+  })
+  const lifetimeStats = computeStudentAttendanceStats({
+    student,
+    attendanceRecords: merged,
+    enrollments,
+    adminOffDays,
+    inferAbsentFromUnpaid: true,
+  })
+  const monthStats = computeStudentAttendanceStats({
+    student,
+    attendanceRecords: merged,
+    enrollments,
+    adminOffDays,
+    month: currentMonth,
+    inferAbsentFromUnpaid: true,
+  })
+  const monthAttendancePct = monthStats.percentage
+  const attendancePct = lifetimeStats.percentage
 
   const totalClassesAttended = walletAttendance
     .filter((x) => String(x.studentId) === String(student.accountUserId || ''))
@@ -594,8 +656,8 @@ router.get('/students/:id/dashboard-view', auth, allowRoles(['admin', 'teacher']
     totalClassesAttended,
     attendancePercentage: attendancePct,
     monthlyAttendancePercentage: monthAttendancePct,
-    classesConductedCount: conducted.size,
-    classesPresentCount: present.size,
+    classesConductedCount: lifetimeStats.conducted,
+    classesPresentCount: lifetimeStats.attended,
     feeStatus: String(student.enrollmentFeeStatus || 'pending'),
     batchId: String(student.batchId || ''),
     courseId: String(student.courseEnrolled || ''),
@@ -1853,25 +1915,226 @@ router.get('/attendance/report/monthly', auth, allowRoles(['admin', 'teacher']),
     if (unlockedOnly && !hasEnrollment(r.studentId, recCourse)) return false
     return true
   })
-  const byStudent = {}
-  for (const r of filtered) {
-    byStudent[r.studentId] ||= { present: 0, absent: 0, total: 0, studentId: r.studentId, name: '', phone: '' }
-    byStudent[r.studentId].total += 1
-    byStudent[r.studentId][r.status] += 1
-  }
-  const rows = Object.keys(byStudent).map((sid) => {
-    const x = byStudent[sid]
-    const s = studentsById.get(String(sid))
-    const percentage = x.total ? Math.round((x.present / x.total) * 100) : 0
+  const adminOffDays = loadJson(PATHS.adminOffDays, [])
+  const scopedStudents = studentsMatchingScope(students, {
+    batchId,
+    courseId,
+    enrollments,
+  }).filter((s) => {
+    if (mobile && normalizePhone(s.phone) !== mobile) return false
+    return true
+  })
+  const statsByStudent = new Map(
+    statsForStudents(scopedStudents, records, enrollments, adminOffDays, loadJson(PATHS.walletAttendance, []), loadJson(PATHS.users, []), { month, courseId }).map((x) => [
+      x.studentId,
+      x,
+    ]),
+  )
+  const rows = scopedStudents.map((s) => {
+    const stats = statsByStudent.get(s.id) || {
+      conducted: 0,
+      attended: 0,
+      absent: 0,
+      unmarked: 0,
+      percentage: 0,
+    }
+    const percentage = stats.conducted ? stats.percentage : 0
     return {
-      ...x,
-      name: s?.name || sid,
-      phone: s?.phone || '',
+      studentId: s.id,
+      name: s.name || s.id,
+      phone: s.phone || '',
+      present: stats.attended,
+      absent: stats.absent,
+      total: stats.conducted,
+      conducted: stats.conducted,
+      attended: stats.attended,
+      unmarked: stats.unmarked,
       percentage,
       below75: percentage < 75,
     }
   })
-  res.json({ month, batchId: batchId || null, report: rows })
+  res.json({ month, batchId: batchId || null, report: rows.sort((a, b) => a.name.localeCompare(b.name)) })
+})
+
+router.get('/attendance/dashboard', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const month = String(req.query.month || '').trim() || null
+  const batchId = String(req.query.batchId || '')
+  const studentId = String(req.query.studentId || '')
+  const courseId = String(req.query.courseId || '')
+  const students = loadJson(PATHS.students, [])
+  const records = loadJson(PATHS.attendance, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const adminOffDays = loadJson(PATHS.adminOffDays, [])
+  const batches = loadJson(PATHS.batches, [])
+  const walletRecords = loadJson(PATHS.walletAttendance, [])
+  const users = loadJson(PATHS.users, [])
+  const scoped = studentsMatchingScope(students, { batchId, studentId, courseId, enrollments })
+  const studentStats = statsForStudents(scoped, records, enrollments, adminOffDays, walletRecords, users, {
+    month,
+    courseId,
+  }).map(
+    (stats) => {
+      const student = students.find((s) => String(s.id) === String(stats.studentId))
+      return {
+        ...stats,
+        name: student?.name || stats.studentId,
+        phone: student?.phone || '',
+        batchIds: getStudentBatchIds(student),
+      }
+    },
+  )
+  const overall = aggregateAttendanceStats(studentStats)
+  const batchBreakdown = batchId
+    ? []
+    : batches.map((b) => {
+        const batchStudents = students.filter((s) => getStudentBatchIds(s).includes(String(b.id)))
+        const batchStats = statsForStudents(
+          batchStudents,
+          records,
+          enrollments,
+          adminOffDays,
+          walletRecords,
+          users,
+          { month, courseId },
+        )
+        return {
+          batchId: b.id,
+          batchName: b.name || b.id,
+          courseId: b.courseId || '',
+          ...aggregateAttendanceStats(batchStats),
+        }
+      })
+  res.json({
+    month: month || 'all',
+    overall,
+    studentStats,
+    batchBreakdown: batchBreakdown.sort((a, b) => String(a.batchName).localeCompare(String(b.batchName))),
+  })
+})
+
+router.get('/attendance/search', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const q = String(req.query.q || '').trim()
+  const students = loadJson(PATHS.students, [])
+  const matches = searchStudentsByQuery(students, q).slice(0, 25)
+  res.json({
+    students: matches.map((s) => ({
+      id: s.id,
+      name: s.name || '',
+      phone: s.phone || '',
+      admissionDate: s.admissionDate || s.createdAt || '',
+      batchIds: getStudentBatchIds(s),
+      courseEnrolled: s.courseEnrolled || '',
+    })),
+  })
+})
+
+router.get('/attendance/students/:id/analytics', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const students = loadJson(PATHS.students, [])
+  const student = students.find((s) => String(s.id) === String(req.params.id))
+  if (!student) return res.status(404).json({ error: 'Student not found' })
+  const month = String(req.query.month || '').trim() || null
+  const records = loadJson(PATHS.attendance, [])
+  const enrollments = loadJson(PATHS.enrollments, [])
+  const adminOffDays = loadJson(PATHS.adminOffDays, [])
+  const courses = loadJson(PATHS.courses, [])
+  const walletRecords = loadJson(PATHS.walletAttendance, [])
+  const users = loadJson(PATHS.users, [])
+  const courseMap = new Map(courses.map((c) => [normCourseId(c.id), c.name || c.id]))
+  const studentRecords = records.filter((r) => String(r.studentId) === String(student.id))
+  const authUserId = authUserIdForStudent(student, users)
+  const mergedRecords = mergeStudentAttendanceRecords({
+    student,
+    authUserId,
+    academyRows: studentRecords,
+    walletRows: walletRecords,
+  })
+  const lifetime = computeStudentAttendanceStats({
+    student,
+    attendanceRecords: mergedRecords,
+    enrollments,
+    adminOffDays,
+    inferAbsentFromUnpaid: true,
+  })
+  const monthly = month
+    ? computeStudentAttendanceStats({
+        student,
+        attendanceRecords: mergedRecords,
+        enrollments,
+        adminOffDays,
+        month,
+        inferAbsentFromUnpaid: true,
+      })
+    : null
+  const monthlyTrend = buildMonthlyTrend(student, mergedRecords, enrollments, adminOffDays, 6)
+  const calendarMonth = month || monthKey(new Date().toISOString())
+  const dailyTrend = buildDailyTrendForMonth(calendarMonth, student, mergedRecords, adminOffDays, {
+    rangeStart: lifetime.rangeStart,
+    rangeEnd: lifetime.rangeEnd,
+    inferAbsentFromUnpaid: true,
+  })
+  res.json({
+    student: {
+      id: student.id,
+      name: student.name || '',
+      phone: student.phone || '',
+      admissionDate: lifetime.admissionDate,
+      batchIds: getStudentBatchIds(student),
+    },
+    lifetime,
+    monthly,
+    monthlyTrend,
+    dailyTrend,
+    courses: (lifetime.courses || []).map((c) => ({
+      ...c,
+      courseName: courseMap.get(normCourseId(c.courseId)) || c.courseId,
+    })),
+    holidays: getHolidaysForMonth(calendarMonth),
+    adminOffDays: adminOffDays.filter((x) => monthKey(x.date) === calendarMonth),
+  })
+})
+
+router.get('/attendance/off-days', auth, allowRoles(['admin', 'teacher']), (req, res) => {
+  const month = String(req.query.month || '').trim()
+  const rows = loadJson(PATHS.adminOffDays, [])
+  const filtered = month ? rows.filter((x) => monthKey(x.date) === month) : rows
+  res.json({ offDays: filtered.slice().reverse() })
+})
+
+router.post('/attendance/off-days', auth, allowRoles(['admin']), (req, res) => {
+  const date = parseDate(req.body?.date)
+  const note = String(req.body?.note || '').trim()
+  if (!date) return res.status(400).json({ error: 'date is required' })
+  if (!note) return res.status(400).json({ error: 'note is required' })
+  const rows = loadJson(PATHS.adminOffDays, [])
+  const idx = rows.findIndex((x) => parseDate(x.date) === date)
+  const next = {
+    date,
+    note,
+    createdAt: new Date().toISOString(),
+    createdBy: req.auth.userId,
+  }
+  if (idx >= 0) rows[idx] = { ...rows[idx], ...next, updatedAt: new Date().toISOString() }
+  else rows.push(next)
+  saveJson(PATHS.adminOffDays, rows)
+  res.json({ success: true, offDay: next })
+})
+
+router.delete('/attendance/off-days/:date', auth, allowRoles(['admin']), (req, res) => {
+  const date = parseDate(req.params.date)
+  const rows = loadJson(PATHS.adminOffDays, [])
+  const next = rows.filter((x) => parseDate(x.date) !== date)
+  if (next.length === rows.length) return res.status(404).json({ error: 'Off day not found' })
+  saveJson(PATHS.adminOffDays, next)
+  res.json({ success: true })
+})
+
+/** Reconcile wallet pay-for-class rows into academy_attendance (present). */
+router.post('/attendance/sync-wallet', auth, allowRoles(['admin']), (_req, res) => {
+  const students = loadJson(PATHS.students, [])
+  const walletRows = loadJson(PATHS.walletAttendance, [])
+  const batches = loadJson(PATHS.batches, [])
+  const result = syncWalletHistoryToAcademy({ students, walletRows, batches })
+  res.json({ success: true, ...result })
 })
 
 // ===== Fees / Payments =====

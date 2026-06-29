@@ -18,15 +18,19 @@ import {
 } from "../labAccess.js";
 import { readJsonSync, writeJsonSync } from "../services/sheetsJsonStore.js";
 import {
-  computeSchoolDayStreak,
-  computeSchoolDayStreakInMonth,
   countSchoolDaysInMonth,
   getHolidaysForMonth,
   getHolidayInfo,
   isNonClassDay,
-  walletDatesForUser,
 } from "../lib/odishaCalendar.js";
 import { persistPaymentReceiptScreenshot } from "../services/googleProfileSync.js";
+import { upsertAcademyPresentFromWallet, mergeStudentAttendanceRecords } from "../lib/attendanceSync.js";
+import {
+  computeStudentAttendanceStats,
+  computeStudentStreak,
+  isExcludedClassDay,
+  parseDateOnly,
+} from "../lib/attendanceStats.js";
 
 const router = Router();
 const PRICE_PER_CLASS = 10;
@@ -49,6 +53,7 @@ const REFERRAL_PAYOUTS_PATH = join(__dirname, "..", "data", "referral_payouts.js
 const ENROLLMENTS_HISTORY_PATH = join(__dirname, "..", "data", "student_enrollments.json");
 const ADMISSIONS_QUEUE_PATH = join(__dirname, "..", "data", "enrollments.json");
 const ADMIN_ALERTS_PATH = join(__dirname, "..", "data", "admin_alerts.json");
+const ADMIN_OFF_DAYS_PATH = join(__dirname, "..", "data", "admin_off_days.json");
 const STUDENT_NOTIFICATIONS_PATH = join(__dirname, "..", "data", "student_notifications.json");
 const COURSE_UNLOCK_FEES = {
   dca: 499,
@@ -366,16 +371,6 @@ function monthlyAttendancePctForUser(rows, userId, month) {
   };
 }
 
-function computeCurrentStreak(walletRows, userId) {
-  const dates = walletDatesForUser(walletRows, userId);
-  return computeSchoolDayStreak(dates, today());
-}
-
-function computeStreakInMonth(walletRows, userId, month) {
-  const dates = walletDatesForUser(walletRows, userId);
-  return computeSchoolDayStreakInMonth(dates, month, today());
-}
-
 function computeMonthlyConductedAttendance({ attendanceRows, enrollments, studentId, month }) {
   const unlockStartByCourse = getUnlockStartByCourse(enrollments, studentId);
   if (unlockStartByCourse.size === 0) {
@@ -594,25 +589,37 @@ function buildStudentCompetitionMetrics({
   let attendancePct;
   let conductedCount;
   let presentCount;
-  if (isMonthly) {
-    const acc = computeMonthlyConductedAttendance({
-      attendanceRows: academyAttendanceRows,
-      enrollments: allEnrollments,
-      studentId: linkedStudent?.id,
-      month,
+  let streak = 0;
+  if (linkedStudent?.id) {
+    const adminOffDays = loadJson(ADMIN_OFF_DAYS_PATH);
+    const merged = mergeStudentAttendanceRecords({
+      student: linkedStudent,
+      authUserId: userId,
+      academyRows: academyAttendanceRows,
+      walletRows,
     });
-    attendancePct = acc.percentage;
-    conductedCount = acc.conductedCount;
-    presentCount = acc.presentCount;
+    const stats = computeStudentAttendanceStats({
+      student: linkedStudent,
+      attendanceRecords: merged,
+      enrollments: allEnrollments,
+      adminOffDays,
+      month: isMonthly ? month : null,
+      inferAbsentFromUnpaid: true,
+    });
+    attendancePct = stats.percentage;
+    conductedCount = stats.conducted;
+    presentCount = stats.attended;
+    streak = computeStudentStreak({
+      student: linkedStudent,
+      attendanceRecords: merged,
+      enrollments: allEnrollments,
+      adminOffDays,
+      month: isMonthly ? month : null,
+    });
   } else {
-    const acc = computeAttendanceFromConductedClasses({
-      attendanceRows: academyAttendanceRows,
-      enrollments: allEnrollments,
-      studentId: linkedStudent?.id,
-    });
-    attendancePct = acc.percentage;
-    conductedCount = acc.conductedCount;
-    presentCount = acc.presentCount;
+    attendancePct = 0;
+    conductedCount = 0;
+    presentCount = 0;
   }
 
   const totalClasses = isMonthly
@@ -620,10 +627,6 @@ function buildStudentCompetitionMetrics({
         .filter((r) => r.studentId === userId && monthKey(r.date) === month)
         .reduce((s, r) => s + (Number(r.classesCount) || 0), 0)
     : getTotalClassesFromWallet(userId);
-
-  const streak = isMonthly
-    ? computeStreakInMonth(walletRows, userId, month)
-    : computeCurrentStreak(walletRows, userId);
 
   return {
     userId,
@@ -950,6 +953,14 @@ router.post("/scan", studentAuth, (req, res) => {
     const status = result.error.includes("Insufficient") ? 400 : 500;
     return res.status(status).json({ error: result.error });
   }
+  if (student) {
+    upsertAcademyPresentFromWallet({
+      student,
+      courseId: validId,
+      date: d,
+      markedBy: result.vvipFree ? "wallet:vvip" : "wallet:auto",
+    });
+  }
   appendStudentNotification(
     studentId,
     result.vvipFree
@@ -1050,66 +1061,86 @@ function daysInMonthString(ym) {
   return new Date(y, m, 0).getDate();
 }
 
-/** Attendance for calendar comes from paid wallet classes only. */
+/** Attendance calendar: wallet pay = present; unpaid school days = absent. */
 router.get("/portal/attendance", studentAuth, (req, res) => {
   const month = String(req.query.month || monthKey(today()));
   const courseFilter = String(req.query.courseId || "").trim()
     ? normalizeCourseId(req.query.courseId)
     : "";
 
-  const walletRows = loadJson(WALLET_ATTENDANCE_PATH).filter(
-    (r) => r.studentId === req.auth.userId && monthKey(r.date) === month,
-  );
-  const filteredWallet = courseFilter
-    ? walletRows.filter((r) => normalizeCourseId(r.courseId) === courseFilter)
-    : walletRows;
+  const authUser = getUserById(req.auth.userId);
+  const student = resolveStudentRecord(authUser);
+  const walletRows = loadJson(WALLET_ATTENDANCE_PATH);
+  const academyRows = loadJson(ACADEMY_ATTENDANCE_PATH);
+  const enrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
+  const adminOffDays = loadJson(ADMIN_OFF_DAYS_PATH);
 
-  const dayMap = new Map();
+  const merged = student
+    ? mergeStudentAttendanceRecords({
+        student,
+        authUserId: req.auth.userId,
+        academyRows,
+        walletRows,
+      })
+    : walletRows
+        .filter((r) => r.studentId === req.auth.userId && (Number(r.classesCount) || 0) > 0)
+        .map((r) => ({
+          date: parseDateOnly(r.date),
+          courseId: r.courseId,
+          status: "present",
+          source: "wallet",
+        }));
 
-  for (const r of filteredWallet) {
-    const d = String(r.date || "").slice(0, 10);
-    if (!d) continue;
-    const cnt = Number(r.classesCount) || 0;
-    if (!dayMap.has(d)) {
-      dayMap.set(d, { classesCount: 0 });
-    }
-    const e = dayMap.get(d);
-    e.classesCount += cnt;
-  }
+  const scopedRecords = courseFilter
+    ? merged.filter((r) => normalizeCourseId(r.courseId) === courseFilter)
+    : merged;
+
+  const stats = student
+    ? computeStudentAttendanceStats({
+        student,
+        attendanceRecords: scopedRecords,
+        enrollments,
+        adminOffDays,
+        month,
+        inferAbsentFromUnpaid: true,
+      })
+    : { conducted: 0, attended: 0, absent: 0, percentage: 0, rangeStart: `${month}-01`, rangeEnd: `${month}-31` };
 
   const holidays = getHolidaysForMonth(month);
-  const holidayMap = new Map(holidays.map((h) => [h.date, h]));
-  for (const h of holidays) {
-    if (!holidayMap.has(h.date)) holidayMap.set(h.date, h);
-  }
+  const [y, m] = month.split("-").map(Number);
+  const dim = new Date(y, m, 0).getDate();
+  const presentDates = new Set(
+    scopedRecords.filter((r) => String(r.status) === "present").map((r) => parseDateOnly(r.date)),
+  );
 
-  const now = today();
-  const isCurrentMonth = month === monthKey(now);
-  const schoolDaysDenominator = countSchoolDaysInMonth(month, isCurrentMonth ? now : null);
-  const schoolDaysInMonth = countSchoolDaysInMonth(month);
-
-  let presentSchoolDays = 0;
   const attendance = [];
-
-  for (const [date, e] of [...dayMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const present = e.classesCount > 0;
+  for (let day = 1; day <= dim; day += 1) {
+    const date = `${month}-${String(day).padStart(2, "0")}`;
     const holiday = getHolidayInfo(date);
-    if (present && !isNonClassDay(date)) presentSchoolDays += 1;
+    const excluded = isExcludedClassDay(date, adminOffDays);
+    const inRange = date >= stats.rangeStart && date <= stats.rangeEnd;
+    const paid = presentDates.has(date);
+    let status = "none";
+    if (excluded) status = "off";
+    else if (paid) status = "present";
+    else if (inRange) status = "absent";
+    const classesCount = walletRows
+      .filter(
+        (r) =>
+          r.studentId === req.auth.userId &&
+          parseDateOnly(r.date) === date &&
+          (!courseFilter || normalizeCourseId(r.courseId) === courseFilter),
+      )
+      .reduce((sum, r) => sum + (Number(r.classesCount) || 0), 0);
     attendance.push({
       id: `day-${date}-${courseFilter || "all"}`,
       date,
-      status: present ? "present" : "none",
-      classesCount: e.classesCount,
-      isNonClassDay: isNonClassDay(date),
-      holiday: holiday
-        ? { name: holiday.name, type: holiday.type }
-        : null,
+      status,
+      classesCount,
+      isNonClassDay: excluded,
+      holiday: holiday ? { name: holiday.name, type: holiday.type } : null,
     });
   }
-
-  const monthlyPercentage = schoolDaysDenominator
-    ? Math.round((presentSchoolDays / schoolDaysDenominator) * 100)
-    : 0;
 
   res.json({
     studentId: req.auth.userId,
@@ -1117,13 +1148,14 @@ router.get("/portal/attendance", studentAuth, (req, res) => {
     courseId: courseFilter || null,
     attendance,
     holidays,
-    monthlyPercentage,
-    daysInMonth: daysInMonthString(month),
-    presentDaysCount: presentSchoolDays,
-    schoolDaysInMonth,
-    schoolDaysDenominator,
+    monthlyPercentage: stats.percentage,
+    daysInMonth: dim,
+    presentDaysCount: stats.attended,
+    absentDaysCount: stats.absent,
+    schoolDaysInMonth: stats.conducted,
+    schoolDaysDenominator: stats.conducted,
     calendarNote:
-      "Attendance % counts only school days (Mon–Sat excluding Odisha public holidays & festivals). Sunday is always a weekly holiday.",
+      "Present = paid for class/LAB (₹10 from wallet or VVIP). Absent = school day with no payment since your admission. Sundays, Odisha holidays, and admin off days are excluded.",
   });
 });
 
@@ -1677,12 +1709,28 @@ router.get("/portal/dashboard", studentAuth, (req, res) => {
   const walletRows = loadJson(WALLET_ATTENDANCE_PATH);
   const academyAttendanceRows = loadJson(ACADEMY_ATTENDANCE_PATH);
   const allEnrollments = loadJson(ENROLLMENTS_HISTORY_PATH);
-  const attendanceFromConducted = computeAttendanceFromConductedClasses({
-    attendanceRows: academyAttendanceRows,
-    enrollments: allEnrollments,
-    studentId: student?.id,
-  });
-  const attendancePct = attendanceFromConducted.percentage;
+  const adminOffDays = loadJson(ADMIN_OFF_DAYS_PATH);
+  let attendancePct = 0;
+  let lifetimeConducted = 0;
+  let lifetimePresent = 0;
+  if (student?.id) {
+    const merged = mergeStudentAttendanceRecords({
+      student,
+      authUserId: req.auth.userId,
+      academyRows: academyAttendanceRows,
+      walletRows,
+    });
+    const lifetimeStats = computeStudentAttendanceStats({
+      student,
+      attendanceRecords: merged,
+      enrollments: allEnrollments,
+      adminOffDays,
+      inferAbsentFromUnpaid: true,
+    });
+    attendancePct = lifetimeStats.percentage;
+    lifetimeConducted = lifetimeStats.conducted;
+    lifetimePresent = lifetimeStats.attended;
+  }
   const payouts = loadJson(REFERRAL_PAYOUTS_PATH).filter((p) => p.referrerUserId === req.auth.userId);
   const rewards = payouts.reduce((a, b) => a + (Number(b.amount) || 0), 0);
   const referralLinks = loadJson(REFERRAL_LINKS_PATH);
@@ -1804,8 +1852,8 @@ router.get("/portal/dashboard", studentAuth, (req, res) => {
     currentMonthLabel: monthLabel,
     scoreBreakdown: scoreBreakdownFromCards(filterChaseVisibleCards(achievementCardsAll)),
     scoreBreakdownMonth: scoreBreakdownFromCards(filterChaseVisibleCards(achievementCardsMonthAll)),
-    classesConductedCount: attendanceFromConducted.conductedCount,
-    classesPresentCount: attendanceFromConducted.presentCount,
+    classesConductedCount: lifetimeConducted,
+    classesPresentCount: lifetimePresent,
     attendancePercentageMonth: myMetricsMonth.attendancePct,
   });
 });

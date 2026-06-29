@@ -200,7 +200,9 @@ export default function Achievements() {
           <p className="text-2xl font-bold text-amber-300">
             {isMonth ? mini?.currentStreakMonth ?? 0 : mini?.currentStreak ?? 0}
           </p>
-          <p className="text-[10px] text-gray-500">school days (Sun & Odisha holidays excluded)</p>
+          <p className="text-[10px] text-gray-500">
+            school days since enrollment (Sun, Odisha holidays & admin off days excluded)
+          </p>
         </div>
       </div>
 
@@ -232,7 +234,8 @@ export default function Achievements() {
       {!isMonth && (
         <div className="mt-3 rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-gray-300">
           Attendance: <span className="text-white">{mini?.classesPresentCount ?? 0}</span> present out of{' '}
-          <span className="text-white">{mini?.classesConductedCount ?? 0}</span> classes since course unlock.
+          <span className="text-white">{mini?.classesConductedCount ?? 0}</span> school days since course enrollment
+          (Sundays, Odisha holidays & admin off days excluded).
           {' · '}
           <Link to="/student/referrals" className="text-violet-300 hover:underline">
             Refer friends to earn Growth Guide badges →
